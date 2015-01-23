@@ -114,7 +114,7 @@ void fsm_msgInitialize(Initialize *msg)
 	recovery_abort();
 	signing_abort();
 	RESP_INIT(Features);
-	resp->has_vendor = true;         strlcpy(resp->vendor, "bitcointrezor.com", sizeof(resp->vendor));
+	resp->has_vendor = true;         strlcpy(resp->vendor, "vertcointrezor.com", sizeof(resp->vendor));
 	resp->has_major_version = true;  resp->major_version = VERSION_MAJOR;
 	resp->has_minor_version = true;  resp->minor_version = VERSION_MINOR;
 	resp->has_patch_version = true;  resp->patch_version = VERSION_PATCH;

@@ -87,7 +87,7 @@ int cryptoMessageSign(const uint8_t *message, size_t message_len, const uint8_t 
 {
 	SHA256_CTX ctx;
 	sha256_Init(&ctx);
-	sha256_Update(&ctx, (const uint8_t *)"\x18" "Bitcoin Signed Message:" "\n", 25);
+	sha256_Update(&ctx, (const uint8_t *)"\x18" "Vertcoin Signed Message:" "\n", 25);
 	uint8_t varint[5];
 	uint32_t l = ser_length(message_len, varint);
 	sha256_Update(&ctx, varint, l);
@@ -127,7 +127,7 @@ int cryptoMessageVerify(const uint8_t *message, size_t message_len, const uint8_
 	uncompress_coords(recid % 2, &cp.x, &cp.y);
 	// calculate hash
 	sha256_Init(&ctx);
-	sha256_Update(&ctx, (const uint8_t *)"\x18" "Bitcoin Signed Message:" "\n", 25);
+	sha256_Update(&ctx, (const uint8_t *)"\x18" "Vertcoin Signed Message:" "\n", 25);
 	uint8_t varint[5];
 	uint32_t l = ser_length(message_len, varint);
 	sha256_Update(&ctx, varint, l);
@@ -200,7 +200,7 @@ int cryptoMessageEncrypt(curve_point *pubkey, const uint8_t *msg, size_t msg_siz
 	// generate keying bytes
 	uint8_t keying_bytes[80];
 	uint8_t salt[22 + 33 + 4];
-	memcpy(salt, "Bitcoin Secure Message", 22);
+	memcpy(salt, "Vertcoin Secure Message", 22);
 	memcpy(salt + 22, nonce, 33);
 	pbkdf2_hmac_sha256(shared_secret, 33, salt, 22 + 33, 2048, keying_bytes, 80, NULL);
 	// encrypt payload
@@ -232,7 +232,7 @@ int cryptoMessageDecrypt(curve_point *nonce, uint8_t *payload, size_t payload_le
 	// generate keying bytes
 	uint8_t keying_bytes[80];
 	uint8_t salt[22 + 33 + 4];
-	memcpy(salt, "Bitcoin Secure Message", 22);
+	memcpy(salt, "Vertcoin Secure Message", 22);
 	salt[22] = 0x02 | (nonce->y.val[0] & 0x01);
 	bn_write_be(&(nonce->x), salt + 23);
 	pbkdf2_hmac_sha256(shared_secret, 33, salt, 22 + 33, 2048, keying_bytes, 80, NULL);

@@ -600,7 +600,7 @@ extern const char SimpleSignTx_coin_name_default[17];
 #define Entropy_init_default                     {{0, {0}}}
 #define GetPublicKey_init_default                {0, {0, 0, 0, 0, 0, 0, 0, 0}}
 #define PublicKey_init_default                   {HDNodeType_init_default, false, ""}
-#define GetAddress_init_default                  {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "Bitcoin", false, 0, false, MultisigRedeemScriptType_init_default}
+#define GetAddress_init_default                  {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "Vertcoin", false, 0, false, MultisigRedeemScriptType_init_default}
 #define Address_init_default                     {""}
 #define WipeDevice_init_default                  {0}
 #define LoadDevice_init_default                  {false, "", false, HDNodeType_init_default, false, "", false, 0, false, "english", false, "", false, 0}
@@ -610,19 +610,19 @@ extern const char SimpleSignTx_coin_name_default[17];
 #define RecoveryDevice_init_default              {false, 0, false, 0, false, 0, false, "english", false, "", false, 0}
 #define WordRequest_init_default                 {0}
 #define WordAck_init_default                     {""}
-#define SignMessage_init_default                 {0, {0, 0, 0, 0, 0, 0, 0, 0}, {0, {0}}, false, "Bitcoin"}
+#define SignMessage_init_default                 {0, {0, 0, 0, 0, 0, 0, 0, 0}, {0, {0}}, false, "Vertcoin"}
 #define VerifyMessage_init_default               {false, "", false, {0, {0}}, false, {0, {0}}}
 #define MessageSignature_init_default            {false, "", false, {0, {0}}}
-#define EncryptMessage_init_default              {false, {0, {0}}, false, {0, {0}}, false, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "Bitcoin"}
+#define EncryptMessage_init_default              {false, {0, {0}}, false, {0, {0}}, false, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "Vertcoin"}
 #define EncryptedMessage_init_default            {false, {0, {0}}, false, {0, {0}}, false, {0, {0}}}
 #define DecryptMessage_init_default              {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, {0, {0}}, false, {0, {0}}, false, {0, {0}}}
 #define DecryptedMessage_init_default            {false, {0, {0}}, false, ""}
 #define CipherKeyValue_init_default              {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "", false, {0, {0}}, false, 0, false, 0, false, 0}
 #define CipheredKeyValue_init_default            {false, {0, {0}}}
-#define EstimateTxSize_init_default              {0, 0, false, "Bitcoin"}
+#define EstimateTxSize_init_default              {0, 0, false, "Vertcoin"}
 #define TxSize_init_default                      {false, 0}
-#define SignTx_init_default                      {0, 0, false, "Bitcoin"}
-#define SimpleSignTx_init_default                {0, {}, 0, {}, 0, {}, false, "Bitcoin"}
+#define SignTx_init_default                      {0, 0, false, "Vertcoin"}
+#define SimpleSignTx_init_default                {0, {}, 0, {}, 0, {}, false, "Vertcoin"}
 #define TxRequest_init_default                   {false, (RequestType)0, false, TxRequestDetailsType_init_default, false, TxRequestSerializedType_init_default}
 #define TxAck_init_default                       {false, TransactionType_init_default}
 #define FirmwareErase_init_default               {0}

@@ -3,16 +3,16 @@
 
 #include "messages.pb.h"
 
-const char GetAddress_coin_name_default[17] = "Bitcoin";
+const char GetAddress_coin_name_default[17] = "Vertcoin";
 const char LoadDevice_language_default[17] = "english";
 const uint32_t ResetDevice_strength_default = 128u;
 const char ResetDevice_language_default[17] = "english";
 const char RecoveryDevice_language_default[17] = "english";
-const char SignMessage_coin_name_default[17] = "Bitcoin";
-const char EncryptMessage_coin_name_default[17] = "Bitcoin";
-const char EstimateTxSize_coin_name_default[17] = "Bitcoin";
-const char SignTx_coin_name_default[17] = "Bitcoin";
-const char SimpleSignTx_coin_name_default[17] = "Bitcoin";
+const char SignMessage_coin_name_default[17] = "Vertcoin";
+const char EncryptMessage_coin_name_default[17] = "Vertcoin";
+const char EstimateTxSize_coin_name_default[17] = "Vertcoin";
+const char SignTx_coin_name_default[17] = "Vertcoin";
+const char SimpleSignTx_coin_name_default[17] = "Vertcoin";
 
 
 const pb_field_t Initialize_fields[1] = {

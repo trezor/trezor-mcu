@@ -1,7 +1,7 @@
 TREZOR Firmware
 ===============
 
-http://bitcointrezor.com/
+http://vertcointrezor.com/
 
 How to build Trezor firmware?
 -----------------------------
