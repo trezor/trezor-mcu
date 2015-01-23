@@ -247,7 +247,7 @@ static void send_msg_failure(usbd_device *dev)
 static void send_msg_features(usbd_device *dev)
 {
 	// send response: Features message (id 17), payload len 27
-		// vendor = "bitcointrezor.com"
+		// vendor = "vertcointrezor.com"
 		// major_version = VERSION_MAJOR
 		// minor_version = VERSION_MINOR
 		// patch_version = VERSION_PATCH
@@ -256,7 +256,7 @@ static void send_msg_features(usbd_device *dev)
 		"?##"				// header
 		"\x00\x11"			// msg_id
 		"\x00\x00\x00\x1b"	// payload_len
-		"\x0a\x11" "bitcointrezor.com\x10" VERSION_MAJOR_CHAR "\x18" VERSION_MINOR_CHAR " " VERSION_PATCH_CHAR "(\x01"		// data
+		"\x0a\x11" "vertcointrezor.com\x10" VERSION_MAJOR_CHAR "\x18" VERSION_MINOR_CHAR " " VERSION_PATCH_CHAR "(\x01"		// data
 		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 		, 64) != 64) {}
 }
