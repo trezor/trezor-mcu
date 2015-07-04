@@ -653,6 +653,8 @@ void fsm_msgVerifyMessage(VerifyMessage *msg)
 	layoutHome();
 }
 
+typedef int (*MessageSignType)(const uint8_t *message, size_t message_len, const uint8_t *privkey, uint8_t *signature);
+
 void fsm_msgSignIdentity(SignIdentity *msg)
 {
 	RESP_INIT(SignedIdentity);
@@ -706,19 +708,18 @@ void fsm_msgSignIdentity(SignIdentity *msg)
 	memcpy(message_bytes, msg->challenge_hidden.bytes, msg->challenge_hidden.size);
 	int message_size = msg->challenge_hidden.size;
 
-	int result = 0;
+	const int visual_length = strlen(msg->challenge_visual);
+	memcpy(message_bytes + message_size, msg->challenge_visual, visual_length);
+	message_size = message_size + visual_length;
+
+	layoutProgressSwipe("Signing", 0);
+
+	MessageSignType sign_func = cryptoMessageSign;
 	if (sign_ssh) {
-		// SSH doesn't sign visual challenge.
-		layoutProgressSwipe("Signing SSH", 0);
-		result = sshMessageSign(message_bytes, message_size, node->private_key, resp->signature.bytes);
-	} else {
-		const int len = strlen(msg->challenge_visual);
-		memcpy(message_bytes + message_size, msg->challenge_visual, len);
-		message_size = message_size + len;
-		layoutProgressSwipe("Signing", 0);
-		result = cryptoMessageSign(message_bytes, message_size, node->private_key, resp->signature.bytes);
+		sign_func = sshMessageSign;
 	}
 
+	int result = sign_func(message_bytes, message_size, node->private_key, resp->signature.bytes);
 	if (result == 0) {
 		if (sign_ssh) {
 			resp->has_address = false;
