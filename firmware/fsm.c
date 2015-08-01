@@ -229,6 +229,12 @@ void fsm_msgChangePin(ChangePin *msg)
 void fsm_msgWipeDevice(WipeDevice *msg)
 {
 	(void)msg;
+
+	if (!protectPin(true)) {
+		layoutHome();
+		return;
+	}
+
 	layoutDialogSwipe(DIALOG_ICON_QUESTION, "Cancel", "Confirm", NULL, "Do you really want to", "wipe the device?", NULL, "All data will be lost.", NULL, NULL);
 	if (!protectButton(ButtonRequestType_ButtonRequest_WipeDevice, false)) {
 		fsm_sendFailure(FailureType_Failure_ActionCancelled, "Wipe cancelled");
