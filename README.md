@@ -15,6 +15,16 @@ How to build TREZOR firmware?
 
 This creates file `output/trezor-TAG.bin` and prints its fingerprint at the last line of the build log.
 
+How to build TREZOR bootloader?
+-----------------------------
+
+1. Install Docker (from docker.com or from your distribution repositories)
+2. `git clone https://github.com/trezor/trezor-mcu.git`
+3. `cd trezor-mcu`
+4. `./bootloader-docker-build.sh`
+
+This creates file `output/bootloader.bin` and prints its fingerprint and size at the last line of the build log
+
 How to get fingerprint of firmware signed and distributed by SatoshiLabs?
 -------------------------------------------------------------------------
 
