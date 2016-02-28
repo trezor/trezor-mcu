@@ -18,4 +18,4 @@ echo "Bootloader fingerprint:"
 FILENAME=output/bootloader-$FIRMWARETAG.bin
 sha256sum $FILENAME
 FILESIZE=$(stat -c%s "$FILENAME")     
-echo "Bootloader size: $FILESIZE/32000 bytes"
+echo "Bootloader size: $FILESIZE/32768 bytes"
