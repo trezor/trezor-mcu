@@ -4,6 +4,7 @@
 #include "messages.pb.h"
 
 const char GetAddress_coin_name_default[17] = "Bitcoin";
+const InputScriptType GetAddress_script_type_default = InputScriptType_SPENDADDRESS;
 const char LoadDevice_language_default[17] = "english";
 const uint32_t ResetDevice_strength_default = 256u;
 const char ResetDevice_language_default[17] = "english";
@@ -141,11 +142,12 @@ const pb_field_t PublicKey_fields[3] = {
     PB_LAST_FIELD
 };
 
-const pb_field_t GetAddress_fields[5] = {
+const pb_field_t GetAddress_fields[6] = {
     PB_FIELD2(  1, UINT32  , REPEATED, STATIC  , FIRST, GetAddress, address_n, address_n, 0),
     PB_FIELD2(  2, STRING  , OPTIONAL, STATIC  , OTHER, GetAddress, coin_name, address_n, &GetAddress_coin_name_default),
     PB_FIELD2(  3, BOOL    , OPTIONAL, STATIC  , OTHER, GetAddress, show_display, coin_name, 0),
     PB_FIELD2(  4, MESSAGE , OPTIONAL, STATIC  , OTHER, GetAddress, multisig, show_display, &MultisigRedeemScriptType_fields),
+    PB_FIELD2(  5, ENUM    , OPTIONAL, STATIC  , OTHER, GetAddress, script_type, multisig, &GetAddress_script_type_default),
     PB_LAST_FIELD
 };
 
@@ -199,17 +201,19 @@ const pb_field_t EntropyAck_fields[2] = {
     PB_LAST_FIELD
 };
 
-const pb_field_t RecoveryDevice_fields[7] = {
+const pb_field_t RecoveryDevice_fields[8] = {
     PB_FIELD2(  1, UINT32  , OPTIONAL, STATIC  , FIRST, RecoveryDevice, word_count, word_count, 0),
     PB_FIELD2(  2, BOOL    , OPTIONAL, STATIC  , OTHER, RecoveryDevice, passphrase_protection, word_count, 0),
     PB_FIELD2(  3, BOOL    , OPTIONAL, STATIC  , OTHER, RecoveryDevice, pin_protection, passphrase_protection, 0),
     PB_FIELD2(  4, STRING  , OPTIONAL, STATIC  , OTHER, RecoveryDevice, language, pin_protection, &RecoveryDevice_language_default),
     PB_FIELD2(  5, STRING  , OPTIONAL, STATIC  , OTHER, RecoveryDevice, label, language, 0),
     PB_FIELD2(  6, BOOL    , OPTIONAL, STATIC  , OTHER, RecoveryDevice, enforce_wordlist, label, 0),
+    PB_FIELD2(  8, ENUM    , OPTIONAL, STATIC  , OTHER, RecoveryDevice, type, enforce_wordlist, 0),
     PB_LAST_FIELD
 };
 
-const pb_field_t WordRequest_fields[1] = {
+const pb_field_t WordRequest_fields[2] = {
+    PB_FIELD2(  1, ENUM    , OPTIONAL, STATIC  , FIRST, WordRequest, type, type, 0),
     PB_LAST_FIELD
 };
 

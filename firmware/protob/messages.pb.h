@@ -125,10 +125,6 @@ typedef struct _WipeDevice {
     uint8_t dummy_field;
 } WipeDevice;
 
-typedef struct _WordRequest {
-    uint8_t dummy_field;
-} WordRequest;
-
 typedef struct _Address {
     char address[36];
 } Address;
@@ -569,6 +565,8 @@ typedef struct _GetAddress {
     bool show_display;
     bool has_multisig;
     MultisigRedeemScriptType multisig;
+    bool has_script_type;
+    InputScriptType script_type;
 } GetAddress;
 
 typedef struct {
@@ -670,6 +668,8 @@ typedef struct _RecoveryDevice {
     char label[33];
     bool has_enforce_wordlist;
     bool enforce_wordlist;
+    bool has_type;
+    RecoveryDeviceType type;
 } RecoveryDevice;
 
 typedef struct _ResetDevice {
@@ -815,8 +815,14 @@ typedef struct _WordAck {
     char word[12];
 } WordAck;
 
+typedef struct _WordRequest {
+    bool has_type;
+    WordRequestType type;
+} WordRequest;
+
 /* Default values for struct fields */
 extern const char GetAddress_coin_name_default[17];
+extern const InputScriptType GetAddress_script_type_default;
 extern const char LoadDevice_language_default[17];
 extern const uint32_t ResetDevice_strength_default;
 extern const char ResetDevice_language_default[17];
@@ -853,7 +859,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define Entropy_init_default                     {{0, {0}}}
 #define GetPublicKey_init_default                {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "", false, 0}
 #define PublicKey_init_default                   {HDNodeType_init_default, false, ""}
-#define GetAddress_init_default                  {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "Bitcoin", false, 0, false, MultisigRedeemScriptType_init_default}
+#define GetAddress_init_default                  {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "Bitcoin", false, 0, false, MultisigRedeemScriptType_init_default, false, InputScriptType_SPENDADDRESS}
 #define EthereumGetAddress_init_default          {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
 #define Address_init_default                     {""}
 #define EthereumAddress_init_default             {{0, {0}}}
@@ -862,8 +868,8 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define ResetDevice_init_default                 {false, 0, false, 256u, false, 0, false, 0, false, "english", false, ""}
 #define EntropyRequest_init_default              {0}
 #define EntropyAck_init_default                  {false, {0, {0}}}
-#define RecoveryDevice_init_default              {false, 0, false, 0, false, 0, false, "english", false, "", false, 0}
-#define WordRequest_init_default                 {0}
+#define RecoveryDevice_init_default              {false, 0, false, 0, false, 0, false, "english", false, "", false, 0, false, (RecoveryDeviceType)0}
+#define WordRequest_init_default                 {false, (WordRequestType)0}
 #define WordAck_init_default                     {""}
 #define SignMessage_init_default                 {0, {0, 0, 0, 0, 0, 0, 0, 0}, {0, {0}}, false, "Bitcoin"}
 #define VerifyMessage_init_default               {false, "", false, {0, {0}}, false, {0, {0}}, false, "Bitcoin"}
@@ -919,7 +925,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define Entropy_init_zero                        {{0, {0}}}
 #define GetPublicKey_init_zero                   {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "", false, 0}
 #define PublicKey_init_zero                      {HDNodeType_init_zero, false, ""}
-#define GetAddress_init_zero                     {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "", false, 0, false, MultisigRedeemScriptType_init_zero}
+#define GetAddress_init_zero                     {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "", false, 0, false, MultisigRedeemScriptType_init_zero, false, (InputScriptType)0}
 #define EthereumGetAddress_init_zero             {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
 #define Address_init_zero                        {""}
 #define EthereumAddress_init_zero                {{0, {0}}}
@@ -928,8 +934,8 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define ResetDevice_init_zero                    {false, 0, false, 0, false, 0, false, 0, false, "", false, ""}
 #define EntropyRequest_init_zero                 {0}
 #define EntropyAck_init_zero                     {false, {0, {0}}}
-#define RecoveryDevice_init_zero                 {false, 0, false, 0, false, 0, false, "", false, "", false, 0}
-#define WordRequest_init_zero                    {0}
+#define RecoveryDevice_init_zero                 {false, 0, false, 0, false, 0, false, "", false, "", false, 0, false, (RecoveryDeviceType)0}
+#define WordRequest_init_zero                    {false, (WordRequestType)0}
 #define WordAck_init_zero                        {""}
 #define SignMessage_init_zero                    {0, {0, 0, 0, 0, 0, 0, 0, 0}, {0, {0}}, false, ""}
 #define VerifyMessage_init_zero                  {false, "", false, {0, {0}}, false, {0, {0}}, false, ""}
@@ -1064,6 +1070,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define GetAddress_coin_name_tag                 2
 #define GetAddress_show_display_tag              3
 #define GetAddress_multisig_tag                  4
+#define GetAddress_script_type_tag               5
 #define GetECDHSessionKey_identity_tag           1
 #define GetECDHSessionKey_peer_public_key_tag    2
 #define GetECDHSessionKey_ecdsa_curve_name_tag   3
@@ -1095,6 +1102,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define RecoveryDevice_language_tag              4
 #define RecoveryDevice_label_tag                 5
 #define RecoveryDevice_enforce_wordlist_tag      6
+#define RecoveryDevice_type_tag                  8
 #define ResetDevice_display_random_tag           1
 #define ResetDevice_strength_tag                 2
 #define ResetDevice_passphrase_protection_tag    3
@@ -1134,6 +1142,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define VerifyMessage_message_tag                3
 #define VerifyMessage_coin_name_tag              4
 #define WordAck_word_tag                         1
+#define WordRequest_type_tag                     1
 
 /* Struct field encoding specification for nanopb */
 extern const pb_field_t Initialize_fields[1];
@@ -1156,7 +1165,7 @@ extern const pb_field_t GetEntropy_fields[2];
 extern const pb_field_t Entropy_fields[2];
 extern const pb_field_t GetPublicKey_fields[4];
 extern const pb_field_t PublicKey_fields[3];
-extern const pb_field_t GetAddress_fields[5];
+extern const pb_field_t GetAddress_fields[6];
 extern const pb_field_t EthereumGetAddress_fields[3];
 extern const pb_field_t Address_fields[2];
 extern const pb_field_t EthereumAddress_fields[2];
@@ -1165,8 +1174,8 @@ extern const pb_field_t LoadDevice_fields[8];
 extern const pb_field_t ResetDevice_fields[7];
 extern const pb_field_t EntropyRequest_fields[1];
 extern const pb_field_t EntropyAck_fields[2];
-extern const pb_field_t RecoveryDevice_fields[7];
-extern const pb_field_t WordRequest_fields[1];
+extern const pb_field_t RecoveryDevice_fields[8];
+extern const pb_field_t WordRequest_fields[2];
 extern const pb_field_t WordAck_fields[2];
 extern const pb_field_t SignMessage_fields[4];
 extern const pb_field_t VerifyMessage_fields[5];
@@ -1224,7 +1233,7 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 #define Entropy_size                             1027
 #define GetPublicKey_size                        84
 #define PublicKey_size                           (121 + HDNodeType_size)
-#define GetAddress_size                          (75 + MultisigRedeemScriptType_size)
+#define GetAddress_size                          (81 + MultisigRedeemScriptType_size)
 #define EthereumGetAddress_size                  50
 #define Address_size                             38
 #define EthereumAddress_size                     22
@@ -1233,8 +1242,8 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 #define ResetDevice_size                         66
 #define EntropyRequest_size                      0
 #define EntropyAck_size                          131
-#define RecoveryDevice_size                      66
-#define WordRequest_size                         0
+#define RecoveryDevice_size                      72
+#define WordRequest_size                         6
 #define WordAck_size                             14
 #define SignMessage_size                         1094
 #define VerifyMessage_size                       1151

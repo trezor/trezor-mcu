@@ -2,6 +2,7 @@
  * This file is part of the TREZOR project.
  *
  * Copyright (C) 2014 Pavol Rusnak <stick@satoshilabs.com>
+ * Copyright (C) 2016 Jochen Hoenicke <hoenicke@gmail.com>
  *
  * This library is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -22,8 +23,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "types.pb.h"
 
-void recovery_init(uint32_t _word_count, bool passphrase_protection, bool pin_protection, const char *language, const char *label, bool _enforce_wordlist);
+void recovery_init(uint32_t _word_count, bool passphrase_protection, bool pin_protection, const char *language, const char *label, bool _enforce_wordlist, uint32 type);
 void recovery_word(const char *word);
 void recovery_abort(void);
 const char *recovery_get_fake_word(void);
