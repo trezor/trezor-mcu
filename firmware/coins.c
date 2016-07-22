@@ -22,13 +22,14 @@
 
 // filled CoinType Protobuf structure defined in https://github.com/trezor/trezor-common/blob/master/protob/types.proto#L133
 const CoinType coins[COINS_COUNT] = {
-	{true, "Bitcoin",  true, "BTC",  true,   0, true,     100000, true,   5, true,  6, true, 10, true, "\x18" "Bitcoin Signed Message:\n"},
-	{true, "Testnet",  true, "TEST", true, 111, true,   10000000, true, 196, true,  3, true, 40, true, "\x18" "Bitcoin Signed Message:\n"},
-	{true, "Namecoin", true, "NMC",  true,  52, true,   10000000, true,   5, false, 0, false, 0, true, "\x19" "Namecoin Signed Message:\n"},
-	{true, "Litecoin", true, "LTC",  true,  48, true,    1000000, true,   5, false, 0, false, 0, true, "\x19" "Litecoin Signed Message:\n"},
-	{true, "Dogecoin", true, "DOGE", true,  30, true, 1000000000, true,  22, false, 0, false, 0, true, "\x19" "Dogecoin Signed Message:\n"},
-	{true, "Dash",     true, "DASH", true,  76, true,     100000, true,  16, false, 0, false, 0, true, "\x19" "DarkCoin Signed Message:\n"},
-	{true, "Zcash",    true, "ZEC",  true,  65, true,    1000000, true,   5, false, 0, false, 0, true, "\x16" "Zcash Signed Message:\n"},
+	{true, "Bitcoin",  true, "BTC",   true,   0, true,     100000, true,   5, true,  6, true, 10, true, "\x18" "Bitcoin Signed Message:\n"},
+	{true, "Testnet",  true, "TEST",  true, 111, true,   10000000, true, 196, true,  3, true, 40, true, "\x18" "Bitcoin Signed Message:\n"},
+	{true, "Namecoin", true, "NMC",   true,  52, true,   10000000, true,   5, false, 0, false, 0, true, "\x19" "Namecoin Signed Message:\n"},
+	{true, "Litecoin", true, "LTC",   true,  48, true,    1000000, true,   5, false, 0, false, 0, true, "\x19" "Litecoin Signed Message:\n"},
+	{true, "Dogecoin", true, "DOGE",  true,  30, true, 1000000000, true,  22, false, 0, false, 0, true, "\x19" "Dogecoin Signed Message:\n"},
+	{true, "Dash",     true, "DASH",  true,  76, true,     100000, true,  16, false, 0, false, 0, true, "\x19" "DarkCoin Signed Message:\n"},
+	{true, "Zcash",    true, "ZEC",   true,  65, true,    1000000, true,   5, false, 0, false, 0, true, "\x16" "Zcash Signed Message:\n"},
+	{true, "tDash",    true, "TDASH", true, 140, true,     100000, true,  19, false, 0, false, 0, true, "\x19" "DarkCoin Signed Message:\n"},
 };
 
 const CoinType *coinByShortcut(const char *shortcut)
