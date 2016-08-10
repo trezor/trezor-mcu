@@ -25,6 +25,7 @@
 #include "debug.h"
 #include "messages.h"
 #include "u2f.h"
+#include "ccid.h"
 #include "storage.h"
 #include "util.h"
 #include "timer.h"
@@ -33,8 +34,10 @@
 #if DEBUG_LINK
 #define USB_INTERFACE_INDEX_DEBUG 1
 #define USB_INTERFACE_INDEX_U2F 2
+#define USB_INTERFACE_INDEX_CCID 3
 #else
 #define USB_INTERFACE_INDEX_U2F 1
+#define USB_INTERFACE_INDEX_CCID 2
 #endif
 
 #define ENDPOINT_ADDRESS_IN         (0x81)
@@ -43,6 +46,9 @@
 #define ENDPOINT_ADDRESS_DEBUG_OUT  (0x02)
 #define ENDPOINT_ADDRESS_U2F_IN     (0x83)
 #define ENDPOINT_ADDRESS_U2F_OUT    (0x03)
+// TODO: invalid endpoint, provide mechanism to cope with lack of endpoints
+#define ENDPOINT_ADDRESS_CCID_IN    (0x84)
+#define ENDPOINT_ADDRESS_CCID_OUT   (0x04)
 
 static const struct usb_device_descriptor dev_descr = {
 	.bLength = USB_DT_DEVICE_SIZE,
@@ -158,6 +164,31 @@ static const struct {
 	}
 };
 
+static const struct usb_ccid_descriptor ccid_descriptor = {
+	.bLength = sizeof(ccid_descriptor),
+	.bDescriptorType = USB_DT_HID,
+	.bcdCCID = 0x0110,
+	.bMaxSlotIndex = 0,
+	.bVoltageSupport = 0x2,
+	.dwProtocols = 0x02,
+	.dwDefaultClock = 3580,
+	.dwMaximumClock = 3580,
+	.bNumClockSupported = 0,
+	.dwDataRate = 9600,
+	.dwMaxDataRate = 9600,
+	.bNumDataRatesSupported = 0,
+	.dwMaxIFSD = 0xFE,
+	.dwSynchProtocols = 0,
+	.dwMechanical = 0,
+	.dwFeatures = 0x00020000 | 0x00000040 | 0x00000020 | 0x00000010 | 0x00000008 | 0x00000004 | 0x00000002,
+	.dwMaxCCIDMessageLength = 0x10F,
+	.bClassGetResponse = 0xFF,
+	.bClassEnvelope = 0xFF,
+	.wLcdLayout = 0,
+	.bPINSupport = 0,
+	.bMaxCCIDBusySlots = 1
+};
+
 
 static const struct usb_endpoint_descriptor hid_endpoints[2] = {{
 	.bLength = USB_DT_ENDPOINT_SIZE,
@@ -221,6 +252,34 @@ static const struct usb_interface_descriptor hid_iface_u2f[] = {{
 	.extralen = sizeof(hid_function_u2f),
 }};
 
+static const struct usb_endpoint_descriptor ccid_endpoints[2] = {{
+	.bLength = USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType = USB_DT_ENDPOINT,
+	.bEndpointAddress = ENDPOINT_ADDRESS_CCID_IN,
+	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
+	.wMaxPacketSize = 64,
+}, {
+	.bLength = USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType = USB_DT_ENDPOINT,
+	.bEndpointAddress = ENDPOINT_ADDRESS_CCID_OUT,
+	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
+	.wMaxPacketSize = 64,
+}};
+
+static const struct usb_interface_descriptor ccid_iface[] = {{
+	.bLength = USB_DT_INTERFACE_SIZE,
+	.bDescriptorType = USB_DT_INTERFACE,
+	.bInterfaceNumber = USB_INTERFACE_INDEX_CCID,
+	.bAlternateSetting = 0,
+	.bNumEndpoints = 2,
+	.bInterfaceClass = USB_CLASS_CSCID,
+	.bInterfaceSubClass = 0,
+	.bInterfaceProtocol = 0,
+	.iInterface = 0,
+	.endpoint = ccid_endpoints,
+	.extra = &ccid_descriptor,
+	.extralen = sizeof(ccid_descriptor),
+}};
 #if DEBUG_LINK
 static const struct usb_endpoint_descriptor hid_endpoints_debug[2] = {{
 	.bLength = USB_DT_ENDPOINT_SIZE,
@@ -265,6 +324,9 @@ static const struct usb_interface ifaces[] = {{
 }, {
     .num_altsetting = 1,
     .altsetting = hid_iface_u2f,
+}, {
+	.num_altsetting = 1,
+	.altsetting = ccid_iface,
 }};
 
 static const struct usb_config_descriptor config = {
@@ -272,9 +334,9 @@ static const struct usb_config_descriptor config = {
 	.bDescriptorType = USB_DT_CONFIGURATION,
 	.wTotalLength = 0,
 #if DEBUG_LINK
-	.bNumInterfaces = 3,
+	.bNumInterfaces = 4,
 #else
-	.bNumInterfaces = 2,
+	.bNumInterfaces = 3,
 #endif
 	.bConfigurationValue = 1,
 	.iConfiguration = 0,
@@ -346,6 +408,16 @@ static void hid_u2f_rx_callback(usbd_device *dev, uint8_t ep)
 	u2fhid_read(tiny, (const U2FHID_FRAME *) (void*) buf);
 }
 
+static void ccid_rx_callback(usbd_device *dev, uint8_t ep)
+{
+	(void)ep;
+	static uint8_t buf[64] __attribute__ ((aligned(4)));
+	static struct ccid_header *header = (struct ccid_header *) buf;
+
+	uint16_t size = usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_CCID_OUT, buf, sizeof(buf));
+	if (size != sizeof(*header) + header->dwLength) return;
+}
+
 #if DEBUG_LINK
 static void hid_debug_rx_callback(usbd_device *dev, uint8_t ep)
 {
@@ -361,7 +433,7 @@ static void hid_debug_rx_callback(usbd_device *dev, uint8_t ep)
 }
 #endif
 
-static void hid_set_config(usbd_device *dev, uint16_t wValue)
+static void usb_set_config(usbd_device *dev, uint16_t wValue)
 {
 	(void)wValue;
 
@@ -369,6 +441,8 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue)
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, hid_rx_callback);
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_U2F_IN,  USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_U2F_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, hid_u2f_rx_callback);
+	usbd_ep_setup(dev, ENDPOINT_ADDRESS_CCID_IN,  USB_ENDPOINT_ATTR_BULK, 64, 0);
+	usbd_ep_setup(dev, ENDPOINT_ADDRESS_CCID_OUT, USB_ENDPOINT_ATTR_BULK, 64, ccid_rx_callback);
 #if DEBUG_LINK
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_DEBUG_IN,  USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_DEBUG_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, hid_debug_rx_callback);
@@ -382,12 +456,12 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue)
 }
 
 static usbd_device *usbd_dev;
-static uint8_t usbd_control_buffer[128];
+static uint8_t usbd_control_buffer[150];
 
 void usbInit(void)
 {
 	usbd_dev = usbd_init(&otgfs_usb_driver, &dev_descr, &config, usb_strings, 3, usbd_control_buffer, sizeof(usbd_control_buffer));
-	usbd_register_set_config_callback(usbd_dev, hid_set_config);
+	usbd_register_set_config_callback(usbd_dev, usb_set_config);
 }
 
 void usbPoll(void)
