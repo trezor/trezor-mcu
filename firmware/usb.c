@@ -42,13 +42,18 @@
 
 #define ENDPOINT_ADDRESS_IN         (0x81)
 #define ENDPOINT_ADDRESS_OUT        (0x01)
-#define ENDPOINT_ADDRESS_DEBUG_IN   (0x82)
-#define ENDPOINT_ADDRESS_DEBUG_OUT  (0x02)
-#define ENDPOINT_ADDRESS_U2F_IN     (0x83)
-#define ENDPOINT_ADDRESS_U2F_OUT    (0x03)
+#define ENDPOINT_ADDRESS_U2F_IN     (0x82)
+#define ENDPOINT_ADDRESS_U2F_OUT    (0x02)
+#if DEBUG_LINK
+#define ENDPOINT_ADDRESS_DEBUG_IN   (0x83)
+#define ENDPOINT_ADDRESS_DEBUG_OUT  (0x03)
 // TODO: invalid endpoint, provide mechanism to cope with lack of endpoints
 #define ENDPOINT_ADDRESS_CCID_IN    (0x84)
 #define ENDPOINT_ADDRESS_CCID_OUT   (0x04)
+#else
+#define ENDPOINT_ADDRESS_CCID_IN    (0x83)
+#define ENDPOINT_ADDRESS_CCID_OUT   (0x03)
+#endif
 
 static const struct usb_device_descriptor dev_descr = {
 	.bLength = USB_DT_DEVICE_SIZE,
