@@ -25,6 +25,28 @@
 #define USB_CLASS_CSCID 0x0b
 
 
+// CCID command handling macros
+#define CCID_HANDLER(type, request, buf)  \
+	void PC_to_RDR_ ## type(struct PC_to_RDR_ ## type *request, const uint8_t *buf)
+
+#define CCID_HANDLER_INIT(type)  CCID_HANDLER(type, /* */, /* */)
+
+#define CCID_HANDLER_TEST(type)  \
+	case PC_to_RDR_ ## type ## _Type:  \
+		PC_to_RDR_ ## type((struct PC_to_RDR_ ## type *) header, buf);  \
+		break
+
+#define CCID_CAST_RESPONSE(type)  \
+	struct RDR_to_PC_ ## type *response = (struct RDR_to_PC_ ## type *) request;  \
+	*response = (struct RDR_to_PC_ ## type) {  \
+		.bMessageType = RDR_to_PC_ ## type ## _Type,  \
+		.bSlot = request->bSlot,  \
+		.bSeq = request->bSeq  \
+	}
+
+#define CCID_TX(response)  ccid_tx((response), sizeof(struct ccid_header) + (response)->dwLength)
+
+
 struct usb_ccid_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
@@ -56,6 +78,12 @@ struct ccid_header {
 	uint8_t  bSlot;
 	uint8_t  bSeq;
 	uint8_t  reserved[3];
+} __attribute__((packed));
+
+struct ccid_slot_status {
+	unsigned int bmICCStatus     : 2;
+	unsigned int bmRFU           : 4;
+	unsigned int bmCommandStatus : 2;
 } __attribute__((packed));
 
 void ccid_read(struct ccid_header *header, const uint8_t *buf);
