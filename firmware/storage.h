@@ -68,6 +68,7 @@ bool storage_isInitialized(void);
 
 extern Storage storage;
 
+extern uint32_t storage_uuid[12/sizeof(uint32_t)];
 extern char storage_uuid_str[25];
 
 #endif

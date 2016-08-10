@@ -109,6 +109,16 @@ struct PC_to_RDR_GetSlotStatus {
 	uint8_t  abRFU[3];
 } __attribute__((packed));
 
+#define PC_to_RDR_XfrBlock_Type 0x6F
+struct PC_to_RDR_XfrBlock {
+	uint8_t  bMessageType;
+	uint32_t dwLength;
+	uint8_t  bSlot;
+	uint8_t  bSeq;
+	uint8_t  bBWI;
+	uint16_t wLevelParameter;
+} __attribute__((packed));
+
 #define RDR_to_PC_DataBlock_Type 0x80
 struct RDR_to_PC_DataBlock {
 	uint8_t  bMessageType;
