@@ -58,4 +58,6 @@ struct ccid_header {
 	uint8_t  reserved[3];
 } __attribute__((packed));
 
+void ccid_read(struct ccid_header *header, const uint8_t *buf);
+
 #endif
