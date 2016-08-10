@@ -510,3 +510,7 @@ void usbSleep(uint32_t millis)
 		usbd_poll(usbd_dev);
 	}
 }
+
+uint16_t ccid_tx(void *tx, uint16_t len) {
+	return usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_CCID_IN, tx, len);
+}

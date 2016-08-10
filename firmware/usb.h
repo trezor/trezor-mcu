@@ -20,10 +20,14 @@
 #ifndef __USB_H__
 #define __USB_H__
 
+#include <stdint.h>
+
 void usbInit(void);
 void usbPoll(void);
 void usbReconnect(void);
 char usbTiny(char set);
 void usbSleep(uint32_t millis);
+
+uint16_t ccid_tx(void *tx, uint16_t len);
 
 #endif

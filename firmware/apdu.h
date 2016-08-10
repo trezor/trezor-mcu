@@ -17,43 +17,13 @@
  * along with this library.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef __APDU_H__
+#define __APDU_H__
 
-#include "usb.h"
-#include "ccid.h"
-#include "debug.h"
+#include <stdint.h>
 
+// APDU ICC Answer-To-Reset
+#define APDU_ICC_ATR  0x3B, 0x00
+#define APDU_ICC_ATR_SIZE  sizeof((uint8_t []) { APDU_ICC_ATR })
 
-CCID_HANDLER_INIT(IccPowerOn);
-
-void ccid_read(struct ccid_header *header, const uint8_t *buf) {
-	switch (header->bMessageType) {
-	CCID_HANDLER_TEST(IccPowerOn);
-
-	default:
-		debugLog(0, "", "ccid_rx_callback");
-		break;
-	}
-}
-
-CCID_HANDLER(IccPowerOn, request, buf) {
-	(void) buf;
-	debugLog(0, "", __func__);
-
-	static struct RDR_to_PC_DataBlock response = {
-		.bMessageType = RDR_to_PC_DataBlock_Type,
-		.dwLength = APDU_ICC_ATR_SIZE,
-		.bStatus = {
-			.bmICCStatus = 0,
-			.bmRFU = 0,
-			.bmCommandStatus = 0
-		},
-		.bError = 0,
-		.bChainParameter = 0,
-		.abData = { APDU_ICC_ATR }
-	};
-
-	response.bSlot = request->bSlot;
-	response.bSeq = request->bSeq;
-
-	CCID_TX(&response);
-}
+#endif

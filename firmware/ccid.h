@@ -20,6 +20,7 @@
 #ifndef __CCID_H__
 #define __CCID_H__
 
+#include "apdu.h"
 #include <stdint.h>
 
 #define USB_CLASS_CSCID 0x0b
@@ -87,5 +88,27 @@ struct ccid_slot_status {
 } __attribute__((packed));
 
 void ccid_read(struct ccid_header *header, const uint8_t *buf);
+
+#define PC_to_RDR_IccPowerOn_Type 0x62
+struct PC_to_RDR_IccPowerOn {
+	uint8_t  bMessageType;
+	uint32_t dwLength;
+	uint8_t  bSlot;
+	uint8_t  bSeq;
+	uint8_t  bPowerSelect;
+	uint8_t  abRFU[2];
+} __attribute__((packed));
+
+#define RDR_to_PC_DataBlock_Type 0x80
+struct RDR_to_PC_DataBlock {
+	uint8_t  bMessageType;
+	uint32_t dwLength;
+	uint8_t  bSlot;
+	uint8_t  bSeq;
+	struct ccid_slot_status bStatus;
+	uint8_t  bError;
+	uint8_t  bChainParameter;
+	uint8_t  abData[33];
+} __attribute__((packed));
 
 #endif
