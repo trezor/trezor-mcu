@@ -99,6 +99,16 @@ struct PC_to_RDR_IccPowerOn {
 	uint8_t  abRFU[2];
 } __attribute__((packed));
 
+#define PC_to_RDR_IccPowerOff_Type 0x63
+#define PC_to_RDR_GetSlotStatus_Type 0x65
+struct PC_to_RDR_GetSlotStatus {
+	uint8_t  bMessageType;
+	uint32_t dwLength;
+	uint8_t  bSlot;
+	uint8_t  bSeq;
+	uint8_t  abRFU[3];
+} __attribute__((packed));
+
 #define RDR_to_PC_DataBlock_Type 0x80
 struct RDR_to_PC_DataBlock {
 	uint8_t  bMessageType;
@@ -109,6 +119,17 @@ struct RDR_to_PC_DataBlock {
 	uint8_t  bError;
 	uint8_t  bChainParameter;
 	uint8_t  abData[33];
+} __attribute__((packed));
+
+#define RDR_to_PC_SlotStatus_Type 0x81
+struct RDR_to_PC_SlotStatus {
+	uint8_t  bMessageType;
+	uint32_t dwLength;
+	uint8_t  bSlot;
+	uint8_t  bSeq;
+	struct ccid_slot_status bStatus;
+	uint8_t  bError;
+	uint8_t  bClockStatus;
 } __attribute__((packed));
 
 #endif

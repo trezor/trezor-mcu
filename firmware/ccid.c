@@ -24,10 +24,15 @@
 
 
 CCID_HANDLER_INIT(IccPowerOn);
+CCID_HANDLER_INIT(GetSlotStatus);
 
 void ccid_read(struct ccid_header *header, const uint8_t *buf) {
 	switch (header->bMessageType) {
 	CCID_HANDLER_TEST(IccPowerOn);
+
+	case PC_to_RDR_IccPowerOff_Type:
+		debugLog(0, "", "PC_to_RDR_IccPowerOff");
+	CCID_HANDLER_TEST(GetSlotStatus);
 
 	default:
 		debugLog(0, "", "ccid_rx_callback");
@@ -56,4 +61,11 @@ CCID_HANDLER(IccPowerOn, request, buf) {
 	response.bSeq = request->bSeq;
 
 	CCID_TX(&response);
+}
+
+CCID_HANDLER(GetSlotStatus, request, buf) {
+	(void) buf;
+	// debugLog(0, "", __func__);
+	CCID_CAST_RESPONSE(SlotStatus);
+	CCID_TX(response);
 }
