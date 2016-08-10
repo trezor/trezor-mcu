@@ -138,7 +138,7 @@ CCID_HANDLER(XfrBlock, request, apdu) {
 		default:
 			debugLog(0, "", "APDU unmatched");
 			APDU_RETURN(response, NOT_SUPPORTED);
-			return;
+			break;
 		}
 	}
 
