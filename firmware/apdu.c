@@ -50,7 +50,10 @@ const struct APDU_ICC_DO_PW_STATUS APDU_PGP_PW_STATUS = {
 		.type = 0x0
 	},
 	.RC = 0,
-	.PW3 = { 0, 0x0 },
+	.PW3 = {
+		.length = PGP_PW3_LENGTH,
+		.type = 0x0
+	},
 	.counter = { 3, 0, 0 },
 
 	.status = { APDU_SUCCESS }

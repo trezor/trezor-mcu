@@ -21,7 +21,10 @@
 #include "usb.h"
 #include "ccid.h"
 #include "debug.h"
+#include "layout2.h"
 #include "storage.h"
+#include "protect.h"
+#include "pinmatrix.h"
 
 #include <string.h>
 
@@ -29,7 +32,7 @@ CCID_HANDLER_INIT(IccPowerOn);
 CCID_HANDLER_INIT(GetSlotStatus);
 CCID_HANDLER_INIT(XfrBlock);
 
-void ccid_read(struct ccid_header *header, const uint8_t *buf) {
+void ccid_read(struct ccid_header *header, uint8_t *buf) {
 	switch (header->bMessageType) {
 	CCID_HANDLER_TEST(IccPowerOn);
 
@@ -75,8 +78,17 @@ CCID_HANDLER(GetSlotStatus, request, buf) {
 	CCID_TX(response);
 }
 
-CCID_HANDLER(XfrBlock, request, apdu) {
+CCID_HANDLER(XfrBlock, request, buf) {
+	const struct APDU_REQUEST *apdu = (struct APDU_REQUEST *) buf;
+	const uint8_t *data = &buf[sizeof(*apdu)];
 	debugLog(0, "", __func__);
+
+	if (apdu->Lc != request->dwLength - sizeof(*apdu)) {
+		// Attempted attack?
+		debugLog(0, "", "APDU: Invalid Length!");
+		return;
+	}
+
 	static struct RDR_to_PC_DataBlock response = {
 		.bMessageType = RDR_to_PC_DataBlock_Type,
 		.bStatus = {
@@ -104,10 +116,10 @@ CCID_HANDLER(XfrBlock, request, apdu) {
 	response.bSlot = request->bSlot;
 	response.bSeq = request->bSeq;
 
-	if (APDU_CHECK(apdu, request->dwLength, APDU_PGP_COMMAND_SELECT)) {
+	if (APDU_CHECK(buf, request->dwLength, APDU_PGP_COMMAND_SELECT)) {
 		APDU_RETURN(response, SUCCESS);
-	} else if (apdu[1] == APDU_GET_DATA) {
-		uint16_t tag = (apdu[2] << 8) + apdu[3];
+	} else if (apdu->INS == APDU_GET_DATA) {
+		uint16_t tag = (apdu->P1 << 8) + apdu->P2;
 		switch (tag) {
 		APDU_DATA_OBJECT(AID);
 		APDU_DATA_OBJECT(PW_STATUS);
@@ -115,8 +127,8 @@ CCID_HANDLER(XfrBlock, request, apdu) {
 
 		case APDU_ICC_DO_NAME_TAG:
 			response.dwLength = 2;
-			if (label) {
-				strcpy((char *) response.abData, label);
+			if (label && protectUnlockedPin(true)) {
+				strlcpy((char *) response.abData, label, sizeof(response.abData));
 				response.dwLength += strlen(label);
 			}
 
@@ -124,13 +136,71 @@ CCID_HANDLER(XfrBlock, request, apdu) {
 			response.abData[response.dwLength - 1] = 0x00;
 			break;
 
+		case APDU_ICC_DO_SECURITY_SUPPORT_TEMPL_TAG:
+			if (!protectUnlocked(true)) {
+				debugLog(0, "", "APDU GET DATA: displaying PIN matrix");
+				pinmatrix_start("OpenPGP (see manual)");
+			}
+
+			APDU_RETURN(response, NOT_SUPPORTED);
+			break;
+
 		default:
 			debugLog(0, "", "APDU GET DATA: Referenced data not found");
 			APDU_RETURN(response, DATA_NOT_FOUND);
 			break;
 		}
+	} else if (apdu->INS == APDU_VERIFY) {
+		/*
+		 * Due to the way OpenPGP works, we use a complex system for entering the PIN and passphrase.
+		 *
+		 * Our OpenPGP password follows the format of
+		 * [scrambled TREZOR PIN] + [0s to pad to OpenPGP minimum length] + [' '] + [passphrase]
+		 *
+		 * All but the scrambled TREZOR PIN are optional, if they are not necessary for the user's parameters.
+		 *
+		 * Examples:
+		 * '123400    '   Scrambled PIN of '1234', padded out to PW1 minimum of 6
+		 * '123400 PWD'   Scrambled PIN of '1234', passphrase of 'PWD'
+		 * '1234   PWD'   Scrambled PIN of '1234', passphrase of '  PWD'
+		 */
+
+		if (!protectUnlocked(true)) {
+			// Initialize passphrase to point to a '\0' so it acts like a zero-length string
+			char *pin = (char *) data, *passphrase = (char *) &data[apdu->Lc], *separator;
+
+			// The buffer containing the request should be uint8_t[65] to allow for a null terminator
+			*passphrase = '\0';
+
+			if ((separator = strchr(pin, ' '))) {
+				*separator = '\0';
+				passphrase = separator + 1;
+			}
+
+			if ((separator = strchr(pin, '0'))) {
+				*separator = '\0';
+			}
+
+			pinmatrix_done(pin);
+
+			if (storage_isPinCorrect(pin)) {
+				session_cachePin();
+				session_cachePassphrase(passphrase);
+				APDU_RETURN(response, SUCCESS);
+			} else {
+				APDU_RETURN(response, PW_WRONG);
+			}
+
+			layoutHome();
+		} else {
+			/* Due to the way the TREZOR works, it is:
+			 * a) pointless to check subsequent passwords and
+			 * b) fallacious, due to the PIN scrambling
+			 */
+			APDU_RETURN(response, SUCCESS);
+		}
 	} else {
-		switch (apdu[1]) {
+		switch (apdu->INS) {
 		case APDU_SELECT_FILE:
 			debugLog(0, "", "APDU SELECT FILE: File not found");
 			APDU_RETURN(response, FILE_NOT_FOUND);

@@ -416,10 +416,11 @@ static void hid_u2f_rx_callback(usbd_device *dev, uint8_t ep)
 static void ccid_rx_callback(usbd_device *dev, uint8_t ep)
 {
 	(void)ep;
-	static uint8_t buf[64] __attribute__ ((aligned(4)));
+	// Extra byte needed for null termination when using string manipulation
+	static uint8_t buf[65] __attribute__ ((aligned(4)));
 	static struct ccid_header *header = (struct ccid_header *) buf;
 
-	uint16_t size = usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_CCID_OUT, buf, sizeof(buf));
+	uint16_t size = usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_CCID_OUT, buf, sizeof(buf) - 1);
 	if (size != sizeof(*header) + header->dwLength) return;
 	ccid_read(header, buf + sizeof(*header));
 }

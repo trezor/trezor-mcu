@@ -21,6 +21,7 @@
 #define __PROTECT_H__
 
 #include <stdbool.h>
+#include "storage.h"
 #include "types.pb.h"
 
 bool protectButton(ButtonRequestType type, bool confirm_only);
@@ -29,5 +30,17 @@ bool protectChangePin(void);
 bool protectPassphrase(void);
 
 extern bool protectAbortedByInitialize;
+
+static inline bool protectUnlockedPin(bool use_cached) {
+	return !storage_hasPin() || (use_cached && session_isPinCached());
+}
+
+static inline bool protectUnlockedPassphrase(void) {
+	return !storage.has_passphrase_protection || !storage.passphrase_protection || session_isPassphraseCached();
+}
+
+static inline bool protectUnlocked(bool use_cached) {
+	return protectUnlockedPin(use_cached) && protectUnlockedPassphrase();
+}
 
 #endif

@@ -28,9 +28,9 @@
 
 // CCID command handling macros
 #define CCID_HANDLER(type, request, buf)  \
-	void PC_to_RDR_ ## type(struct PC_to_RDR_ ## type *request, const uint8_t *buf)
+	void PC_to_RDR_ ## type(struct PC_to_RDR_ ## type *request, uint8_t *buf)
 
-#define CCID_HANDLER_INIT(type)  CCID_HANDLER(type, /* */, /* */)
+#define CCID_HANDLER_INIT(type)  CCID_HANDLER(type, // */, /*)
 
 #define CCID_HANDLER_TEST(type)  \
 	case PC_to_RDR_ ## type ## _Type:  \
@@ -87,7 +87,7 @@ struct ccid_slot_status {
 	unsigned int bmCommandStatus : 2;
 } __attribute__((packed));
 
-void ccid_read(struct ccid_header *header, const uint8_t *buf);
+void ccid_read(struct ccid_header *header, uint8_t *buf);
 
 #define PC_to_RDR_IccPowerOn_Type 0x62
 struct PC_to_RDR_IccPowerOn {

@@ -143,7 +143,7 @@ const char *requestPin(PinMatrixRequestType type, const char *text)
 
 bool protectPin(bool use_cached)
 {
-	if (!storage.has_pin || storage.pin[0] == 0 || (use_cached && session_isPinCached())) {
+	if (protectUnlockedPin(use_cached)) {
 		return true;
 	}
 	uint32_t *fails = storage_getPinFailsPtr();
@@ -216,7 +216,7 @@ bool protectChangePin(void)
 
 bool protectPassphrase(void)
 {
-	if (!storage.has_passphrase_protection || !storage.passphrase_protection || session_isPassphraseCached()) {
+	if (protectUnlockedPassphrase()) {
 		return true;
 	}
 

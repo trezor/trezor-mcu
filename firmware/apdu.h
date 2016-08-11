@@ -31,6 +31,7 @@
 #define APDU_ICC_ATR_SIZE  sizeof((uint8_t []) { APDU_ICC_ATR })
 
 // APDU commands
+#define APDU_VERIFY      0x20
 #define APDU_SELECT_FILE 0xA4
 #define APDU_GET_DATA    0xCA
 
@@ -43,14 +44,17 @@
 // APDU OpenPGP commands
 static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04, 0x00, 0x06, APDU_PGP_APPLICATION_ID, 0x01 };
 
-// APDU OpenPGP TREZOR configuration
-#define PGP_PW1_LENGTH  9
+// APDU OpenPGP password configuration
+#define PGP_PW1_LENGTH  0b0110110
+#define PGP_PW3_LENGTH  (PGP_PW1_LENGTH)
 
 // APDU OpenPGP data object tags
-#define APDU_ICC_DO_AID_TAG           0x4F
-#define APDU_ICC_DO_NAME_TAG          0x5B
-#define APDU_ICC_DO_EXTENDED_CAPS_TAG 0xC0
-#define APDU_ICC_DO_PW_STATUS_TAG     0xC4
+#define APDU_ICC_DO_AID_TAG            0x4F
+#define APDU_ICC_DO_NAME_TAG           0x5B
+#define APDU_ICC_DO_EXTENDED_CAPS_TAG  0xC0
+#define APDU_ICC_DO_PW_STATUS_TAG      0xC4
+
+#define APDU_ICC_DO_SECURITY_SUPPORT_TEMPL_TAG  0x7A
 
 #define APDU_ICC_DO_ALGORITHM_ATTRS_TAG(index)  (0xC1 + index)
 
@@ -65,6 +69,7 @@ static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04,
 
 // APDU status codes
 #define APDU_SUCCESS         0x90, 0x00
+#define APDU_PW_WRONG        0x69, 0x82
 #define APDU_FILE_NOT_FOUND  0x6A, 0x82
 #define APDU_DATA_NOT_FOUND  0x6A, 0x88
 #define APDU_NOT_SUPPORTED   0x91, 0x1C
@@ -81,12 +86,20 @@ static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04,
 
 #define APDU_CHECK(buffer, length, APDU) (sizeof((APDU)) == (length) && memcmp((buffer), (APDU), (length)) == 0)
 
-// APDU OpenPGP data objects (DOs)
+struct APDU_REQUEST {
+	uint8_t CLA;
+	uint8_t INS;
+	uint8_t P1;
+	uint8_t P2;
+	uint8_t Lc;
+} __attribute__((packed));
+
 struct APDU_STATUS {
 	uint8_t SW1;
 	uint8_t SW2;
 } __attribute__((packed));
 
+// APDU OpenPGP data objects (DOs)
 struct APDU_ICC_DO_AID {
 	uint8_t  RID[5];
 	uint8_t  application;
