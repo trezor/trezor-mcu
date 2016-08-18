@@ -1,0 +1,4 @@
+APPLICATION_VERSION := 1.0.0
+
+OBJECTS := $(APPLICATION)/demo.o
+ALGORITHMS := pbkdf2 hmac sha2

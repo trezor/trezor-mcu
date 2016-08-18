@@ -1,0 +1,29 @@
+Language: Cpp
+Standard: Auto
+
+ColumnLimit: 0
+ReflowComments: true
+
+AlignConsecutiveAssignments: true
+AlignTrailingComments: true
+
+AllowShortIfStatementsOnASingleLine: true
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+    AfterFunction: true
+SortIncludes: true
+IncludeCategories:
+    - Regex: '^<libopencm3/'
+      Priority: 3
+    - Regex: '^<'
+      Priority: 2
+    - Regex: '.*'
+      Priority: 1
+
+SpaceAfterCStyleCast: true
+
+UseTab: Always
+IndentWidth: 8
+
+# vim: ft=yaml
