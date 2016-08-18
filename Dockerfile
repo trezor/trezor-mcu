@@ -2,10 +2,12 @@
 
 FROM ubuntu:16.04
 
-# update repositories
+RUN apt-get update \
+ && apt-get install -yqq \
+        build-essential \
+        git \
+        gcc-arm-none-eabi \
+        python \
+        python-ecdsa
 
-RUN apt-get update
-
-# install build tools and dependencies
-
-RUN apt-get install -y build-essential git python python-ecdsa gcc-arm-none-eabi
+ENTRYPOINT ["make", "-C", "/build"]
