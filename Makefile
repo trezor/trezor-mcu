@@ -27,9 +27,9 @@ TREZORCTL = trezorctl
 # }}}
 
 # Compilation configuration (CFLAGS, LDFLAGS) {{{
-ARFLAGS  = rcs --target=arm-none-eabi
+ARFLAGS  = rcsD --target=arm-none-eabi
 
-CFLAGS   = -O3
+CFLAGS   = -O3 -DNDEBUG
 override CFLAGS  += -std=gnu99 \
                     -Wall -Wextra -Werror \
                     -Wundef -Wshadow \
@@ -46,13 +46,13 @@ override CFLAGS  += -std=gnu99 \
                     -I$(QRENC_LIBRARY)
 
 override LDFLAGS += -static \
+                     -L. -L$(SUPPORT_LIBRARY)/lib -ltrezor -lopencm3_stm32f2 \
                      -Wl,--start-group \
                      -lc -lgcc -lnosys \
                      -Wl,--end-group \
                      -nostartfiles \
                      -Wl,--gc-sections \
-                     -march=armv7 -mthumb -mfix-cortex-m3-ldrd -msoft-float \
-                     -L. -L$(SUPPORT_LIBRARY)/lib -ltrezor -lopencm3_stm32f2
+                     -march=armv7 -mthumb -mfix-cortex-m3-ldrd -msoft-float
 # }}}
 
 # Default target (firmware.bin) {{{
@@ -67,8 +67,11 @@ APPLICATIONS := bootloader firmware demo
 $(APPLICATIONS):
 	@$(MAKE) APPLICATION=$@
 
+define add-algorithms
+$(eval OBJECTS += $(patsubst %,$(CRYPTO_LIBRARY)/%.o,$(1)))
+endef
+
 include $(APPLICATION)/Makefile.include
-OBJECTS += $(patsubst %,$(CRYPTO_LIBRARY)/%.o,$(ALGORITHMS))
 # }}}
 
 # Pretty compilation output {{{
@@ -124,9 +127,8 @@ endif
 
 # TREZOR firmware library (libtrezor.a) {{{
 TREZOR_LIBRARY := libtrezor.a
-TREZOR_OBJECTS := buttons.o layout.o memory.o oled.o rng.o serialno.o setup.o util.o \
-	$(GENERATED)/bitmaps.o $(GENERATED)/fonts.o $(QRENC_LIBRARY)/qr_encode.o
-
+TREZOR_OBJECTS := buttons.o layout.o oled.o rng.o serialno.o setup.o util.o memory.o \
+	$(GENERATED)/bitmaps.o $(GENERATED)/fonts.o
 $(TREZOR_LIBRARY): CMD = $(AR) $(ARFLAGS) $@ $^
 $(TREZOR_LIBRARY): $(TREZOR_OBJECTS)
 	$(call pretty_cmd,LIB,$(TERM_RED))

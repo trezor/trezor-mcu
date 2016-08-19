@@ -1,6 +1,6 @@
 OBJECTS := bootloader.o signatures.o usb.o
 OBJECTS := $(addprefix $(APPLICATION)/,$(OBJECTS))
 
-ALGORITHMS := bignum ecdsa secp256k1 sha2
+$(call add-algorithms, bignum ecdsa hmac ripemd160 secp256k1 sha2)
 
 override CFLAGS += -DUSE_PRECOMPUTED_IV=0 -DUSE_PRECOMPUTED_CP=0
