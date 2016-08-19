@@ -1,15 +1,17 @@
 APPLICATION_VERSION := 1.0.0
 
-OBJECTS := trezor.o \
-    coins.o crypto.o debug.o ethereum.o fsm.o layout2.o messages.o pinmatrix.o \
-    protect.o recovery.o reset.o signing.o storage.o transaction.o u2f.o usb.o \
-    protob/pb_decode.o protob/pb_encode.o \
-    protob/messages.pb.o protob/storage.pb.o protob/types.pb.o
-
+OBJECTS := usb.o u2f.o messages.o storage.o trezor.o pinmatrix.o fsm.o coins.o \
+	transaction.o protect.o layout2.o recovery.o reset.o signing.o crypto.o \
+	ethereum.o debug.o
 OBJECTS := $(addprefix $(APPLICATION)/,$(OBJECTS))
 
-ALGORITHMS := aes_modes aescrypt aeskey aestab base58 bignum bip32 bip39 curves ecdsa \
-    ed25519-donna/ed25519 hmac nist256p1 pbkdf2 ripemd160 secp256k1 sha2 sha3
+ALGORITHMS := bignum ecdsa curves secp256k1 nist256p1 ed25519-donna/ed25519 hmac \
+	bip32 bip39 pbkdf2 base58 ripemd160 sha2 sha3 aescrypt aeskey aestab aes_modes
+$(call add-algorithms, $(ALGORITHMS))
+
+PROTOBUF_OBJECTS := pb_decode pb_encode messages.pb storage.pb types.pb
+OBJECTS += $(QRENC_LIBRARY)/qr_encode.o \
+	$(patsubst %,$(APPLICATION)/protob/%.o,$(PROTOBUF_OBJECTS))
 
 DEBUG ?= 0
 override CFLAGS += -I$(APPLICATION) \
