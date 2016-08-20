@@ -30,6 +30,7 @@ OBJECTS += $(APPLICATION)/fastflash.o
 bootloader/trezor.bin: | bootloader
 
 $(APPLICATION)/fastflash.o: CMD = $(OBJCOPY) -I binary -O elf32-littlearm -B arm \
+	--rename-section .data=.rodata,alloc,load,readonly,data,contents \
 	--redefine-sym _binary_bootloader_trezor_bin_end=_FASTFLASH_BLOB_END \
 	--redefine-sym _binary_bootloader_trezor_bin_size=_FASTFLASH_BLOB_SIZE \
 	--redefine-sym _binary_bootloader_trezor_bin_start=_FASTFLASH_BLOB_START \
