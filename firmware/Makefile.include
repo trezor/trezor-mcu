@@ -21,3 +21,20 @@ override CFLAGS += -I$(APPLICATION) \
                    -DED25519_CUSTOMRANDOM=1 -DED25519_CUSTOMHASH=1 \
                    -DUSE_ETHEREUM=1 \
                    -Wno-sequence-point
+
+FASTFLASH ?= 0
+ifneq ($(FASTFLASH),0)
+override CFLAGS += -DFASTFLASH
+OBJECTS += $(APPLICATION)/fastflash.o
+
+bootloader/trezor.bin: | bootloader
+
+$(APPLICATION)/fastflash.o: CMD = $(OBJCOPY) -I binary -O elf32-littlearm -B arm \
+	--redefine-sym _binary_bootloader_trezor_bin_end=_FASTFLASH_BLOB_END \
+	--redefine-sym _binary_bootloader_trezor_bin_size=_FASTFLASH_BLOB_SIZE \
+	--redefine-sym _binary_bootloader_trezor_bin_start=_FASTFLASH_BLOB_START \
+	$< $@
+
+$(APPLICATION)/fastflash.o: bootloader/trezor.bin | bootloader
+	$(call pretty_cmd,BIN,$(TERM_DARK))
+endif

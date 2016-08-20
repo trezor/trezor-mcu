@@ -34,7 +34,7 @@
 #include "serialno.h"
 #include "rng.h"
 
-#ifdef APPVER
+#if defined(APPVER) && !defined(FASTFLASH)
 #error Bootloader cannot be used in app mode
 #endif
 
@@ -144,6 +144,7 @@ int main(void)
 	memory_protect();
 	oledInit();
 
+#ifndef FASTFLASH
 	// at least one button is unpressed
 	uint16_t state = gpio_port_read(BTN_PORT);
 	if ((state & BTN_PIN_YES) == BTN_PIN_YES || (state & BTN_PIN_NO) == BTN_PIN_NO) {
@@ -162,6 +163,7 @@ int main(void)
 		load_app();
 
 	}
+#endif
 
 	bootloader_loop();
 
