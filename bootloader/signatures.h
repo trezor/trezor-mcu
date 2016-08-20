@@ -20,6 +20,10 @@
 #ifndef __SIGNATURES_H__
 #define __SIGNATURES_H__
 
+#ifdef FASTFLASH
+#define signatures_ok(store_hash) (true)
+#else
 int signatures_ok(uint8_t *store_hash);
+#endif
 
 #endif

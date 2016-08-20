@@ -26,6 +26,8 @@
 #include "sha2.h"
 #include "bootloader.h"
 
+#ifndef FASTFLASH
+
 #define PUBKEYS 5
 
 static const uint8_t *pubkey[PUBKEYS] = {
@@ -73,3 +75,5 @@ int signatures_ok(uint8_t *store_hash)
 
 	return 1;
 }
+
+#endif
