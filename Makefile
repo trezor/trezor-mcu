@@ -157,8 +157,8 @@ flash: $(APPLICATION)/firmware.bin
 %.o: %.c
 	$(call pretty_cmd,CC,$(TERM_BLUE))
 
-%/firmware.bin: CMD = bootloader/firmware_sign.py -f $@
-%/firmware.bin: %/trezor.bin
+$(APPLICATION)/firmware.bin: CMD = bootloader/firmware_sign.py -f $@
+$(APPLICATION)/firmware.bin: $(APPLICATION)/trezor.bin
 	@cp $< $@
 	$(call pretty_cmd,SIGN,$(TERM_YELLOW),true)
 
@@ -166,8 +166,8 @@ flash: $(APPLICATION)/firmware.bin
 %.bin: %.elf
 	$(call pretty_cmd,BIN,$(TERM_DARK))
 
-%.elf: CMD = $(LD) -o $@ $^ $(LDFLAGS)
-%.elf: $(OBJECTS) | $(TREZOR_LIBRARY) $(SUPPORT_LIBRARY_STATIC)
+$(APPLICATION)/trezor.elf: CMD = $(LD) -o $@ $^ $(LDFLAGS)
+$(APPLICATION)/trezor.elf: $(OBJECTS) | $(TREZOR_LIBRARY) $(SUPPORT_LIBRARY_STATIC)
 	$(call pretty_cmd,LINK,$(TERM_MAGENTA))
 
 $(SUPPORT_LIBRARY_STATIC): CMD = \
