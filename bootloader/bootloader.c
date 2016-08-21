@@ -21,7 +21,6 @@
 
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
-#include <libopencm3/cm3/scb.h>
 
 #include "bootloader.h"
 #include "buttons.h"
@@ -79,14 +78,6 @@ void show_unofficial_warning(uint8_t *hash)
 	}
 
 	// everything is OK, user pressed 2x Continue -> continue program
-}
-
-void load_app(void)
-{
-	// jump to app
-	SCB_VTOR = FLASH_APP_START; // & 0xFFFF;
-	__asm__ volatile("msr msp, %0"::"g" (*(volatile uint32_t *)FLASH_APP_START));
-	(*(void (**)())(FLASH_APP_START + 4))();
 }
 
 void bootloader_loop(void)
@@ -160,7 +151,7 @@ int main(void)
 			show_unofficial_warning(hash);
 		}
 
-		load_app();
+		load_address(FLASH_APP_START);
 
 	}
 #endif
