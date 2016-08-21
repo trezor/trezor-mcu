@@ -3,6 +3,10 @@ language: c
 services:
   - docker
 
+env:
+    - ''
+    - FASTFLASH=1
+
 script:
   - ./docker-prepare
   - ./docker-make
