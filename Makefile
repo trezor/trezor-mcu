@@ -144,6 +144,7 @@ $(TREZOR_LIBRARY): $(TREZOR_OBJECTS)
 
 clean:
 	@$(GIT) clean -Xfd
+	@$(GIT) submodule foreach $(GIT) clean -Xfd
 
 submodules:
 	@$(GIT) submodule update --init
