@@ -4,6 +4,7 @@ services:
   - docker
 
 script:
+  - ./docker-prepare
   - ./docker-make
   - ./docker-make bootloader
   - ./docker-make demo
