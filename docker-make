@@ -11,4 +11,5 @@ exec docker run -u "$SUDO_UID" -v "$(pwd):/build" --rm -it \
     -e APPLICATION \
     -e CFLAGS \
     -e LDFLAGS \
+    -e FASTFLASH \
     "$IMAGE" "$@"
