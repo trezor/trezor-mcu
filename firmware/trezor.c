@@ -32,11 +32,13 @@
 #include <libopencm3/cm3/scb.h>
 #include "buttons.h"
 
-#define RAM_FASTFLASH_START (0x20016000)
+extern uint8_t _RAM_FASTFLASH_START;
 
 extern uint8_t _FASTFLASH_BLOB_START;
 extern uint8_t _FASTFLASH_BLOB_SIZE;
 // extern uint8_t _FASTFLASH_BLOB_END;
+
+static uint32_t RAM_FASTFLASH_START  = (uint32_t) &_RAM_FASTFLASH_START;
 
 static uint8_t *FASTFLASH_BLOB_START = &_FASTFLASH_BLOB_START;
 static uint32_t FASTFLASH_BLOB_SIZE  = (uint32_t) &_FASTFLASH_BLOB_SIZE;
