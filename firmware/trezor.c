@@ -29,7 +29,6 @@
 #include "rng.h"
 
 #ifdef FASTFLASH
-#include <libopencm3/cm3/scb.h>
 #include "buttons.h"
 
 extern uint8_t _RAM_FASTFLASH_START;
@@ -43,17 +42,13 @@ static uint32_t RAM_FASTFLASH_START  = (uint32_t) &_RAM_FASTFLASH_START;
 static uint8_t *FASTFLASH_BLOB_START = &_FASTFLASH_BLOB_START;
 static uint32_t FASTFLASH_BLOB_SIZE  = (uint32_t) &_FASTFLASH_BLOB_SIZE;
 
-void __attribute__((noreturn)) load_bootloader(void)
+static inline void __attribute__((noreturn)) load_bootloader(void)
 {
 	// load bootloader into RAM to prevent overwriting itself
 	memcpy((uint8_t *) RAM_FASTFLASH_START, FASTFLASH_BLOB_START, FASTFLASH_BLOB_SIZE);
 
 	// jump to bootloader
-	SCB_VTOR = RAM_FASTFLASH_START; // & 0xFFFF;
-	__asm__ volatile("msr msp, %0"::"g" (*(volatile uint32_t *)RAM_FASTFLASH_START));
-	(*(void (**)())(RAM_FASTFLASH_START + 4))();
-
-	for (;;) {}
+	load_address(RAM_FASTFLASH_START);
 }
 #endif
 
