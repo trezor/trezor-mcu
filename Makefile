@@ -19,6 +19,7 @@ CROSS_COMPILE ?= arm-none-eabi-
 AR      = $(CROSS_COMPILE)ar
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)gcc
+NM      = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
 OBJDUMP = $(CROSS_COMPILE)objdump
 
@@ -28,6 +29,7 @@ TREZORCTL = trezorctl
 
 # Compilation configuration (CFLAGS, LDFLAGS) {{{
 ARFLAGS  = rcsD --target=arm-none-eabi
+NMFLAGS  = --target=arm-none-eabi
 
 CFLAGS   = -O3 -DNDEBUG
 override CFLAGS  += -std=gnu99 \
