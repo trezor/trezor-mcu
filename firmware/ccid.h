@@ -128,7 +128,7 @@ struct RDR_to_PC_DataBlock {
 	struct ccid_slot_status bStatus;
 	uint8_t  bError;
 	uint8_t  bChainParameter;
-	uint8_t  abData[33];
+	uint8_t  abData[261];
 } __attribute__((packed));
 
 #define RDR_to_PC_SlotStatus_Type 0x81

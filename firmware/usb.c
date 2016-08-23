@@ -185,7 +185,7 @@ static const struct usb_ccid_descriptor ccid_descriptor = {
 	.dwMaxIFSD = 0xFE,
 	.dwSynchProtocols = 0,
 	.dwMechanical = 0,
-	.dwFeatures = 0x00020000 | 0x00000040 | 0x00000020 | 0x00000010 | 0x00000008 | 0x00000004 | 0x00000002,
+	.dwFeatures = 0x00040000 | 0x00000040 | 0x00000020 | 0x00000010 | 0x00000008 | 0x00000004 | 0x00000002,
 	.dwMaxCCIDMessageLength = 0x10F,
 	.bClassGetResponse = 0xFF,
 	.bClassEnvelope = 0xFF,
@@ -517,6 +517,15 @@ void usbSleep(uint32_t millis)
 	}
 }
 
-uint16_t ccid_tx(void *tx, uint16_t len) {
-	return usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_CCID_IN, tx, len);
+void ccid_tx(const void *tx, uint16_t txlen) {
+	uint8_t *buffer = (uint8_t *) tx;
+	uint8_t len;
+
+	do {
+		len = txlen > 64 ? 64 : txlen;
+		while (usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_CCID_IN, buffer, len) != len) {}
+
+		txlen -= len;
+		buffer += len;
+	} while (txlen);
 }

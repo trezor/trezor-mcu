@@ -28,6 +28,6 @@ void usbReconnect(void);
 char usbTiny(char set);
 void usbSleep(uint32_t millis);
 
-uint16_t ccid_tx(void *tx, uint16_t len);
+void ccid_tx(const void *tx, uint16_t txlen);
 
 #endif
