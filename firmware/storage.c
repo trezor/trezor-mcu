@@ -304,6 +304,13 @@ void storage_setLabel(const char *label)
 	strlcpy(storage.label, label, sizeof(storage.label));
 }
 
+void storage_setName(const char *name)
+{
+	if (!name) return;
+	storage.has_name = true;
+	strlcpy(storage.name, name, sizeof(storage.name));
+}
+
 void storage_setLanguage(const char *lang)
 {
 	if (!lang) return;
@@ -424,6 +431,11 @@ const char *storage_getLanguage(void)
 const uint8_t *storage_getHomescreen(void)
 {
 	return (storage.has_homescreen && storage.homescreen.size == 1024) ? storage.homescreen.bytes : 0;
+}
+
+const char *storage_getName(void)
+{
+	return storage.has_name ? storage.name : 0;
 }
 
 /* Check whether pin matches storage.  The pin must be a null-terminated

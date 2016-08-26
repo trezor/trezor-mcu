@@ -20,7 +20,6 @@
 #ifndef __CCID_H__
 #define __CCID_H__
 
-#include "apdu.h"
 #include <stdint.h>
 
 #define USB_CLASS_CSCID 0x0b

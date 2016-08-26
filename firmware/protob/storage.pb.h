@@ -11,6 +11,13 @@ extern "C" {
 #endif
 
 /* Enum definitions */
+typedef enum _ISO5218 {
+    ISO5218_ISO5218_NotKnown = 0,
+    ISO5218_ISO5218_Male = 1,
+    ISO5218_ISO5218_Female = 2,
+    ISO5218_ISO5218_NotApplicable = 9
+} ISO5218;
+
 /* Struct definitions */
 typedef struct {
     size_t size;
@@ -39,13 +46,17 @@ typedef struct _Storage {
     Storage_homescreen_t homescreen;
     bool has_u2f_counter;
     uint32_t u2f_counter;
+    bool has_name;
+    char name[40];
+    bool has_sex;
+    ISO5218 sex;
 } Storage;
 
 /* Default values for struct fields */
 
 /* Initializer values for message structs */
-#define Storage_init_default                     {0, false, HDNodeType_init_default, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0}
-#define Storage_init_zero                        {0, false, HDNodeType_init_zero, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0}
+#define Storage_init_default                     {0, false, HDNodeType_init_default, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0}
+#define Storage_init_zero                        {0, false, HDNodeType_init_zero, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define Storage_version_tag                      1
@@ -59,12 +70,14 @@ typedef struct _Storage {
 #define Storage_imported_tag                     9
 #define Storage_homescreen_tag                   10
 #define Storage_u2f_counter_tag                  11
+#define Storage_name_tag                         12
+#define Storage_sex_tag                          13
 
 /* Struct field encoding specification for nanopb */
-extern const pb_field_t Storage_fields[12];
+extern const pb_field_t Storage_fields[14];
 
 /* Maximum encoded size of messages (where known) */
-#define Storage_size                             (1365 + HDNodeType_size)
+#define Storage_size                             (1413 + HDNodeType_size)
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -19,6 +19,7 @@
 
 
 #include "usb.h"
+#include "apdu.h"
 #include "ccid.h"
 #include "debug.h"
 #include "layout2.h"
@@ -99,6 +100,7 @@ CCID_HANDLER(XfrBlock, request, buf) {
 		.bError = 0,
 		.bChainParameter = 0
 	};
+	response.dwLength = 0;
 
 	static struct APDU_ICC_DO_AID APDU_PGP_AID = {
 		.RID = { APDU_PGP_APPLICATION_ID },
@@ -111,29 +113,29 @@ CCID_HANDLER(XfrBlock, request, buf) {
 	};
 	memcpy(&APDU_PGP_AID.serialNumber, storage_uuid, sizeof(APDU_PGP_AID.serialNumber));
 
-	const char *label = storage_getLabel();
+	static struct APDU_ICC_DO_FINGERPRINTS APDU_PGP_FINGERPRINTS;
+
+	// Cardholder's name
+	const char *name = storage_getName();
 
 	response.bSlot = request->bSlot;
 	response.bSeq = request->bSeq;
 
+	uint16_t tag = (apdu->P1 << 8) + apdu->P2;
 	if (APDU_CHECK(buf, request->dwLength, APDU_PGP_COMMAND_SELECT)) {
 		APDU_RETURN(response, SUCCESS);
 	} else if (apdu->INS == APDU_GET_DATA) {
-		uint16_t tag = (apdu->P1 << 8) + apdu->P2;
 		switch (tag) {
 		APDU_DATA_OBJECT(AID);
 		APDU_DATA_OBJECT(PW_STATUS);
-		APDU_DATA_OBJECT(EXTENDED_CAPS);
 
 		case APDU_ICC_DO_NAME_TAG:
-			response.dwLength = 2;
-			if (label && protectUnlockedPin(true)) {
-				strlcpy((char *) response.abData, label, sizeof(response.abData));
-				response.dwLength += strlen(label);
+			if (name && protectUnlockedPin(true)) {
+				strlcpy((char *) response.abData, name, sizeof(response.abData));
+				response.dwLength += strlen(name);
 			}
 
-			response.abData[response.dwLength - 2] = 0x90;
-			response.abData[response.dwLength - 1] = 0x00;
+			APDU_RETURN(response, SUCCESS);
 			break;
 
 		case APDU_ICC_DO_SECURITY_SUPPORT_TEMPL_TAG:
@@ -145,9 +147,28 @@ CCID_HANDLER(XfrBlock, request, buf) {
 			APDU_RETURN(response, NOT_SUPPORTED);
 			break;
 
+		APDU_DATA_OBJECT_CONSTRUCT_INIT(APPLICATION_RELATED_DATA)
+			APDU_DATA_OBJECT_CONSTRUCT(EXTENDED_CAPS);
+			APDU_DATA_OBJECT_CONSTRUCT(FINGERPRINTS);
+			APDU_DATA_OBJECT_CONSTRUCT_END();
+			APDU_RETURN(response, SUCCESS);
+			break;
+
 		default:
 			debugLog(0, "", "APDU GET DATA: Referenced data not found");
 			APDU_RETURN(response, DATA_NOT_FOUND);
+			break;
+		}
+	} else if (apdu->INS == APDU_PUT_DATA && protectUnlockedPin(true)) {
+		switch (tag) {
+		case APDU_ICC_DO_NAME_TAG:
+			storage_setName((const char *) data);
+			storage_commit();
+			APDU_RETURN(response, SUCCESS);
+			break;
+		default:
+			debugLog(0, "", "APDU PUT DATA: Function not supported");
+			APDU_RETURN(response, FCN_NO_SUPPORT);
 			break;
 		}
 	} else if (apdu->INS == APDU_VERIFY) {
@@ -204,6 +225,9 @@ CCID_HANDLER(XfrBlock, request, buf) {
 		case APDU_SELECT_FILE:
 			debugLog(0, "", "APDU SELECT FILE: File not found");
 			APDU_RETURN(response, FILE_NOT_FOUND);
+			break;
+		case APDU_PUT_DATA:
+			APDU_RETURN(response, PW_WRONG);
 			break;
 		default:
 			debugLog(0, "", "APDU unmatched");

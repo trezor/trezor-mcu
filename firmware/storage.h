@@ -40,6 +40,9 @@ bool storage_getRootNode(HDNode *node, const char *curve, bool usePassphrase);
 const char *storage_getLabel(void);
 void storage_setLabel(const char *label);
 
+const char *storage_getName(void);
+void storage_setName(const char *label);
+
 const char *storage_getLanguage(void);
 void storage_setLanguage(const char *lang);
 

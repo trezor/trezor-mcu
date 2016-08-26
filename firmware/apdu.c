@@ -27,7 +27,7 @@ const struct APDU_ICC_DO_EXTENDED_CAPS APDU_PGP_EXTENDED_CAPS = {
 		.keyImport = false,
 		.mutablePWStatus = false,
 		.privateUse = false,
-		.mutableAlgorithmAttrs = false,
+		.mutableAlgorithmAttrs = true,
 		.AES = false,
 		.RFU = 0x0
 	},
@@ -38,8 +38,6 @@ const struct APDU_ICC_DO_EXTENDED_CAPS APDU_PGP_EXTENDED_CAPS = {
 	.maxSpecialDOLength = 0x0000,
 	.pinBlock2 = false,
 	.RFU = 0x0,
-
-	.status = { APDU_SUCCESS }
 };
 
 const struct APDU_ICC_DO_PW_STATUS APDU_PGP_PW_STATUS = {
@@ -54,7 +52,7 @@ const struct APDU_ICC_DO_PW_STATUS APDU_PGP_PW_STATUS = {
 		.length = PGP_PW3_LENGTH,
 		.type = 0x0
 	},
-	.counter = { 3, 0, 0 },
+	.counter = { 3, 0, 3 },
 
 	.status = { APDU_SUCCESS }
 };

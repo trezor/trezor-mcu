@@ -20,6 +20,8 @@
 #ifndef __APDU_H__
 #define __APDU_H__
 
+#include "ccid.h"
+#include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -34,6 +36,7 @@
 #define APDU_VERIFY      0x20
 #define APDU_SELECT_FILE 0xA4
 #define APDU_GET_DATA    0xCA
+#define APDU_PUT_DATA    0xDA
 
 // APDU OpenPGP Application ID
 #define APDU_PGP_APPLICATION_ID  0xD2, 0x76, 0x00, 0x01, 0x24
@@ -53,10 +56,12 @@ static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04,
 #define APDU_ICC_DO_NAME_TAG           0x5B
 #define APDU_ICC_DO_EXTENDED_CAPS_TAG  0xC0
 #define APDU_ICC_DO_PW_STATUS_TAG      0xC4
+#define APDU_ICC_DO_FINGERPRINTS_TAG   0xC5
 
-#define APDU_ICC_DO_SECURITY_SUPPORT_TEMPL_TAG  0x7A
+#define APDU_ICC_DO_SECURITY_SUPPORT_TEMPL_TAG    0x7A
+#define APDU_ICC_DO_APPLICATION_RELATED_DATA_TAG  0x6E
 
-#define APDU_ICC_DO_ALGORITHM_ATTRS_TAG(index)  (0xC1 + index)
+#define APDU_ICC_DO_ALGORITHM_ATTRS_TAG(index)   (0xC1 + index)
 
 // OpenPGP algorithms
 #define PGP_ECDSA_ALGO  19
@@ -70,6 +75,7 @@ static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04,
 // APDU status codes
 #define APDU_SUCCESS         0x90, 0x00
 #define APDU_PW_WRONG        0x69, 0x82
+#define APDU_FCN_NO_SUPPORT  0x6A, 0x81
 #define APDU_FILE_NOT_FOUND  0x6A, 0x82
 #define APDU_DATA_NOT_FOUND  0x6A, 0x88
 #define APDU_NOT_SUPPORTED   0x91, 0x1C
@@ -81,7 +87,53 @@ static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04,
 		response.dwLength = sizeof(APDU_PGP_ ## tag);  \
 		break
 
-#define _APDU_RETURN(response, SW1, SW2)  do { response.dwLength = 2; response.abData[0] = SW1; response.abData[1] = SW2; } while (0)
+#define  APDU_DATA_OBJECT_CONSTRUCT_INIT(tag)  \
+	case APDU_ICC_DO_ ## tag ## _TAG:  \
+		_APDU_DATA_OBJECT_CONSTRUCT(&response, APDU_ICC_DO_ ## tag ## _TAG, NULL, 0);  \
+		response.abData[response.dwLength++] = 0x00;
+
+#define  APDU_DATA_OBJECT_CONSTRUCT(tag)  \
+	_APDU_DATA_OBJECT_CONSTRUCT(&response, APDU_ICC_DO_ ## tag ## _TAG,  \
+		(const uint8_t *) &APDU_PGP_ ## tag, sizeof(APDU_PGP_ ## tag))
+
+static inline void _APDU_DATA_OBJECT_CONSTRUCT(struct RDR_to_PC_DataBlock *response, uint16_t tag, const uint8_t *data, uint8_t size) {
+	// Tag
+	if ((tag >> 8 & 0x1F) == 0x1F)
+		response->abData[response->dwLength++] = tag >> 8;
+	response->abData[response->dwLength++] = tag & 0xFF;
+
+	// Length
+	if (size >= 0x80)
+		response->abData[response->dwLength++] = 0x81;
+	response->abData[response->dwLength++] = size;
+
+	// Data
+	if (size) {
+		memcpy(&response->abData[response->dwLength], data, size);
+		response->dwLength += size;
+	}
+}
+
+#define APDU_DATA_OBJECT_CONSTRUCT_END()  _APDU_DATA_OBJECT_CONSTRUCT_END(&response);
+
+static inline void _APDU_DATA_OBJECT_CONSTRUCT_END(struct RDR_to_PC_DataBlock *response) {
+	uint8_t offset = 0;
+	if ((response->abData[offset++] >> 8 & 0x1F) == 0x1F)
+		++offset;
+
+	uint8_t size = response->dwLength - offset;
+	if (size >= 0x80)
+		response->abData[offset++] = 0x81;
+	response->abData[offset++] = size;
+}
+
+#define _APDU_RETURN(response, SW1, SW2)  \
+	do {  \
+		response.dwLength += 2;  \
+		response.abData[response.dwLength - 2] = SW1;  \
+		response.abData[response.dwLength - 1] = SW2;  \
+	} while (0)
+
 #define  APDU_RETURN(response, type)      SPLAT(_APDU_RETURN, response, APDU_ ## type)
 
 #define APDU_CHECK(buffer, length, APDU) (sizeof((APDU)) == (length) && memcmp((buffer), (APDU), (length)) == 0)
@@ -133,6 +185,12 @@ struct APDU_ICC_DO_PW_STATUS {
 } __attribute__((packed));
 extern const struct APDU_ICC_DO_PW_STATUS APDU_PGP_PW_STATUS;
 
+struct APDU_ICC_DO_FINGERPRINTS {
+	uint8_t Sig[20];
+	uint8_t Dec[20];
+	uint8_t Aut[20];
+} __attribute__((packed));
+
 struct APDU_ICC_DO_EXTENDED_CAPS {
 	struct {
 		bool secureMessaging       : 1;
@@ -151,9 +209,8 @@ struct APDU_ICC_DO_EXTENDED_CAPS {
 	uint16_t maxSpecialDOLength;
 	uint8_t  pinBlock2;
 	uint8_t  RFU;
-
-	struct APDU_STATUS status;
 } __attribute__((packed));
 extern const struct APDU_ICC_DO_EXTENDED_CAPS APDU_PGP_EXTENDED_CAPS;
+
 
 #endif
