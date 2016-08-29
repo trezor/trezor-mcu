@@ -21,7 +21,6 @@
 
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
-#include <libopencm3/cm3/scb.h>
 
 #include "bootloader.h"
 #include "buttons.h"
@@ -34,7 +33,7 @@
 #include "serialno.h"
 #include "rng.h"
 
-#ifdef APPVER
+#if defined(APPVER) && !defined(FASTFLASH)
 #error Bootloader cannot be used in app mode
 #endif
 
@@ -79,14 +78,6 @@ void show_unofficial_warning(uint8_t *hash)
 	}
 
 	// everything is OK, user pressed 2x Continue -> continue program
-}
-
-void load_app(void)
-{
-	// jump to app
-	SCB_VTOR = FLASH_APP_START; // & 0xFFFF;
-	__asm__ volatile("msr msp, %0"::"g" (*(volatile uint32_t *)FLASH_APP_START));
-	(*(void (**)())(FLASH_APP_START + 4))();
 }
 
 void bootloader_loop(void)
@@ -144,6 +135,7 @@ int main(void)
 	memory_protect();
 	oledInit();
 
+#ifndef FASTFLASH
 	// at least one button is unpressed
 	uint16_t state = gpio_port_read(BTN_PORT);
 	if ((state & BTN_PIN_YES) == BTN_PIN_YES || (state & BTN_PIN_NO) == BTN_PIN_NO) {
@@ -159,9 +151,10 @@ int main(void)
 			show_unofficial_warning(hash);
 		}
 
-		load_app();
+		load_address(FLASH_APP_START);
 
 	}
+#endif
 
 	bootloader_loop();
 

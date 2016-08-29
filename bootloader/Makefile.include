@@ -1,0 +1,12 @@
+OBJECTS := bootloader.o signatures.o usb.o
+OBJECTS := $(addprefix $(APPLICATION)/,$(OBJECTS))
+
+$(call add-algorithms, bignum ecdsa hmac ripemd160 secp256k1 sha2)
+
+override CFLAGS += -DUSE_PRECOMPUTED_IV=0 -DUSE_PRECOMPUTED_CP=0
+
+FASTFLASH ?= 0
+ifneq ($(FASTFLASH),0)
+APPLICATION_VERSION := fastflash
+override CFLAGS += -DFASTFLASH
+endif

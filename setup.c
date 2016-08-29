@@ -17,6 +17,8 @@
  * along with this library.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <libopencm3/cm3/scb.h>
+
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/spi.h>
@@ -72,4 +74,12 @@ void setupApp(void)
 	// hotfix for old bootloader
 	gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO9);
 	spi_init_master(SPI1, SPI_CR1_BAUDRATE_FPCLK_DIV_8, SPI_CR1_CPOL_CLK_TO_0_WHEN_IDLE, SPI_CR1_CPHA_CLK_TRANSITION_1, SPI_CR1_DFF_8BIT, SPI_CR1_MSBFIRST);
+}
+
+void load_address(const uint32_t address) {
+	SCB_VTOR = address; // & 0xFFFF;
+	__asm__ volatile("msr msp, %0"::"g" (*(volatile uint32_t *)address));
+	(*(void (**)())(address + 4))();
+
+	for (;;) {}
 }

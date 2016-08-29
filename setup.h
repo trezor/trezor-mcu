@@ -23,4 +23,6 @@
 void setup(void);
 void setupApp(void);
 
+void __attribute__((noreturn)) load_address(const uint32_t);
+
 #endif
