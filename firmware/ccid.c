@@ -129,15 +129,6 @@ CCID_HANDLER(XfrBlock, request, buf) {
 		APDU_DATA_OBJECT(AID);
 		APDU_DATA_OBJECT(PW_STATUS);
 
-		case APDU_ICC_DO_NAME_TAG:
-			if (name && protectUnlockedPin(true)) {
-				strlcpy((char *) response.abData, name, sizeof(response.abData));
-				response.dwLength += strlen(name);
-			}
-
-			APDU_RETURN(response, SUCCESS);
-			break;
-
 		case APDU_ICC_DO_SECURITY_SUPPORT_TEMPL_TAG:
 			if (!protectUnlocked(true)) {
 				debugLog(0, "", "APDU GET DATA: displaying PIN matrix");
@@ -145,6 +136,11 @@ CCID_HANDLER(XfrBlock, request, buf) {
 			}
 
 			APDU_RETURN(response, NOT_SUPPORTED);
+			break;
+
+		APDU_DATA_OBJECT_CONSTRUCT_INIT(CARDHOLDER_RELATED_DATA)
+			APDU_DATA_OBJECT_CONSTRUCT_OTHER(NAME, name, strlen(name));
+			APDU_RETURN(response, SUCCESS);
 			break;
 
 		APDU_DATA_OBJECT_CONSTRUCT_INIT(APPLICATION_RELATED_DATA)
