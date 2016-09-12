@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+IMAGE=trezor-mcu-build
+
+if [ -z "$SUDO_UID" ]; then
+    SUDO_UID="$(id -u)"
+fi
+
+exec docker run -u "$SUDO_UID" -v "$(pwd):/build" --rm -it \
+    -e APPLICATION \
+    -e CFLAGS \
+    -e LDFLAGS \
+    "$IMAGE" "$@"

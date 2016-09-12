@@ -1,0 +1,3 @@
+#!/bin/sh
+IMAGE=trezor-mcu-build
+exec docker build -t "$IMAGE" - < Dockerfile
