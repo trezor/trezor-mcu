@@ -118,6 +118,8 @@ GetECDHSessionKey.ecdsa_curve_name	max_size:32
 
 ECDHSessionKey.session_key		max_size:65
 
+InitializeOpenPGP.ecdsa_curve_name	max_size:32
+
 # not used in firmware
 SimpleSignTx.inputs			max_count:0
 SimpleSignTx.outputs			max_count:0

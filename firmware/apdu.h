@@ -70,6 +70,8 @@ static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04,
 #define APDU_ICC_DO_PUBLIC_KEY_ECC_TAG    0x86
 
 // OpenPGP algorithms
+#define PGP_DERIVATION_PATH (0x80 << 24 | 'P' << 16 | 'G' << 8 | 'P' << 0)
+
 #define PGP_ECDSA_ALGO  19
 #define PGP_EDDSA_ALGO  22
 

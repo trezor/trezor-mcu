@@ -73,6 +73,7 @@ static const struct MessagesMap_t MessagesMap[] = {
 	{'n', 'i', MessageType_MessageType_RecoveryDevice,		RecoveryDevice_fields,		(void (*)(void *))fsm_msgRecoveryDevice},
 	{'n', 'i', MessageType_MessageType_WordAck,				WordAck_fields,				(void (*)(void *))fsm_msgWordAck},
 	{'n', 'i', MessageType_MessageType_SetU2FCounter,		SetU2FCounter_fields,		(void (*)(void *))fsm_msgSetU2FCounter},
+	{'n', 'i', MessageType_MessageType_InitializeOpenPGP,		InitializeOpenPGP_fields,	(void (*)(void *))fsm_msgInitializeOpenPGP},
 	{'n', 'i', MessageType_MessageType_EthereumGetAddress,		EthereumGetAddress_fields,	(void (*)(void *))fsm_msgEthereumGetAddress},
 	{'n', 'i', MessageType_MessageType_EthereumSignTx,		EthereumSignTx_fields,		(void (*)(void *))fsm_msgEthereumSignTx},
 	{'n', 'i', MessageType_MessageType_EthereumTxAck,		EthereumTxAck_fields,		(void (*)(void *))fsm_msgEthereumTxAck},

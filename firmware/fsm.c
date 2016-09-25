@@ -48,6 +48,7 @@
 #include "secp256k1.h"
 #include <libopencm3/stm32/flash.h>
 #include "ethereum.h"
+#include "apdu.h"
 
 // message methods
 
@@ -996,6 +997,34 @@ void fsm_msgSetU2FCounter(SetU2FCounter *msg)
 	storage_setU2FCounter(msg->u2f_counter);
 	fsm_sendSuccess("U2F counter set");
 	layoutHome();
+}
+
+void fsm_msgInitializeOpenPGP(InitializeOpenPGP *msg)
+{
+	const char *curve = NIST256P1_NAME;
+	if (msg->has_ecdsa_curve_name) {
+		curve = msg->ecdsa_curve_name;
+	}
+
+	CHECK_PARAM(
+		strcmp(curve, NIST256P1_NAME) == 0 || strcmp(curve, ED25519_NAME) == 0,
+		"Unsupported curve for OpenPGP"
+	);
+
+	CHECK_INITIALIZED
+	CHECK_PIN
+
+	static uint32_t address_n[2] = { PGP_DERIVATION_PATH, 0 };
+	address_n[1] = 0x80000000 | msg->time;
+
+	const HDNode *node = fsm_getDerivedNode(curve, address_n, sizeof(address_n) / sizeof(uint32_t));
+	if (!node) return;
+
+	storage.has_pgp_curve_name = true;
+	strlcpy(storage.pgp_curve_name, curve, sizeof(storage.pgp_curve_name));
+	storage_commit();
+
+	fsm_sendSuccess("OpenPGP initialized");
 }
 
 #if DEBUG_LINK

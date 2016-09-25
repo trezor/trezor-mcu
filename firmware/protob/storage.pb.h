@@ -50,13 +50,15 @@ typedef struct _Storage {
     char name[40];
     bool has_sex;
     ISO5218 sex;
+    bool has_pgp_curve_name;
+    char pgp_curve_name[32];
 } Storage;
 
 /* Default values for struct fields */
 
 /* Initializer values for message structs */
-#define Storage_init_default                     {0, false, HDNodeType_init_default, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0}
-#define Storage_init_zero                        {0, false, HDNodeType_init_zero, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0}
+#define Storage_init_default                     {0, false, HDNodeType_init_default, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0, false, ""}
+#define Storage_init_zero                        {0, false, HDNodeType_init_zero, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0, false, ""}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define Storage_version_tag                      1
@@ -72,12 +74,13 @@ typedef struct _Storage {
 #define Storage_u2f_counter_tag                  11
 #define Storage_name_tag                         12
 #define Storage_sex_tag                          13
+#define Storage_pgp_curve_name_tag               14
 
 /* Struct field encoding specification for nanopb */
-extern const pb_field_t Storage_fields[14];
+extern const pb_field_t Storage_fields[15];
 
 /* Maximum encoded size of messages (where known) */
-#define Storage_size                             (1413 + HDNodeType_size)
+#define Storage_size                             (1447 + HDNodeType_size)
 
 #ifdef __cplusplus
 } /* extern "C" */

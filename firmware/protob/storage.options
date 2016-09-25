@@ -5,3 +5,4 @@ Storage.label		max_size:33
 Storage.homescreen	max_size:1024
 
 Storage.name		max_size:40
+Storage.pgp_curve_name	max_size:32
