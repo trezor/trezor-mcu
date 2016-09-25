@@ -27,6 +27,8 @@
 #include "protect.h"
 #include "pinmatrix.h"
 
+#include "curves.h"
+
 #include <string.h>
 
 CCID_HANDLER_INIT(IccPowerOn);
@@ -80,15 +82,9 @@ CCID_HANDLER(GetSlotStatus, request, buf) {
 }
 
 CCID_HANDLER(XfrBlock, request, buf) {
-	const struct APDU_REQUEST *apdu = (struct APDU_REQUEST *) buf;
-	const uint8_t *data = &buf[sizeof(*apdu)];
+	struct APDU_REQUEST *apdu = (struct APDU_REQUEST *) buf;
+	uint8_t *data = &buf[sizeof(*apdu)];
 	debugLog(0, "", __func__);
-
-	if (apdu->Lc != request->dwLength - sizeof(*apdu)) {
-		// Attempted attack?
-		debugLog(0, "", "APDU: Invalid Length!");
-		return;
-	}
 
 	static struct RDR_to_PC_DataBlock response = {
 		.bMessageType = RDR_to_PC_DataBlock_Type,
@@ -122,6 +118,12 @@ CCID_HANDLER(XfrBlock, request, buf) {
 	response.bSeq = request->bSeq;
 
 	uint16_t tag = (apdu->P1 << 8) + apdu->P2;
+
+	if (apdu->INS == APDU_SELECT_FILE) {
+		// Discard selection options
+		apdu->P2 = 0x00;
+	}
+
 	if (APDU_CHECK(buf, request->dwLength, APDU_PGP_COMMAND_SELECT)) {
 		APDU_RETURN(response, SUCCESS);
 	} else if (apdu->INS == APDU_GET_DATA) {
@@ -138,14 +140,25 @@ CCID_HANDLER(XfrBlock, request, buf) {
 			APDU_RETURN(response, NOT_SUPPORTED);
 			break;
 
-		APDU_DATA_OBJECT_CONSTRUCT_INIT(CARDHOLDER_RELATED_DATA)
+		case APDU_ICC_DO_CARDHOLDER_RELATED_DATA_TAG:
+			APDU_DATA_OBJECT_CONSTRUCT_INIT(CARDHOLDER_RELATED_DATA);
+
 			APDU_DATA_OBJECT_CONSTRUCT_OTHER(NAME, name, strlen(name));
+
+			APDU_DATA_OBJECT_CONSTRUCT_END();
 			APDU_RETURN(response, SUCCESS);
 			break;
 
-		APDU_DATA_OBJECT_CONSTRUCT_INIT(APPLICATION_RELATED_DATA)
+		case APDU_ICC_DO_APPLICATION_RELATED_DATA_TAG:
+			APDU_DATA_OBJECT_CONSTRUCT_INIT(APPLICATION_RELATED_DATA);
+
 			APDU_DATA_OBJECT_CONSTRUCT(EXTENDED_CAPS);
 			APDU_DATA_OBJECT_CONSTRUCT(FINGERPRINTS);
+
+			APDU_DATA_OBJECT_CONSTRUCT_OTHER(ALGORITHM_ATTRS_SIG, PGP_NISTP256, sizeof(PGP_NISTP256));
+			APDU_DATA_OBJECT_CONSTRUCT_OTHER(ALGORITHM_ATTRS_DEC, PGP_NISTP256, sizeof(PGP_NISTP256));
+			APDU_DATA_OBJECT_CONSTRUCT_OTHER(ALGORITHM_ATTRS_AUT, PGP_NISTP256, sizeof(PGP_NISTP256));
+
 			APDU_DATA_OBJECT_CONSTRUCT_END();
 			APDU_RETURN(response, SUCCESS);
 			break;
@@ -184,7 +197,9 @@ CCID_HANDLER(XfrBlock, request, buf) {
 
 		if (!protectUnlocked(true)) {
 			// Initialize passphrase to point to a '\0' so it acts like a zero-length string
-			char *pin = (char *) data, *passphrase = (char *) &data[apdu->Lc], *separator;
+			char *pin = (char *) data,
+				 *passphrase = (char *) &data[request->dwLength - sizeof(*apdu)],
+				 *separator;
 
 			// The buffer containing the request should be uint8_t[65] to allow for a null terminator
 			*passphrase = '\0';

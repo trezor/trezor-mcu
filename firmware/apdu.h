@@ -62,16 +62,24 @@ static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04,
 #define APDU_ICC_DO_CARDHOLDER_RELATED_DATA_TAG   0x65
 #define APDU_ICC_DO_APPLICATION_RELATED_DATA_TAG  0x6E
 
-#define APDU_ICC_DO_ALGORITHM_ATTRS_TAG(index)   (0xC1 + index)
+#define APDU_ICC_DO_ALGORITHM_ATTRS_SIG_TAG       0xC1
+#define APDU_ICC_DO_ALGORITHM_ATTRS_DEC_TAG       0xC2
+#define APDU_ICC_DO_ALGORITHM_ATTRS_AUT_TAG       0xC3
+
+#define APDU_ICC_DO_PUBLIC_KEY_TAG      0x7F49
+#define APDU_ICC_DO_PUBLIC_KEY_ECC_TAG    0x86
 
 // OpenPGP algorithms
 #define PGP_ECDSA_ALGO  19
 #define PGP_EDDSA_ALGO  22
 
-#define PGP_ED25519_OID    0x2B, 0x06, 0x01, 0x04, 0x01, 0x47, 0x01
+#define PGP_ED25519_OID    0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01
 #define PGP_ED25519_ALGO   (PGP_EDDSA_ALGO)
 #define PGP_NISTP256_OID   0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07
 #define PGP_NISTP256_ALGO  (PGP_ECDSA_ALGO)
+
+static const uint8_t  PGP_ED25519[] = {  PGP_ED25519_ALGO,  PGP_ED25519_OID };
+static const uint8_t PGP_NISTP256[] = { PGP_NISTP256_ALGO, PGP_NISTP256_OID };
 
 // APDU status codes
 #define APDU_SUCCESS         0x90, 0x00
@@ -89,9 +97,10 @@ static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04,
 		break
 
 #define  APDU_DATA_OBJECT_CONSTRUCT_INIT(tag)  \
-	case APDU_ICC_DO_ ## tag ## _TAG:  \
+	do {  \
 		_APDU_DATA_OBJECT_CONSTRUCT(&response, APDU_ICC_DO_ ## tag ## _TAG, NULL, 0);  \
-		response.abData[response.dwLength++] = 0x00;
+		response.abData[response.dwLength++] = 0x00;  \
+	} while (0)
 
 #define  APDU_DATA_OBJECT_CONSTRUCT(tag)  \
 	_APDU_DATA_OBJECT_CONSTRUCT(&response, APDU_ICC_DO_ ## tag ## _TAG,  \
@@ -123,10 +132,10 @@ static inline void _APDU_DATA_OBJECT_CONSTRUCT(struct RDR_to_PC_DataBlock *respo
 
 static inline void _APDU_DATA_OBJECT_CONSTRUCT_END(struct RDR_to_PC_DataBlock *response) {
 	uint8_t offset = 0;
-	if ((response->abData[offset++] >> 8 & 0x1F) == 0x1F)
+	if ((response->abData[offset++] & 0x1F) == 0x1F)
 		++offset;
 
-	uint8_t size = response->dwLength - offset;
+	uint8_t size = response->dwLength - offset - 1;
 	if (size >= 0x80)
 		response->abData[offset++] = 0x81;
 	response->abData[offset++] = size;
