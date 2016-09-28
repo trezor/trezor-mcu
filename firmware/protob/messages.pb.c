@@ -454,6 +454,40 @@ const pb_field_t DebugLinkFlashErase_fields[2] = {
     PB_LAST_FIELD
 };
 
+const pb_field_t SteemOperationTransfer_fields[6] = {
+    PB_FIELD2(  1, STRING  , REQUIRED, STATIC  , FIRST, SteemOperationTransfer, from, from, 0),
+    PB_FIELD2(  2, STRING  , REQUIRED, STATIC  , OTHER, SteemOperationTransfer, to, from, 0),
+    PB_FIELD2(  3, INT64   , REQUIRED, STATIC  , OTHER, SteemOperationTransfer, amount, to, 0),
+    PB_FIELD2(  4, STRING  , REQUIRED, STATIC  , OTHER, SteemOperationTransfer, asset, amount, 0),
+    PB_FIELD2(  5, STRING  , OPTIONAL, STATIC  , OTHER, SteemOperationTransfer, memo, asset, 0),
+    PB_LAST_FIELD
+};
+
+const pb_field_t SteemSignTx_fields[5] = {
+    PB_FIELD2(  1, UINT32  , REQUIRED, STATIC  , FIRST, SteemSignTx, ref_block_num, ref_block_num, 0),
+    PB_FIELD2(  2, UINT32  , REQUIRED, STATIC  , OTHER, SteemSignTx, ref_block_prefix, ref_block_num, 0),
+    PB_FIELD2(  3, UINT32  , REQUIRED, STATIC  , OTHER, SteemSignTx, expiration, ref_block_prefix, 0),
+    PB_FIELD2(  4, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemSignTx, transfer, expiration, &SteemOperationTransfer_fields),
+    PB_LAST_FIELD
+};
+
+const pb_field_t SteemTxSignature_fields[3] = {
+    PB_FIELD2(  1, BYTES   , REQUIRED, STATIC  , FIRST, SteemTxSignature, signature, signature, 0),
+    PB_FIELD2(  2, BYTES   , OPTIONAL, STATIC  , OTHER, SteemTxSignature, digest, signature, 0),
+    PB_LAST_FIELD
+};
+
+const pb_field_t SteemGetPublicKey_fields[3] = {
+    PB_FIELD2(  1, UINT32  , REPEATED, STATIC  , FIRST, SteemGetPublicKey, address_n, address_n, 0),
+    PB_FIELD2(  2, BOOL    , OPTIONAL, STATIC  , OTHER, SteemGetPublicKey, show_display, address_n, 0),
+    PB_LAST_FIELD
+};
+
+const pb_field_t SteemPublicKey_fields[2] = {
+    PB_FIELD2(  1, BYTES   , REQUIRED, STATIC  , FIRST, SteemPublicKey, pubkey, pubkey, 0),
+    PB_LAST_FIELD
+};
+
 
 /* Check that field information fits in pb_field_t */
 #if !defined(PB_FIELD_32BIT)
@@ -464,7 +498,7 @@ const pb_field_t DebugLinkFlashErase_fields[2] = {
  * numbers or field sizes that are larger than what can fit in 8 or 16 bit
  * field descriptors.
  */
-STATIC_ASSERT((pb_membersize(Features, coins[0]) < 65536 && pb_membersize(PublicKey, node) < 65536 && pb_membersize(GetAddress, multisig) < 65536 && pb_membersize(LoadDevice, node) < 65536 && pb_membersize(SimpleSignTx, inputs[0]) < 65536 && pb_membersize(SimpleSignTx, outputs[0]) < 65536 && pb_membersize(SimpleSignTx, transactions[0]) < 65536 && pb_membersize(TxRequest, details) < 65536 && pb_membersize(TxRequest, serialized) < 65536 && pb_membersize(TxAck, tx) < 65536 && pb_membersize(SignIdentity, identity) < 65536 && pb_membersize(GetECDHSessionKey, identity) < 65536 && pb_membersize(DebugLinkState, node) < 65536), YOU_MUST_DEFINE_PB_FIELD_32BIT_FOR_MESSAGES_Initialize_GetFeatures_Features_ClearSession_ApplySettings_ChangePin_Ping_Success_Failure_ButtonRequest_ButtonAck_PinMatrixRequest_PinMatrixAck_Cancel_PassphraseRequest_PassphraseAck_GetEntropy_Entropy_GetPublicKey_PublicKey_GetAddress_EthereumGetAddress_Address_EthereumAddress_WipeDevice_LoadDevice_ResetDevice_EntropyRequest_EntropyAck_RecoveryDevice_WordRequest_WordAck_SignMessage_VerifyMessage_MessageSignature_EncryptMessage_EncryptedMessage_DecryptMessage_DecryptedMessage_CipherKeyValue_CipheredKeyValue_EstimateTxSize_TxSize_SignTx_SimpleSignTx_TxRequest_TxAck_EthereumSignTx_EthereumTxRequest_EthereumTxAck_SignIdentity_SignedIdentity_GetECDHSessionKey_ECDHSessionKey_SetU2FCounter_FirmwareErase_FirmwareUpload_DebugLinkDecision_DebugLinkGetState_DebugLinkState_DebugLinkStop_DebugLinkLog_DebugLinkMemoryRead_DebugLinkMemory_DebugLinkMemoryWrite_DebugLinkFlashErase)
+STATIC_ASSERT((pb_membersize(Features, coins[0]) < 65536 && pb_membersize(PublicKey, node) < 65536 && pb_membersize(GetAddress, multisig) < 65536 && pb_membersize(LoadDevice, node) < 65536 && pb_membersize(SimpleSignTx, inputs[0]) < 65536 && pb_membersize(SimpleSignTx, outputs[0]) < 65536 && pb_membersize(SimpleSignTx, transactions[0]) < 65536 && pb_membersize(TxRequest, details) < 65536 && pb_membersize(TxRequest, serialized) < 65536 && pb_membersize(TxAck, tx) < 65536 && pb_membersize(SignIdentity, identity) < 65536 && pb_membersize(GetECDHSessionKey, identity) < 65536 && pb_membersize(DebugLinkState, node) < 65536 && pb_membersize(SteemSignTx, transfer) < 65536), YOU_MUST_DEFINE_PB_FIELD_32BIT_FOR_MESSAGES_Initialize_GetFeatures_Features_ClearSession_ApplySettings_ChangePin_Ping_Success_Failure_ButtonRequest_ButtonAck_PinMatrixRequest_PinMatrixAck_Cancel_PassphraseRequest_PassphraseAck_GetEntropy_Entropy_GetPublicKey_PublicKey_GetAddress_EthereumGetAddress_Address_EthereumAddress_WipeDevice_LoadDevice_ResetDevice_EntropyRequest_EntropyAck_RecoveryDevice_WordRequest_WordAck_SignMessage_VerifyMessage_MessageSignature_EncryptMessage_EncryptedMessage_DecryptMessage_DecryptedMessage_CipherKeyValue_CipheredKeyValue_EstimateTxSize_TxSize_SignTx_SimpleSignTx_TxRequest_TxAck_EthereumSignTx_EthereumTxRequest_EthereumTxAck_SignIdentity_SignedIdentity_GetECDHSessionKey_ECDHSessionKey_SetU2FCounter_FirmwareErase_FirmwareUpload_DebugLinkDecision_DebugLinkGetState_DebugLinkState_DebugLinkStop_DebugLinkLog_DebugLinkMemoryRead_DebugLinkMemory_DebugLinkMemoryWrite_DebugLinkFlashErase_SteemOperationTransfer_SteemSignTx_SteemTxSignature_SteemGetPublicKey_SteemPublicKey)
 #endif
 
 #if !defined(PB_FIELD_16BIT) && !defined(PB_FIELD_32BIT)

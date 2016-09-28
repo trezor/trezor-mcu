@@ -18,6 +18,7 @@ OBJS += reset.o
 OBJS += signing.o
 OBJS += crypto.o
 OBJS += ethereum.o
+OBJS += steem.o
 
 OBJS += debug.o
 
@@ -64,3 +65,6 @@ CFLAGS += -DSCM_REVISION='"$(shell git rev-parse HEAD | sed 's:\(..\):\\x\1:g')"
 CFLAGS += -DED25519_CUSTOMRANDOM=1
 CFLAGS += -DED25519_CUSTOMHASH=1
 CFLAGS += -DUSE_ETHEREUM=1
+CFLAGS += -DUSE_GRAPHENE=1
+CFLAGS += -DUSE_STEEM=1
+CFLAGS += -DUSE_RFC6979=1

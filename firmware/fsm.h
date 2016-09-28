@@ -63,6 +63,10 @@ void fsm_msgEthereumGetAddress(EthereumGetAddress *msg);
 void fsm_msgEthereumSignTx(EthereumSignTx *msg);
 void fsm_msgEthereumTxAck(EthereumTxAck *msg);
 
+// STEEM
+void fsm_msgSteemGetPublicKey(SteemGetPublicKey *msg);
+void fsm_msgSteemSignTx(SteemSignTx *msg);
+
 // debug message functions
 #if DEBUG_LINK
 //void fsm_msgDebugLinkDecision(DebugLinkDecision *msg);

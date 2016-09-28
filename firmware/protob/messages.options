@@ -37,6 +37,16 @@ Address.address				max_size:41
 EthereumGetAddress.address_n		max_count:8
 EthereumAddress.address			max_size:20
 
+SteemGetPublicKey.address_n		max_count:8
+SteemOperationTransfer.from             max_size:16
+SteemOperationTransfer.to               max_size:16
+SteemOperationTransfer.asset            max_size:8
+SteemOperationTransfer.memo             max_size:64
+SteemPublicKey.pubkey                   max_size:33
+SteemPublicKey.address			max_size:20
+SteemTxSignature.signature              max_size:65
+SteemTxSignature.digest                 max_size:32
+
 LoadDevice.mnemonic			max_size:241
 LoadDevice.pin				max_size:10
 LoadDevice.language			max_size:17

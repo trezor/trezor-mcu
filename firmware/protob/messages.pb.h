@@ -69,6 +69,11 @@ typedef enum _MessageType {
     MessageType_MessageType_GetECDHSessionKey = 61,
     MessageType_MessageType_ECDHSessionKey = 62,
     MessageType_MessageType_SetU2FCounter = 63,
+    MessageType_MessageType_SteemPublicKey = 64,
+    MessageType_MessageType_SteemGetPublicKey = 65,
+    MessageType_MessageType_SteemTxSignature = 66,
+    MessageType_MessageType_SteemSignTx = 67,
+    MessageType_MessageType_SteemOperationTransfer = 68,
     MessageType_MessageType_DebugLinkDecision = 100,
     MessageType_MessageType_DebugLinkGetState = 101,
     MessageType_MessageType_DebugLinkState = 102,
@@ -770,6 +775,47 @@ typedef struct _SimpleSignTx {
     uint32_t lock_time;
 } SimpleSignTx;
 
+typedef struct _SteemGetPublicKey {
+    size_t address_n_count;
+    uint32_t address_n[8];
+    bool has_show_display;
+    bool show_display;
+} SteemGetPublicKey;
+
+typedef struct _SteemOperationTransfer {
+    char from[16];
+    char to[16];
+    int64_t amount;
+    char asset[8];
+    bool has_memo;
+    char memo[64];
+} SteemOperationTransfer;
+
+typedef struct {
+    size_t size;
+    uint8_t bytes[33];
+} SteemPublicKey_pubkey_t;
+
+typedef struct _SteemPublicKey {
+    SteemPublicKey_pubkey_t pubkey;
+} SteemPublicKey;
+
+typedef struct {
+    size_t size;
+    uint8_t bytes[65];
+} SteemTxSignature_signature_t;
+
+typedef struct {
+    size_t size;
+    uint8_t bytes[32];
+} SteemTxSignature_digest_t;
+
+typedef struct _SteemTxSignature {
+    SteemTxSignature_signature_t signature;
+    bool has_digest;
+    SteemTxSignature_digest_t digest;
+} SteemTxSignature;
+
 typedef struct _Success {
     bool has_message;
     char message[256];
@@ -818,6 +864,14 @@ typedef struct _VerifyMessage {
 typedef struct _WordAck {
     char word[12];
 } WordAck;
+
+typedef struct _SteemSignTx {
+    uint32_t ref_block_num;
+    uint32_t ref_block_prefix;
+    uint32_t expiration;
+    bool has_transfer;
+    SteemOperationTransfer transfer;
+} SteemSignTx;
 
 /* Default values for struct fields */
 extern const char GetAddress_coin_name_default[17];
@@ -904,6 +958,11 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define DebugLinkMemory_init_default             {false, {0, {0}}}
 #define DebugLinkMemoryWrite_init_default        {false, 0, false, {0, {0}}, false, 0}
 #define DebugLinkFlashErase_init_default         {false, 0}
+#define SteemOperationTransfer_init_default      {"", "", 0, "", false, ""}
+#define SteemSignTx_init_default                 {0, 0, 0, false, SteemOperationTransfer_init_default}
+#define SteemTxSignature_init_default            {{0, {0}}, false, {0, {0}}}
+#define SteemGetPublicKey_init_default           {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
+#define SteemPublicKey_init_default              {{0, {0}}}
 #define Initialize_init_zero                     {0}
 #define GetFeatures_init_zero                    {0}
 #define Features_init_zero                       {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0}
@@ -970,6 +1029,11 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define DebugLinkMemory_init_zero                {false, {0, {0}}}
 #define DebugLinkMemoryWrite_init_zero           {false, 0, false, {0, {0}}, false, 0}
 #define DebugLinkFlashErase_init_zero            {false, 0}
+#define SteemOperationTransfer_init_zero         {"", "", 0, "", false, ""}
+#define SteemSignTx_init_zero                    {0, 0, 0, false, SteemOperationTransfer_init_zero}
+#define SteemTxSignature_init_zero               {{0, {0}}, false, {0, {0}}}
+#define SteemGetPublicKey_init_zero              {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
+#define SteemPublicKey_init_zero                 {{0, {0}}}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define Address_address_tag                      1
@@ -1130,6 +1194,16 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define SimpleSignTx_coin_name_tag               4
 #define SimpleSignTx_version_tag                 5
 #define SimpleSignTx_lock_time_tag               6
+#define SteemGetPublicKey_address_n_tag          1
+#define SteemGetPublicKey_show_display_tag       2
+#define SteemOperationTransfer_from_tag          1
+#define SteemOperationTransfer_to_tag            2
+#define SteemOperationTransfer_amount_tag        3
+#define SteemOperationTransfer_asset_tag         4
+#define SteemOperationTransfer_memo_tag          5
+#define SteemPublicKey_pubkey_tag                1
+#define SteemTxSignature_signature_tag           1
+#define SteemTxSignature_digest_tag              2
 #define Success_message_tag                      1
 #define TxAck_tx_tag                             1
 #define TxRequest_request_type_tag               1
@@ -1141,6 +1215,10 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define VerifyMessage_message_tag                3
 #define VerifyMessage_coin_name_tag              4
 #define WordAck_word_tag                         1
+#define SteemSignTx_ref_block_num_tag            1
+#define SteemSignTx_ref_block_prefix_tag         2
+#define SteemSignTx_expiration_tag               3
+#define SteemSignTx_transfer_tag                 4
 
 /* Struct field encoding specification for nanopb */
 extern const pb_field_t Initialize_fields[1];
@@ -1209,6 +1287,11 @@ extern const pb_field_t DebugLinkMemoryRead_fields[3];
 extern const pb_field_t DebugLinkMemory_fields[2];
 extern const pb_field_t DebugLinkMemoryWrite_fields[4];
 extern const pb_field_t DebugLinkFlashErase_fields[2];
+extern const pb_field_t SteemOperationTransfer_fields[6];
+extern const pb_field_t SteemSignTx_fields[5];
+extern const pb_field_t SteemTxSignature_fields[3];
+extern const pb_field_t SteemGetPublicKey_fields[3];
+extern const pb_field_t SteemPublicKey_fields[2];
 
 /* Maximum encoded size of messages (where known) */
 #define Initialize_size                          0
@@ -1277,6 +1360,11 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 #define DebugLinkMemory_size                     1027
 #define DebugLinkMemoryWrite_size                1035
 #define DebugLinkFlashErase_size                 6
+#define SteemOperationTransfer_size              123
+#define SteemSignTx_size                         143
+#define SteemTxSignature_size                    101
+#define SteemGetPublicKey_size                   50
+#define SteemPublicKey_size                      35
 
 #ifdef __cplusplus
 } /* extern "C" */

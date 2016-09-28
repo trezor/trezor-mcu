@@ -48,6 +48,7 @@
 #include "secp256k1.h"
 #include <libopencm3/stm32/flash.h>
 #include "ethereum.h"
+#include "steem.h"
 
 // message methods
 
@@ -1076,6 +1077,136 @@ void fsm_msgSetU2FCounter(SetU2FCounter *msg)
 	fsm_sendSuccess("U2F counter set");
 	layoutHome();
 }
+
+/**
+ * STEEM
+ */
+#if USE_STEEM
+
+void fsm_msgSteemSignTx(SteemSignTx *msg)
+{
+	RESP_INIT(SteemTxSignature);
+
+	layout_steem_confirm_transfer(
+		msg->transfer.from,
+		msg->transfer.to,
+		msg->transfer.asset,
+		msg->transfer.amount
+	);
+	// true: right, false: left
+	if (!protectButton(ButtonRequestType_ButtonRequest_SignTx, false)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, "Signing Canceled");
+		layoutHome();
+		return;
+	}
+
+	const uint8_t chainid[32] = {0};
+
+	SHA256_CTX ctx;
+	sha256_Init(&ctx);
+
+	gph_ser_bytes(&ctx, (uint8_t *) chainid, 32);
+	gph_ser_int16(&ctx, msg->ref_block_num);
+	gph_ser_int32(&ctx, msg->ref_block_prefix);
+	gph_ser_int32(&ctx, msg->expiration);
+
+	gph_ser_varint(&ctx, 1); // one operation
+
+	/**
+	 * Transfer specific
+	 */
+	gph_ser_varint(&ctx, 2); // transfer operation
+	gph_ser_string(&ctx, msg->transfer.from);
+	gph_ser_string(&ctx, msg->transfer.to);
+	if(steem_ser_amount(&ctx, msg->transfer.amount, msg->transfer.asset))
+	{
+		fsm_sendFailure(FailureType_Failure_Other, "Unknown Asset");
+	}
+	if (msg->transfer.has_memo && msg->transfer.memo) {
+		gph_ser_string(&ctx, msg->transfer.memo);
+	}
+
+	/**
+	 * End of transfer specific
+	 */
+	gph_ser_varint(&ctx, 0); // extension
+
+	// Digest
+	uint8_t digest[32];
+	sha256_Final(&ctx, digest);
+
+	// Send Digest via protobuf
+	resp->has_digest = true;
+	resp->digest.size = 32;
+	memcpy(resp->digest.bytes, digest, 32);
+
+	// Sign the digest
+	HDNode *node = fsm_getDerivedNode(SECP256K1_NAME, NULL, 0); // FIXME
+	hdnode_fill_public_key(node);
+	graphene_sign_digest(node, digest, resp->signature.bytes);
+	resp->signature.size = 65;
+
+	// Send message via protobuf
+	msg_write(MessageType_MessageType_SteemTxSignature, resp);
+
+	layoutHome();
+}
+
+void fsm_msgSteemGetPublicKey(SteemGetPublicKey *msg)
+{
+	RESP_INIT(SteemPublicKey);
+
+	if (!storage_isInitialized()) {
+		fsm_sendFailure(FailureType_Failure_NotInitialized, "Device not initialized");
+		return;
+	}
+
+	if (!protectPin(true)) {
+		layoutHome();
+		return;
+	}
+
+	const HDNode *node = fsm_getDerivedNode(SECP256K1_NAME, msg->address_n, msg->address_n_count);
+	if (!node) return;
+
+	resp->pubkey.size = 33;
+	ecdsa_get_public_key33(node->curve->params, node->private_key, resp->pubkey.bytes);
+
+	char formatedKey[53 + 3];
+	memcpy(formatedKey + 0, "STM", 3);
+	base58gph_encode_check(resp->pubkey.bytes, 33, formatedKey + 3, sizeof(formatedKey));
+
+	static char _pubkey1[14] = {0};
+	static char _pubkey2[14] = {0};
+	static char _pubkey3[14] = {0};
+	static char _pubkey4[14] = {0};
+
+	strlcpy(_pubkey1, formatedKey + 0*sizeof(_pubkey1), sizeof(_pubkey1));
+	strlcpy(_pubkey2, formatedKey + 1*sizeof(_pubkey2), sizeof(_pubkey2));
+	strlcpy(_pubkey3, formatedKey + 2*sizeof(_pubkey3), sizeof(_pubkey3));
+	strlcpy(_pubkey4, formatedKey + 3*sizeof(_pubkey4), sizeof(_pubkey4));
+
+	layoutDialogSwipe(&bmp_icon_question,
+		NULL,
+		"Done",
+		NULL,
+		"Public Key",
+		_pubkey1,
+		_pubkey2,
+		_pubkey3,
+		_pubkey4,
+		NULL
+	);
+	if (!protectButton(ButtonRequestType_ButtonRequest_PublicKey, true)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, "Show pubkey cancelled");
+	}
+
+	msg_write(MessageType_MessageType_SteemPublicKey, resp);
+
+	layoutHome();
+}
+
+#endif // USE_STEEM
 
 #if DEBUG_LINK
 
