@@ -295,8 +295,6 @@ void oledDrawStringRight(int x, int y, const char* text)
 	oledDrawString(x, y, text);
 }
 
-#define min(X,Y) ((X) < (Y) ? (X) : (Y))
-
 void oledDrawBitmap(int x, int y, const BITMAP *bmp)
 {
 	int i, j;

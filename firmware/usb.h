@@ -21,6 +21,7 @@
 #define __USB_H__
 
 #include <stdint.h>
+#include "ccid.h"
 
 void usbInit(void);
 void usbPoll(void);
@@ -28,6 +29,6 @@ void usbReconnect(void);
 char usbTiny(char set);
 void usbSleep(uint32_t millis);
 
-void ccid_tx(const void *tx, uint16_t txlen);
+void ccid_tx(const CCID_HEADER *request);
 
 #endif

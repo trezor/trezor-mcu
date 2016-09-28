@@ -22,31 +22,21 @@
 
 #include <stdint.h>
 
+typedef struct {
+	uint8_t  bMessageType;
+	uint32_t dwLength;
+	uint8_t  bSlot;
+	uint8_t  bSeq;
+	uint8_t  abRFU[3];
+	uint8_t  abData[];
+} __attribute__((packed)) CCID_HEADER;
+
+void ccid_rx(const CCID_HEADER *request);
+
+/*
+ * USB CCID Descriptor
+ */
 #define USB_CLASS_CSCID 0x0b
-
-
-// CCID command handling macros
-#define CCID_HANDLER(type, request, buf)  \
-	void PC_to_RDR_ ## type(struct PC_to_RDR_ ## type *request, uint8_t *buf)
-
-#define CCID_HANDLER_INIT(type)  CCID_HANDLER(type, // */, /*)
-
-#define CCID_HANDLER_TEST(type)  \
-	case PC_to_RDR_ ## type ## _Type:  \
-		PC_to_RDR_ ## type((struct PC_to_RDR_ ## type *) header, buf);  \
-		break
-
-#define CCID_CAST_RESPONSE(type)  \
-	struct RDR_to_PC_ ## type *response = (struct RDR_to_PC_ ## type *) request;  \
-	*response = (struct RDR_to_PC_ ## type) {  \
-		.bMessageType = RDR_to_PC_ ## type ## _Type,  \
-		.bSlot = request->bSlot,  \
-		.bSeq = request->bSeq  \
-	}
-
-#define CCID_TX(response)  ccid_tx((response), sizeof(struct ccid_header) + (response)->dwLength)
-
-
 struct usb_ccid_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
@@ -72,23 +62,20 @@ struct usb_ccid_descriptor {
 	uint8_t  bMaxCCIDBusySlots;
 } __attribute__((packed));
 
-struct ccid_header {
-	uint8_t  bMessageType;
-	uint32_t dwLength;
-	uint8_t  bSlot;
-	uint8_t  bSeq;
-	uint8_t  reserved[3];
-} __attribute__((packed));
+/*
+ * CCID Messages
+ */
 
-struct ccid_slot_status {
-	unsigned int bmICCStatus     : 2;
-	unsigned int bmRFU           : 4;
-	unsigned int bmCommandStatus : 2;
-} __attribute__((packed));
+enum {
+	PC_to_RDR_IccPowerOn    = 0x62,
+	PC_to_RDR_IccPowerOff   = 0x63,
+	PC_to_RDR_GetSlotStatus = 0x65,
+	PC_to_RDR_XfrBlock      = 0x6F,
 
-void ccid_read(struct ccid_header *header, uint8_t *buf);
+	RDR_to_PC_DataBlock     = 0x80,
+	RDR_to_PC_SlotStatus    = 0x81,
+};
 
-#define PC_to_RDR_IccPowerOn_Type 0x62
 struct PC_to_RDR_IccPowerOn {
 	uint8_t  bMessageType;
 	uint32_t dwLength;
@@ -98,8 +85,6 @@ struct PC_to_RDR_IccPowerOn {
 	uint8_t  abRFU[2];
 } __attribute__((packed));
 
-#define PC_to_RDR_IccPowerOff_Type 0x63
-#define PC_to_RDR_GetSlotStatus_Type 0x65
 struct PC_to_RDR_GetSlotStatus {
 	uint8_t  bMessageType;
 	uint32_t dwLength;
@@ -108,7 +93,6 @@ struct PC_to_RDR_GetSlotStatus {
 	uint8_t  abRFU[3];
 } __attribute__((packed));
 
-#define PC_to_RDR_XfrBlock_Type 0x6F
 struct PC_to_RDR_XfrBlock {
 	uint8_t  bMessageType;
 	uint32_t dwLength;
@@ -116,27 +100,30 @@ struct PC_to_RDR_XfrBlock {
 	uint8_t  bSeq;
 	uint8_t  bBWI;
 	uint16_t wLevelParameter;
+	uint8_t  abData[];
 } __attribute__((packed));
 
-#define RDR_to_PC_DataBlock_Type 0x80
 struct RDR_to_PC_DataBlock {
 	uint8_t  bMessageType;
 	uint32_t dwLength;
 	uint8_t  bSlot;
 	uint8_t  bSeq;
-	struct ccid_slot_status bStatus;
+	unsigned bmICCStatus     : 2;
+	unsigned bmRFU           : 4;
+	unsigned bmCommandStatus : 2;
 	uint8_t  bError;
 	uint8_t  bChainParameter;
 	uint8_t  abData[261];
 } __attribute__((packed));
 
-#define RDR_to_PC_SlotStatus_Type 0x81
 struct RDR_to_PC_SlotStatus {
 	uint8_t  bMessageType;
 	uint32_t dwLength;
 	uint8_t  bSlot;
 	uint8_t  bSeq;
-	struct ccid_slot_status bStatus;
+	unsigned bmICCStatus     : 2;
+	unsigned bmRFU           : 4;
+	unsigned bmCommandStatus : 2;
 	uint8_t  bError;
 	uint8_t  bClockStatus;
 } __attribute__((packed));

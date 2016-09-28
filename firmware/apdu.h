@@ -21,98 +21,50 @@
 #define __APDU_H__
 
 #include "ccid.h"
-#include <string.h>
+
 #include <stdint.h>
-#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
 
-// Helper macro to evaluate arguments
-#define SPLAT(MACRO, ...)  MACRO(__VA_ARGS__)
+typedef struct {
+	uint8_t CLA;
+	uint8_t INS;
+	uint8_t P1;
+	uint8_t P2;
+	uint8_t Lc;
 
-// APDU ICC Answer-To-Reset
-#define APDU_ICC_ATR  0x3B, 0x00
-#define APDU_ICC_ATR_SIZE  sizeof((uint8_t []) { APDU_ICC_ATR })
+	uint8_t data[];
+} __attribute__((packed)) APDU_HEADER;
 
-// APDU commands
-#define APDU_VERIFY      0x20
-#define APDU_SELECT_FILE 0xA4
-#define APDU_GET_DATA    0xCA
-#define APDU_PUT_DATA    0xDA
+enum {
+	APDU_VERIFY = 0x20,
+	APDU_SELECT_FILE = 0xA4,
+	APDU_GET_DATA = 0xCA,
+	APDU_PUT_DATA = 0xDA,
+};
 
-// APDU OpenPGP Application ID
-#define APDU_PGP_APPLICATION_ID  0xD2, 0x76, 0x00, 0x01, 0x24
+typedef enum {
+	APDU_SECURITY_COND_FAIL = 0x6982, // Security condition not satisfied
+	APDU_FCN_NOT_SUPPORTED  = 0x6A81, // Function not supported
+	APDU_FILE_NOT_FOUND     = 0x6A82, // File not found
+	APDU_DATA_NOT_FOUND     = 0x6A88, // Referenced data not found
+	APDU_SUCCESS            = 0x9000, // Command successfully executed (OK)
+	APDU_NOT_SUPPORTED      = 0x911C, // Command code not supported
+} APDU_STATUS;
 
-#define APDU_PGP_VERSION       0x0003
-#define APDU_PGP_MANUFACTURER  0x4c53
+static inline void APDU_SW(struct RDR_to_PC_DataBlock *response, const APDU_STATUS status) {
+	response->abData[response->dwLength++] = status >> 8 & 0xFF;
+	response->abData[response->dwLength++] = status >> 0 & 0xFF;
+}
 
-// APDU OpenPGP commands
-static const uint8_t APDU_PGP_COMMAND_SELECT[] = { 0x00, APDU_SELECT_FILE, 0x04, 0x00, 0x06, APDU_PGP_APPLICATION_ID, 0x01 };
+static inline void APDU_WRITE(struct RDR_to_PC_DataBlock *response, const void *data, const uint8_t length) {
+	if (data != NULL && length > 0) {
+		memcpy(&response->abData[response->dwLength], data, length);
+		response->dwLength += length;
+	}
+}
 
-// APDU OpenPGP password configuration
-#define PGP_PW1_LENGTH  0b0110110
-#define PGP_PW3_LENGTH  (PGP_PW1_LENGTH)
-
-// APDU OpenPGP data object tags
-#define APDU_ICC_DO_AID_TAG            0x4F
-#define APDU_ICC_DO_NAME_TAG           0x5B
-#define APDU_ICC_DO_EXTENDED_CAPS_TAG  0xC0
-#define APDU_ICC_DO_PW_STATUS_TAG      0xC4
-#define APDU_ICC_DO_FINGERPRINTS_TAG   0xC5
-
-#define APDU_ICC_DO_SECURITY_SUPPORT_TEMPL_TAG    0x7A
-#define APDU_ICC_DO_CARDHOLDER_RELATED_DATA_TAG   0x65
-#define APDU_ICC_DO_APPLICATION_RELATED_DATA_TAG  0x6E
-
-#define APDU_ICC_DO_ALGORITHM_ATTRS_SIG_TAG       0xC1
-#define APDU_ICC_DO_ALGORITHM_ATTRS_DEC_TAG       0xC2
-#define APDU_ICC_DO_ALGORITHM_ATTRS_AUT_TAG       0xC3
-
-#define APDU_ICC_DO_PUBLIC_KEY_TAG      0x7F49
-#define APDU_ICC_DO_PUBLIC_KEY_ECC_TAG    0x86
-
-// OpenPGP algorithms
-#define PGP_DERIVATION_PATH (0x80 << 24 | 'P' << 16 | 'G' << 8 | 'P' << 0)
-
-#define PGP_ECDSA_ALGO  19
-#define PGP_EDDSA_ALGO  22
-
-#define PGP_ED25519_OID    0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01
-#define PGP_ED25519_ALGO   (PGP_EDDSA_ALGO)
-#define PGP_NISTP256_OID   0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07
-#define PGP_NISTP256_ALGO  (PGP_ECDSA_ALGO)
-
-static const uint8_t  PGP_ED25519[] = {  PGP_ED25519_ALGO,  PGP_ED25519_OID };
-static const uint8_t PGP_NISTP256[] = { PGP_NISTP256_ALGO, PGP_NISTP256_OID };
-
-// APDU status codes
-#define APDU_SUCCESS         0x90, 0x00
-#define APDU_PW_WRONG        0x69, 0x82
-#define APDU_FCN_NO_SUPPORT  0x6A, 0x81
-#define APDU_FILE_NOT_FOUND  0x6A, 0x82
-#define APDU_DATA_NOT_FOUND  0x6A, 0x88
-#define APDU_NOT_SUPPORTED   0x91, 0x1C
-
-// APDU helper macros
-#define  APDU_DATA_OBJECT(tag)  \
-	case APDU_ICC_DO_ ## tag ## _TAG:  \
-		memcpy(response.abData, &APDU_PGP_ ## tag, sizeof(APDU_PGP_ ## tag));  \
-		response.dwLength = sizeof(APDU_PGP_ ## tag);  \
-		break
-
-#define  APDU_DATA_OBJECT_CONSTRUCT_INIT(tag)  \
-	do {  \
-		_APDU_DATA_OBJECT_CONSTRUCT(&response, APDU_ICC_DO_ ## tag ## _TAG, NULL, 0);  \
-		response.abData[response.dwLength++] = 0x00;  \
-	} while (0)
-
-#define  APDU_DATA_OBJECT_CONSTRUCT(tag)  \
-	_APDU_DATA_OBJECT_CONSTRUCT(&response, APDU_ICC_DO_ ## tag ## _TAG,  \
-		(const uint8_t *) &APDU_PGP_ ## tag, sizeof(APDU_PGP_ ## tag))
-
-#define  APDU_DATA_OBJECT_CONSTRUCT_OTHER(tag, data, length)  \
-	_APDU_DATA_OBJECT_CONSTRUCT(&response, APDU_ICC_DO_ ## tag ## _TAG,  \
-		(const uint8_t *) data, length)
-
-static inline void _APDU_DATA_OBJECT_CONSTRUCT(struct RDR_to_PC_DataBlock *response, uint16_t tag, const uint8_t *data, uint8_t length) {
+static inline void APDU_CONSTRUCT(struct RDR_to_PC_DataBlock *response, const uint16_t tag, const void *data, const uint8_t length) {
 	// Tag
 	if ((tag >> 8 & 0x1F) == 0x1F)
 		response->abData[response->dwLength++] = tag >> 8;
@@ -124,109 +76,29 @@ static inline void _APDU_DATA_OBJECT_CONSTRUCT(struct RDR_to_PC_DataBlock *respo
 	response->abData[response->dwLength++] = length;
 
 	// Data
-	if (length) {
-		memcpy(&response->abData[response->dwLength], data, length);
-		response->dwLength += length;
-	}
+	APDU_WRITE(response, data, length);
 }
 
-#define APDU_DATA_OBJECT_CONSTRUCT_END()  _APDU_DATA_OBJECT_CONSTRUCT_END(&response);
-
-static inline void _APDU_DATA_OBJECT_CONSTRUCT_END(struct RDR_to_PC_DataBlock *response) {
+static inline void APDU_CONSTRUCT_END(struct RDR_to_PC_DataBlock *response) {
 	uint8_t offset = 0;
+
 	if ((response->abData[offset++] & 0x1F) == 0x1F)
 		++offset;
 
-	uint8_t size = response->dwLength - offset - 1;
+	const uint8_t size = response->dwLength - offset - 1;
 	if (size >= 0x80)
 		response->abData[offset++] = 0x81;
+
 	response->abData[offset++] = size;
 }
 
-#define _APDU_RETURN(response, SW1, SW2)  \
-	do {  \
-		response.dwLength += 2;  \
-		response.abData[response.dwLength - 2] = SW1;  \
-		response.abData[response.dwLength - 1] = SW2;  \
-	} while (0)
-
-#define  APDU_RETURN(response, type)      SPLAT(_APDU_RETURN, response, APDU_ ## type)
-
-#define APDU_CHECK(buffer, length, APDU) (sizeof((APDU)) == (length) && memcmp((buffer), (APDU), (length)) == 0)
-
-struct APDU_REQUEST {
-	uint8_t CLA;
-	uint8_t INS;
-	uint8_t P1;
-	uint8_t P2;
-	uint8_t Lc;
-} __attribute__((packed));
-
-struct APDU_STATUS {
-	uint8_t SW1;
-	uint8_t SW2;
-} __attribute__((packed));
-
-// APDU OpenPGP data objects (DOs)
-struct APDU_ICC_DO_AID {
+typedef struct {
 	uint8_t  RID[5];
-	uint8_t  application;
-	uint16_t version;
-	uint16_t manufacturer;
-	uint32_t serialNumber;
+	uint8_t  Application;
+	uint16_t Version;
+	uint16_t Manufacturer;
+	uint32_t SerialNumber;
 	uint8_t  RFU[2];
-
-	struct APDU_STATUS status;
-} __attribute__((packed));
-
-struct APDU_PGP_PW_FORMAT {
-	unsigned int length : 7;
-	unsigned int type : 1;
-} __attribute__((packed));
-
-struct APDU_ICC_DO_PW_STATUS {
-	uint8_t validity;
-
-	struct APDU_PGP_PW_FORMAT PW1;
-	uint8_t RC;
-	struct APDU_PGP_PW_FORMAT PW3;
-
-	struct {
-		uint8_t PW1;
-		uint8_t RC;
-		uint8_t PW3;
-	} counter;
-
-	struct APDU_STATUS status;
-} __attribute__((packed));
-extern const struct APDU_ICC_DO_PW_STATUS APDU_PGP_PW_STATUS;
-
-struct APDU_ICC_DO_FINGERPRINTS {
-	uint8_t Sig[20];
-	uint8_t Dec[20];
-	uint8_t Aut[20];
-} __attribute__((packed));
-
-struct APDU_ICC_DO_EXTENDED_CAPS {
-	struct {
-		bool secureMessaging       : 1;
-		bool challenge             : 1;
-		bool keyImport             : 1;
-		bool mutablePWStatus       : 1;
-		bool privateUse            : 1;
-		bool mutableAlgorithmAttrs : 1;
-		bool AES                   : 1;
-		bool RFU                   : 1;
-	} capabilities;
-
-	uint8_t  secureMessagingAlgorithm;
-	uint16_t maxChallengeLength;
-	uint16_t maxCertLength;
-	uint16_t maxSpecialDOLength;
-	uint8_t  pinBlock2;
-	uint8_t  RFU;
-} __attribute__((packed));
-extern const struct APDU_ICC_DO_EXTENDED_CAPS APDU_PGP_EXTENDED_CAPS;
-
+} __attribute__((packed)) ISO7816_AID;
 
 #endif

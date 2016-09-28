@@ -5,7 +5,7 @@
 
 
 
-const pb_field_t Storage_fields[15] = {
+const pb_field_t Storage_fields[16] = {
     PB_FIELD2(  1, UINT32  , REQUIRED, STATIC  , FIRST, Storage, version, version, 0),
     PB_FIELD2(  2, MESSAGE , OPTIONAL, STATIC  , OTHER, Storage, node, version, &HDNodeType_fields),
     PB_FIELD2(  3, STRING  , OPTIONAL, STATIC  , OTHER, Storage, mnemonic, node, 0),
@@ -19,7 +19,8 @@ const pb_field_t Storage_fields[15] = {
     PB_FIELD2( 11, UINT32  , OPTIONAL, STATIC  , OTHER, Storage, u2f_counter, homescreen, 0),
     PB_FIELD2( 12, STRING  , OPTIONAL, STATIC  , OTHER, Storage, name, u2f_counter, 0),
     PB_FIELD2( 13, ENUM    , OPTIONAL, STATIC  , OTHER, Storage, sex, name, 0),
-    PB_FIELD2( 14, STRING  , OPTIONAL, STATIC  , OTHER, Storage, pgp_curve_name, sex, 0),
+    PB_FIELD2( 14, STRING  , OPTIONAL, STATIC  , OTHER, Storage, openpgp_curve_name, sex, 0),
+    PB_FIELD2( 15, UINT32  , OPTIONAL, STATIC  , OTHER, Storage, openpgp_timestamp, openpgp_curve_name, 0),
     PB_LAST_FIELD
 };
 

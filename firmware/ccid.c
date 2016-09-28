@@ -18,240 +18,125 @@
  */
 
 
-#include "usb.h"
-#include "apdu.h"
 #include "ccid.h"
+
+#include "apdu.h"
 #include "debug.h"
-#include "layout2.h"
-#include "storage.h"
-#include "protect.h"
-#include "pinmatrix.h"
+#include "openpgp.h"
+#include "usb.h"
 
-#include "curves.h"
-
+#include <stddef.h>
 #include <string.h>
 
-CCID_HANDLER_INIT(IccPowerOn);
-CCID_HANDLER_INIT(GetSlotStatus);
-CCID_HANDLER_INIT(XfrBlock);
+static void ccid_IccPowerOn(const CCID_HEADER *request);
+static void ccid_GetSlotStatus(const CCID_HEADER *request);
 
-void ccid_read(struct ccid_header *header, uint8_t *buf) {
-	switch (header->bMessageType) {
-	CCID_HANDLER_TEST(IccPowerOn);
+static void ccid_XfrBlock(const struct PC_to_RDR_XfrBlock *request);
 
-	case PC_to_RDR_IccPowerOff_Type:
-		debugLog(0, "", "PC_to_RDR_IccPowerOff");
-	CCID_HANDLER_TEST(GetSlotStatus);
+/*
+ * Smart card applications
+ */
+typedef enum {
+	NONE = 0,
 
-	CCID_HANDLER_TEST(XfrBlock);
+	/*
+	 * OpenPGP Card 3.0 Application (firmware/openpgp.c)
+	 */
+	CCID_OPENPGP = 0x01,
+} CCID_APPLICATION;
 
+/*
+ * Handle CCID message, expecting request->dwLength to be accurate.
+ */
+void ccid_rx(const CCID_HEADER *request) {
+	switch (request->bMessageType) {
+		case PC_to_RDR_IccPowerOn:
+			ccid_IccPowerOn(request);
+			break;
+
+		case PC_to_RDR_IccPowerOff:
+		case PC_to_RDR_GetSlotStatus:
+			ccid_GetSlotStatus(request);
+			break;
+
+		case PC_to_RDR_XfrBlock:
+			ccid_XfrBlock((struct PC_to_RDR_XfrBlock *) request);
+			break;
+
+		default:
+			debugLog(0, "", "CCID: Unknown message.");
+			break;
+	}
+}
+
+/*
+ * Dummy implementation of RDR_to_PC_IccPowerOn
+ */
+void ccid_IccPowerOn(const CCID_HEADER *request) {
+	static struct RDR_to_PC_DataBlock response = {
+		.bMessageType = RDR_to_PC_DataBlock,
+
+		.dwLength = 2,
+		.abData = { 0x3B, 0x00 }
+	};
+
+	response.bSlot = request->bSlot;
+	response.bSeq = request->bSeq;
+
+	ccid_tx((CCID_HEADER *) &response);
+}
+
+/*
+ * Dummy implementation of RDR_to_PC_GetSlotStatus
+ */
+void ccid_GetSlotStatus(const CCID_HEADER *request) {
+	static struct RDR_to_PC_SlotStatus response = {
+		.bMessageType = RDR_to_PC_SlotStatus,
+	};
+
+	response.bSlot = request->bSlot;
+	response.bSeq = request->bSeq;
+
+	ccid_tx((CCID_HEADER *) &response);
+}
+
+void ccid_XfrBlock(const struct PC_to_RDR_XfrBlock *request) {
+	static CCID_APPLICATION application = NONE;
+
+	struct RDR_to_PC_DataBlock response = {
+		.bMessageType = RDR_to_PC_DataBlock,
+		.bSlot = request->bSlot,
+		.bSeq = request->bSeq,
+	};
+
+	const APDU_HEADER *APDU = (APDU_HEADER *) request->abData;
+
+	switch (APDU->INS) {
+	case APDU_SELECT_FILE:
+		if (memcmp(APDU->data, OPENPGP_APPLICATION_ID, sizeof(OPENPGP_APPLICATION_ID)) == 0) {
+			application = CCID_OPENPGP;
+			APDU_SW(&response, APDU_SUCCESS);
+		} else {
+			debugLog(0, "",  "APDU: File not found.");
+			APDU_SW(&response, APDU_FILE_NOT_FOUND);
+		}
+
+		break;
 	default:
-		debugLog(0, "", "ccid_rx_callback");
+		// Call application specific code
+		switch (application) {
+		case CCID_OPENPGP:
+			ccid_OpenPGP(APDU, request->dwLength, &response);
+			break;
+
+		default:
+			debugLog(0, "",  "APDU: No file selected.");
+			APDU_SW(&response, APDU_NOT_SUPPORTED);
+			break;
+		}
+
 		break;
 	}
-}
 
-CCID_HANDLER(IccPowerOn, request, buf) {
-	(void) buf;
-	debugLog(0, "", __func__);
-
-	static struct RDR_to_PC_DataBlock response = {
-		.bMessageType = RDR_to_PC_DataBlock_Type,
-		.dwLength = APDU_ICC_ATR_SIZE,
-		.bStatus = {
-			.bmICCStatus = 0,
-			.bmRFU = 0,
-			.bmCommandStatus = 0
-		},
-		.bError = 0,
-		.bChainParameter = 0,
-		.abData = { APDU_ICC_ATR }
-	};
-
-	response.bSlot = request->bSlot;
-	response.bSeq = request->bSeq;
-
-	CCID_TX(&response);
-}
-
-CCID_HANDLER(GetSlotStatus, request, buf) {
-	(void) buf;
-	// debugLog(0, "", __func__);
-	CCID_CAST_RESPONSE(SlotStatus);
-	CCID_TX(response);
-}
-
-CCID_HANDLER(XfrBlock, request, buf) {
-	struct APDU_REQUEST *apdu = (struct APDU_REQUEST *) buf;
-	uint8_t *data = &buf[sizeof(*apdu)];
-	debugLog(0, "", __func__);
-
-	static struct RDR_to_PC_DataBlock response = {
-		.bMessageType = RDR_to_PC_DataBlock_Type,
-		.bStatus = {
-			.bmICCStatus = 0,
-			.bmRFU = 0,
-			.bmCommandStatus = 0
-		},
-		.bError = 0,
-		.bChainParameter = 0
-	};
-	response.dwLength = 0;
-
-	static struct APDU_ICC_DO_AID APDU_PGP_AID = {
-		.RID = { APDU_PGP_APPLICATION_ID },
-		.application = 0x01,
-		.version = APDU_PGP_VERSION,
-		.manufacturer = APDU_PGP_MANUFACTURER,
-		.RFU = { 0x00, 0x00 },
-
-		.status = { APDU_SUCCESS }
-	};
-	memcpy(&APDU_PGP_AID.serialNumber, storage_uuid, sizeof(APDU_PGP_AID.serialNumber));
-
-	static struct APDU_ICC_DO_FINGERPRINTS APDU_PGP_FINGERPRINTS;
-
-	// Cardholder's name
-	const char *name = storage_getName();
-
-	response.bSlot = request->bSlot;
-	response.bSeq = request->bSeq;
-
-	uint16_t tag = (apdu->P1 << 8) + apdu->P2;
-
-	if (apdu->INS == APDU_SELECT_FILE) {
-		// Discard selection options
-		apdu->P2 = 0x00;
-	}
-
-	if (APDU_CHECK(buf, request->dwLength, APDU_PGP_COMMAND_SELECT)) {
-		APDU_RETURN(response, SUCCESS);
-	} else if (apdu->INS == APDU_GET_DATA) {
-		switch (tag) {
-		APDU_DATA_OBJECT(AID);
-		APDU_DATA_OBJECT(PW_STATUS);
-
-		case APDU_ICC_DO_SECURITY_SUPPORT_TEMPL_TAG:
-			if (!protectUnlocked(true)) {
-				debugLog(0, "", "APDU GET DATA: displaying PIN matrix");
-				pinmatrix_start("OpenPGP (see manual)");
-			}
-
-			APDU_RETURN(response, NOT_SUPPORTED);
-			break;
-
-		case APDU_ICC_DO_CARDHOLDER_RELATED_DATA_TAG:
-			APDU_DATA_OBJECT_CONSTRUCT_INIT(CARDHOLDER_RELATED_DATA);
-
-			APDU_DATA_OBJECT_CONSTRUCT_OTHER(NAME, name, strlen(name));
-
-			APDU_DATA_OBJECT_CONSTRUCT_END();
-			APDU_RETURN(response, SUCCESS);
-			break;
-
-		case APDU_ICC_DO_APPLICATION_RELATED_DATA_TAG:
-			APDU_DATA_OBJECT_CONSTRUCT_INIT(APPLICATION_RELATED_DATA);
-
-			APDU_DATA_OBJECT_CONSTRUCT(EXTENDED_CAPS);
-			APDU_DATA_OBJECT_CONSTRUCT(FINGERPRINTS);
-
-			if (storage.has_pgp_curve_name && strcmp(storage.pgp_curve_name, ED25519_NAME) == 0) {
-				APDU_DATA_OBJECT_CONSTRUCT_OTHER(ALGORITHM_ATTRS_SIG, PGP_ED25519, sizeof(PGP_ED25519));
-				APDU_DATA_OBJECT_CONSTRUCT_OTHER(ALGORITHM_ATTRS_DEC, PGP_ED25519, sizeof(PGP_ED25519));
-				APDU_DATA_OBJECT_CONSTRUCT_OTHER(ALGORITHM_ATTRS_AUT, PGP_ED25519, sizeof(PGP_ED25519));
-			} else {
-				APDU_DATA_OBJECT_CONSTRUCT_OTHER(ALGORITHM_ATTRS_SIG, PGP_NISTP256, sizeof(PGP_NISTP256));
-				APDU_DATA_OBJECT_CONSTRUCT_OTHER(ALGORITHM_ATTRS_DEC, PGP_NISTP256, sizeof(PGP_NISTP256));
-				APDU_DATA_OBJECT_CONSTRUCT_OTHER(ALGORITHM_ATTRS_AUT, PGP_NISTP256, sizeof(PGP_NISTP256));
-			}
-
-			APDU_DATA_OBJECT_CONSTRUCT_END();
-			APDU_RETURN(response, SUCCESS);
-			break;
-
-		default:
-			debugLog(0, "", "APDU GET DATA: Referenced data not found");
-			APDU_RETURN(response, DATA_NOT_FOUND);
-			break;
-		}
-	} else if (apdu->INS == APDU_PUT_DATA && protectUnlockedPin(true)) {
-		switch (tag) {
-		case APDU_ICC_DO_NAME_TAG:
-			storage_setName((const char *) data);
-			storage_commit();
-			APDU_RETURN(response, SUCCESS);
-			break;
-		default:
-			debugLog(0, "", "APDU PUT DATA: Function not supported");
-			APDU_RETURN(response, FCN_NO_SUPPORT);
-			break;
-		}
-	} else if (apdu->INS == APDU_VERIFY) {
-		/*
-		 * Due to the way OpenPGP works, we use a complex system for entering the PIN and passphrase.
-		 *
-		 * Our OpenPGP password follows the format of
-		 * [scrambled TREZOR PIN] + [0s to pad to OpenPGP minimum length] + [' '] + [passphrase]
-		 *
-		 * All but the scrambled TREZOR PIN are optional, if they are not necessary for the user's parameters.
-		 *
-		 * Examples:
-		 * '123400    '   Scrambled PIN of '1234', padded out to PW1 minimum of 6
-		 * '123400 PWD'   Scrambled PIN of '1234', passphrase of 'PWD'
-		 * '1234   PWD'   Scrambled PIN of '1234', passphrase of '  PWD'
-		 */
-
-		if (!protectUnlocked(true)) {
-			// Initialize passphrase to point to a '\0' so it acts like a zero-length string
-			char *pin = (char *) data,
-				 *passphrase = (char *) &data[request->dwLength - sizeof(*apdu)],
-				 *separator;
-
-			// The buffer containing the request should be uint8_t[65] to allow for a null terminator
-			*passphrase = '\0';
-
-			if ((separator = strchr(pin, ' '))) {
-				*separator = '\0';
-				passphrase = separator + 1;
-			}
-
-			if ((separator = strchr(pin, '0'))) {
-				*separator = '\0';
-			}
-
-			pinmatrix_done(pin);
-
-			if (storage_isPinCorrect(pin)) {
-				session_cachePin();
-				session_cachePassphrase(passphrase);
-				APDU_RETURN(response, SUCCESS);
-			} else {
-				APDU_RETURN(response, PW_WRONG);
-			}
-
-			layoutHome();
-		} else {
-			/* Due to the way the TREZOR works, it is:
-			 * a) pointless to check subsequent passwords and
-			 * b) fallacious, due to the PIN scrambling
-			 */
-			APDU_RETURN(response, SUCCESS);
-		}
-	} else {
-		switch (apdu->INS) {
-		case APDU_SELECT_FILE:
-			debugLog(0, "", "APDU SELECT FILE: File not found");
-			APDU_RETURN(response, FILE_NOT_FOUND);
-			break;
-		case APDU_PUT_DATA:
-			APDU_RETURN(response, PW_WRONG);
-			break;
-		default:
-			debugLog(0, "", "APDU unmatched");
-			APDU_RETURN(response, NOT_SUPPORTED);
-			break;
-		}
-	}
-
-	CCID_TX(&response);
+	ccid_tx((CCID_HEADER *) &response);
 }

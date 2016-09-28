@@ -416,13 +416,14 @@ static void hid_u2f_rx_callback(usbd_device *dev, uint8_t ep)
 static void ccid_rx_callback(usbd_device *dev, uint8_t ep)
 {
 	(void)ep;
-	// Extra byte needed for null termination when using string manipulation
-	static uint8_t buf[65] __attribute__ ((aligned(4)));
-	static struct ccid_header *header = (struct ccid_header *) buf;
 
-	uint16_t size = usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_CCID_OUT, buf, sizeof(buf) - 1);
-	if (size != sizeof(*header) + header->dwLength) return;
-	ccid_read(header, buf + sizeof(*header));
+	// Extra byte needed for null termination when using string manipulation
+	static uint8_t buf[64 + 1] __attribute__ ((aligned(4)));
+	static CCID_HEADER *header = (CCID_HEADER *) buf;
+
+	uint16_t len = usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_CCID_OUT, buf, sizeof(buf) - 1);
+	if (len != sizeof(*header) + header->dwLength) return;
+	ccid_rx(header);
 }
 
 #if DEBUG_LINK
@@ -517,15 +518,15 @@ void usbSleep(uint32_t millis)
 	}
 }
 
-void ccid_tx(const void *tx, uint16_t txlen) {
-	uint8_t *buffer = (uint8_t *) tx;
-	uint8_t len;
+void ccid_tx(const CCID_HEADER *request) {
+	const uint8_t *data = (uint8_t *) request;
+	uint8_t remaining = sizeof(*request) + request->dwLength;
 
 	do {
-		len = txlen > 64 ? 64 : txlen;
-		while (usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_CCID_IN, buffer, len) != len) {}
+		const uint8_t len = remaining > 64 ? 64 : remaining;
+		while (usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_CCID_IN, data, len) != len) {}
 
-		txlen -= len;
-		buffer += len;
-	} while (txlen);
+		remaining -= len;
+		data += len;
+	} while (remaining);
 }

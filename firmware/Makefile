@@ -18,8 +18,8 @@ OBJS += reset.o
 OBJS += signing.o
 OBJS += crypto.o
 OBJS += ethereum.o
-OBJS += apdu.o
 OBJS += ccid.o
+OBJS += openpgp.o
 
 OBJS += debug.o
 

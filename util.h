@@ -38,4 +38,12 @@ void __attribute__((noreturn)) system_halt(void);
 // reset system
 void __attribute__((noreturn)) system_reset(void);
 
+// Uses GNU Extensions
+#define min(X, Y) \
+	({ __auto_type _X = (X); __auto_type _Y = (Y); _X < _Y ? _X : _Y; })
+
+#define max(X, Y) \
+	({ __auto_type _X = (X); __auto_type _Y = (Y); _X > _Y ? _X : _Y; })
+
+
 #endif

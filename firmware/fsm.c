@@ -48,7 +48,7 @@
 #include "secp256k1.h"
 #include <libopencm3/stm32/flash.h>
 #include "ethereum.h"
-#include "apdu.h"
+#include "openpgp.h"
 
 // message methods
 
@@ -1011,20 +1011,42 @@ void fsm_msgInitializeOpenPGP(InitializeOpenPGP *msg)
 		"Unsupported curve for OpenPGP"
 	);
 
+	CHECK_PARAM(msg->has_time, "No timestamp provided");
+
 	CHECK_INITIALIZED
+
+	static char desc[] = "__________?";
+
+	// Point to '?' to ensure it's not overwritten
+	char *slot = &desc[sizeof(desc) - 2];
+	{
+		uint32_t time = msg->time;
+		do {
+			// Prefix decrement to ensure always pointing in correct location
+			*--slot = '0' + time % 10;
+			time /= 10;
+		} while (time && slot > desc); // Pointer comparison *should* be superfluous
+	}
+
+	layoutDialogSwipe(&bmp_icon_question, "Cancel", "Confirm", NULL, "Do you really want to", "setup OpenPGP with", curve, "curve and timestamp", slot, NULL);
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, "Initialization cancelled");
+		layoutHome();
+		return;
+	}
+
 	CHECK_PIN
 
-	static uint32_t address_n[2] = { PGP_DERIVATION_PATH, 0 };
-	address_n[1] = 0x80000000 | msg->time;
+	storage.has_openpgp_curve_name = true;
+	strlcpy(storage.openpgp_curve_name, curve, sizeof(storage.openpgp_curve_name));
 
-	const HDNode *node = fsm_getDerivedNode(curve, address_n, sizeof(address_n) / sizeof(uint32_t));
-	if (!node) return;
+	storage.has_openpgp_timestamp = true;
+	storage.openpgp_timestamp = msg->time;
 
-	storage.has_pgp_curve_name = true;
-	strlcpy(storage.pgp_curve_name, curve, sizeof(storage.pgp_curve_name));
 	storage_commit();
 
 	fsm_sendSuccess("OpenPGP initialized");
+	layoutHome();
 }
 
 #if DEBUG_LINK
