@@ -22,6 +22,7 @@
 
 #include "apdu.h"
 #include "ccid.h"
+#include "sha2.h"
 
 #include <stdint.h>
 
@@ -30,13 +31,25 @@ void ccid_OpenPGP(const APDU_HEADER *APDU, uint8_t length, struct RDR_to_PC_Data
 #define OPENPGP_VERSION      0x0003 // OpenPGP Card 3.0
 #define OPENPGP_MANUFACTURER 0x4C53 // TODO: choose a valid value
 
-#define OPENPGP_DERIVATION_PATH (0x80 << 24 | 'P' << 16 | 'G' <<  8 | 'P')
-
 static const uint8_t OPENPGP_APPLICATION_ID[] = { 0xD2, 0x76, 0x00, 0x01, 0x24, 0x01 };
 
 // OpenPGP Algorithms
 static const uint8_t OPENPGP_NISTP256[] = { 19, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 };
 static const uint8_t OPENPGP_ED25519[]  = { 22, 0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01 };
+
+// OpenPGP Key Derivation
+#define OPENPGP_DERIVATION_PATH (0x80 << 24 | 'P' << 16 | 'G' <<  8 | 'P')
+
+#define OPENPGP_BIP32_INDEX_SIG 0x0
+#define OPENPGP_BIP32_INDEX_DEC 0x1
+#define OPENPGP_BIP32_INDEX_AUT 0x2
+
+#define OPENPGP_FINGERPRINT_LENGTH SHA1_DIGEST_LENGTH
+
+// APDU Instructions
+enum {
+	OPENPGP_GENERATE_ASYMMETRIC_KEY_PAIR = 0x47,
+};
 
 typedef struct {
 	unsigned Length : 7; /* Max. length, for PIN format 2 always '08'

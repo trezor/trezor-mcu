@@ -44,12 +44,14 @@ enum {
 };
 
 typedef enum {
-	APDU_SECURITY_COND_FAIL = 0x6982, // Security condition not satisfied
-	APDU_FCN_NOT_SUPPORTED  = 0x6A81, // Function not supported
-	APDU_FILE_NOT_FOUND     = 0x6A82, // File not found
-	APDU_DATA_NOT_FOUND     = 0x6A88, // Referenced data not found
-	APDU_SUCCESS            = 0x9000, // Command successfully executed (OK)
-	APDU_NOT_SUPPORTED      = 0x911C, // Command code not supported
+	APDU_SECURITY_COND_FAIL   = 0x6982, // Security condition not satisfied
+	APDU_PARAM_DATA_INCORRECT = 0x6A80, // The parameters in the data field are incorrect.
+	APDU_FCN_NOT_SUPPORTED    = 0x6A81, // Function not supported
+	APDU_FILE_NOT_FOUND       = 0x6A82, // File not found
+	APDU_DATA_NOT_FOUND       = 0x6A88, // Referenced data not found
+	APDU_SUCCESS              = 0x9000, // Command successfully executed (OK)
+	APDU_NOT_SUPPORTED        = 0x911C, // Command code not supported
+	APDU_UNRECOVERABLE        = 0x91A1, // Unrecoverable error within application
 } APDU_STATUS;
 
 static inline void APDU_SW(struct RDR_to_PC_DataBlock *response, const APDU_STATUS status) {

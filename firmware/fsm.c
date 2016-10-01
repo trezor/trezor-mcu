@@ -1007,7 +1007,7 @@ void fsm_msgInitializeOpenPGP(InitializeOpenPGP *msg)
 	}
 
 	CHECK_PARAM(
-		strcmp(curve, NIST256P1_NAME) == 0 || strcmp(curve, ED25519_NAME) == 0,
+		strcmp(curve, NIST256P1_NAME) == 0 /* TODO: || strcmp(curve, ED25519_NAME) == 0 */,
 		"Unsupported curve for OpenPGP"
 	);
 
