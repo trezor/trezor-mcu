@@ -41,6 +41,7 @@ static const HDNode *openpgp_derive_root_node(void);
 static const HDNode *NODE;
 static HDNode NODE_SIG, NODE_DEC, NODE_AUT;
 
+void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node, uint32_t timestamp);
 void openpgp_fingerprint(const HDNode *node, uint8_t fingerprint[OPENPGP_FINGERPRINT_LENGTH], uint32_t timestamp);
 
 static const OPENPGP_PW_STATUS PW_STATUS = {
@@ -352,47 +353,19 @@ const HDNode *openpgp_derive_root_node() {
 	return &node;
 }
 
+void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node, uint32_t timestamp) {
+	*packet = OPENPGP_NISTP256_PACKET_DEFAULT;
+
+	packet->timestamp = htonl(timestamp);
+	memcpy(packet->curve_oid, &OPENPGP_NISTP256[1], sizeof(packet->curve_oid));
+	ecdsa_get_public_key65(node->curve->params, node->private_key, packet->mpi);
+};
+
 // TODO: Ed25519 support
 void openpgp_fingerprint(const HDNode *node, uint8_t *fingerprint, const uint32_t timestamp) {
-	uint8_t length = 0;
-	static uint8_t buffer[65];
+	static OPENPGP_NISTP256_PACKET packet;
 
-	static SHA1_CTX context;
-	sha1_Init(&context);
+	openpgp_nistp256_packet(&packet, node, timestamp);
 
-	/* TODO: given a particular curve, Public Key Packet length *should* be
-	 * predictable, so we should be able to move packet building into its own
-	 * function, using a custom struct for each curve */
-
-	// Version
-	buffer[length++] = 0x04;
-	// Creation time
-	buffer[length++] = timestamp >> 24 & 0xff;
-	buffer[length++] = timestamp >> 16 & 0xff;
-	buffer[length++] = timestamp >>  8 & 0xff;
-	buffer[length++] = timestamp       & 0xff;
-	// Public key algorithm
-	buffer[length++] = *OPENPGP_NISTP256;
-	// Curve OID Length
-	buffer[length++] = sizeof(OPENPGP_NISTP256) - 1;
-
-	sha1_Update(&context, buffer, length);
-	length = 0;
-
-	// Curve OID
-	sha1_Update(&context, &OPENPGP_NISTP256[1], sizeof(OPENPGP_NISTP256) - 1);
-
-	// MPI Length
-	const uint16_t mpi_length = 3 + 2 * 32 * 8; // 04 || x || y
-	buffer[length++] = mpi_length >> 8;
-	buffer[length++] = mpi_length & 0xff;
-
-	sha1_Update(&context, buffer, length);
-	length = 0;
-
-	// MPI
-	ecdsa_get_public_key65(node->curve->params, node->private_key, buffer);
-	sha1_Update(&context, buffer, sizeof(buffer));
-
-	sha1_Final(&context, fingerprint);
+	sha1_Raw((uint8_t *) &packet, sizeof(packet), fingerprint);
 }

@@ -34,8 +34,43 @@ void ccid_OpenPGP(const APDU_HEADER *APDU, uint8_t length, struct RDR_to_PC_Data
 static const uint8_t OPENPGP_APPLICATION_ID[] = { 0xD2, 0x76, 0x00, 0x01, 0x24, 0x01 };
 
 // OpenPGP Algorithms
-static const uint8_t OPENPGP_NISTP256[] = { 19, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 };
-static const uint8_t OPENPGP_ED25519[]  = { 22, 0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01 };
+#define OPENPGP_NISTP256_ID 19
+#define OPENPGP_ED25519_ID 22
+
+#define OPENPGP_NISTP256_MPI_LENGTH (3 + 2 * 32 * 8) // 04 || x || y
+
+static const uint8_t OPENPGP_NISTP256[] = { OPENPGP_NISTP256_ID,
+	0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 };
+static const uint8_t OPENPGP_ED25519[]  = { OPENPGP_ED25519_ID,
+	0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01 };
+
+
+typedef struct {
+	uint8_t  version;    // Public Key Packet version (0x04)
+	uint32_t timestamp;  // Creation timestamp
+
+	uint8_t  algorithm;  // ECC Algorithm ID
+
+	uint8_t  oid_length; // Curve OID length
+	uint8_t  curve_oid[sizeof(OPENPGP_NISTP256) - 1]; // Curve OID
+
+	uint16_t mpi_length; // MPI Length, in bits
+	uint8_t  mpi[65];    // ECDSA Public Key MPI ( 04 || x || y )
+} __attribute__((packed)) OPENPGP_NISTP256_PACKET;
+
+static const OPENPGP_NISTP256_PACKET OPENPGP_NISTP256_PACKET_DEFAULT = {
+	.version = 0x04,
+	// .timestamp =
+
+	.algorithm = OPENPGP_NISTP256_ID,
+
+	.oid_length = sizeof(OPENPGP_NISTP256) - 1,
+	// .curve_oid[] =
+
+	.mpi_length = ((OPENPGP_NISTP256_MPI_LENGTH & 0xFF) << 8) |
+	              ((OPENPGP_NISTP256_MPI_LENGTH >> 8) & 0xFF),
+	// .mpi =
+};
 
 // OpenPGP Key Derivation
 #define OPENPGP_DERIVATION_PATH (0x80 << 24 | 'P' << 16 | 'G' <<  8 | 'P')
