@@ -80,10 +80,7 @@ int compile_output(const CoinType *coin, const HDNode *root, TxOutputType *in, T
 					return -1;
 				}
 			}
-			if (!ecdsa_address_decode(in->address, addr_raw)) {
-				return 0;
-			}
-			if (!addressHasExpectedPrefix(addr_raw, coin->address_type)) {
+			if (!ecdsa_address_decode(in->address, coin->address_type, addr_raw)) {
 				return 0;
 			}
 
@@ -102,10 +99,7 @@ int compile_output(const CoinType *coin, const HDNode *root, TxOutputType *in, T
 	}
 
 	if (in->script_type == OutputScriptType_PAYTOSCRIPTHASH) {
-		if (!in->has_address || !ecdsa_address_decode(in->address, addr_raw)) {
-			return 0;
-		}
-		if (!addressHasExpectedPrefix(addr_raw, coin->address_type_p2sh)) {
+		if (!in->has_address || !ecdsa_address_decode(in->address, coin->address_type_p2sh, addr_raw)) {
 			return 0;
 		}
 		if (needs_confirm) {
