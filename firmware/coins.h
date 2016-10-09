@@ -22,12 +22,16 @@
 
 #include "types.pb.h"
 
-#define COINS_COUNT 7
+#define COINS_COUNT 8
 
 extern const CoinType coins[COINS_COUNT];
 
 const CoinType *coinByShortcut(const char *shortcut);
 const CoinType *coinByName(const char *name);
-const CoinType *coinByAddressType(uint8_t address_type);
+const CoinType *coinByAddressType(uint32_t address_type);
+size_t prefixBytesByAddressType(uint32_t address_type);
+bool addressHasExpectedPrefix(const uint8_t *addr, uint32_t address_type);
+void writeAddressPrefix(uint8_t *addr, uint32_t address_type);
+bool getAddressType(const CoinType *coin, const uint8_t *addr, uint32_t *address_type);
 
 #endif
