@@ -757,11 +757,13 @@ void fsm_msgVerifyMessage(VerifyMessage *msg)
 	const CoinType *coin = fsm_getCoin(msg->coin_name);
 	if (!coin) return;
 	layoutProgressSwipe("Verifying", 0);
-	uint8_t addr_raw[21];
-	if (!ecdsa_address_decode(msg->address, addr_raw)) {
+	uint8_t addr_raw[MAX_ADDR_RAW_SIZE];
+	uint32_t address_type;
+	if (!getAddressType(coin, (const uint8_t *) msg->address, &address_type) || !ecdsa_address_decode(msg->address, address_type, addr_raw)) {
 		fsm_sendFailure(FailureType_Failure_InvalidSignature, "Invalid address");
+		return;
 	}
-	if (msg->signature.size == 65 && cryptoMessageVerify(coin, msg->message.bytes, msg->message.size, addr_raw, msg->signature.bytes) == 0) {
+	if (msg->signature.size == 65 && cryptoMessageVerify(coin, msg->message.bytes, msg->message.size, address_type, addr_raw, msg->signature.bytes) == 0) {
 		layoutVerifyAddress(msg->address);
 		if (!protectButton(ButtonRequestType_ButtonRequest_Other, false)) {
 			fsm_sendFailure(FailureType_Failure_ActionCancelled, "Message verification cancelled");
@@ -943,7 +945,7 @@ void fsm_msgEncryptMessage(EncryptMessage *msg)
 	RESP_INIT(EncryptedMessage);
 	const CoinType *coin = 0;
 	const HDNode *node = 0;
-	uint8_t address_raw[21];
+	uint8_t address_raw[21]; // FIXME: assumes addresses are 21 bytes
 	if (signing) {
 		coin = coinByName(msg->coin_name);
 		if (!coin) {
