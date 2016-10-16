@@ -1172,37 +1172,39 @@ void fsm_msgSteemGetPublicKey(SteemGetPublicKey *msg)
 	resp->pubkey.size = 33;
 	ecdsa_get_public_key33(node->curve->params, node->private_key, resp->pubkey.bytes);
 
-	char formatedKey[53 + 3];
-	memcpy(formatedKey + 0, "STM", 3);
-	base58gph_encode_check(resp->pubkey.bytes, 33, formatedKey + 3, sizeof(formatedKey));
+	if (msg->has_show_display && msg->show_display)
+	{
+		char formatedKey[53 + 3];
+		memcpy(formatedKey + 0, "STM", 3);
+		base58gph_encode_check(resp->pubkey.bytes, 33, formatedKey + 3, sizeof(formatedKey));
 
-	static char _pubkey1[14] = {0};
-	static char _pubkey2[14] = {0};
-	static char _pubkey3[14] = {0};
-	static char _pubkey4[14] = {0};
+		static char _pubkey1[14] = {0};
+		static char _pubkey2[14] = {0};
+		static char _pubkey3[14] = {0};
+		static char _pubkey4[14] = {0};
 
-	strlcpy(_pubkey1, formatedKey + 0*sizeof(_pubkey1), sizeof(_pubkey1));
-	strlcpy(_pubkey2, formatedKey + 1*sizeof(_pubkey2), sizeof(_pubkey2));
-	strlcpy(_pubkey3, formatedKey + 2*sizeof(_pubkey3), sizeof(_pubkey3));
-	strlcpy(_pubkey4, formatedKey + 3*sizeof(_pubkey4), sizeof(_pubkey4));
+		strlcpy(_pubkey1, formatedKey + 0*sizeof(_pubkey1), sizeof(_pubkey1));
+		strlcpy(_pubkey2, formatedKey + 1*sizeof(_pubkey2), sizeof(_pubkey2));
+		strlcpy(_pubkey3, formatedKey + 2*sizeof(_pubkey3), sizeof(_pubkey3));
+		strlcpy(_pubkey4, formatedKey + 3*sizeof(_pubkey4), sizeof(_pubkey4));
 
-	layoutDialogSwipe(&bmp_icon_question,
-		NULL,
-		"Done",
-		NULL,
-		"Public Key",
-		_pubkey1,
-		_pubkey2,
-		_pubkey3,
-		_pubkey4,
-		NULL
-	);
-	if (!protectButton(ButtonRequestType_ButtonRequest_PublicKey, true)) {
-		fsm_sendFailure(FailureType_Failure_ActionCancelled, "Show pubkey cancelled");
+		layoutDialogSwipe(&bmp_icon_question,
+			NULL,
+			"Done",
+			NULL,
+			"Public Key",
+			_pubkey1,
+			_pubkey2,
+			_pubkey3,
+			_pubkey4,
+			NULL
+		);
+		if (!protectButton(ButtonRequestType_ButtonRequest_PublicKey, true)) {
+			fsm_sendFailure(FailureType_Failure_ActionCancelled, "Show pubkey cancelled");
+		}
 	}
 
 	msg_write(MessageType_MessageType_SteemPublicKey, resp);
-
 	layoutHome();
 }
 
