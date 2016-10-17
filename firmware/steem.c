@@ -70,6 +70,22 @@ void gph_ser_bytes(SHA256_CTX *ctx, uint8_t * msg, size_t msglen)
     sha256_Update(ctx, msg, msglen);
 }
 
+void gph_ser_bool(SHA256_CTX *ctx, bool i)
+{
+    uint8_t _true = 0x01;
+    uint8_t _false = 0x00;
+    if (i) {
+        sha256_Update(ctx, (const uint8_t *) &_true, 1);
+    } else {
+        sha256_Update(ctx, (const uint8_t *) &_false, 1);
+    }
+}
+
+void gph_ser_int8(SHA256_CTX *ctx, uint8_t i)
+{
+    sha256_Update(ctx, (const uint8_t *) &i, 1);
+}
+
 void gph_ser_int32(SHA256_CTX *ctx, uint32_t i)
 {
     sha256_Update(ctx, (const uint8_t *) &i, 4);
@@ -149,6 +165,22 @@ void layout_steem_confirm_transfer(char * from, char * to, char * asset, uint64_
         NULL
     );
 }
+
+void layout_steem_confirm_account_update(char* account)
+{
+    layoutDialogSwipe(&bmp_icon_question,
+        "Cancel",
+        "Confirm",
+        NULL,
+        "Confirm",
+        "  ACCOUNT UPDATE",
+        "for account:",
+        NULL,
+        account,
+        NULL
+    );
+}
+
 
 
 #endif // USE_STEEM

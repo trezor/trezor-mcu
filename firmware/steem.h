@@ -36,10 +36,13 @@ void gph_ser_string(SHA256_CTX *ctx, const char *msg);
 void gph_ser_varint(SHA256_CTX *ctx, uint8_t i);
 void gph_ser_int32(SHA256_CTX *ctx, uint32_t i);
 void gph_ser_int16(SHA256_CTX *ctx, uint16_t i);
+void gph_ser_int8(SHA256_CTX *ctx, uint8_t i);
+void gph_ser_bool(SHA256_CTX *ctx, bool i);
 void gph_ser_bytes(SHA256_CTX *ctx, uint8_t * msg, size_t msglen);
 
 uint8_t steem_ser_amount(SHA256_CTX *ctx, uint64_t amount, char *asset);
 void layout_steem_confirm_transfer(char * from, char * to, char * asset, uint64_t amount);
+void layout_steem_confirm_account_update(char* account);
 
 #endif
 #endif

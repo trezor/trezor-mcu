@@ -42,8 +42,14 @@ SteemOperationTransfer.from             max_size:16
 SteemOperationTransfer.to               max_size:16
 SteemOperationTransfer.asset            max_size:8
 SteemOperationTransfer.memo             max_size:64
+SteemOperationAccountUpdate.account     max_size:16
+SteemOperationAccountUpdate.memo_key    max_size:33
+SteemOperationAccountUpdate.json_metadata   max_size:256
+SteemPermission.account_auths           max_count:4
+SteemPermission.key_auths               max_count:4
+SteemAccountKeyAuth.pubkey              max_size:33
+SteemAccountAccountAuth.account         max_size:16
 SteemPublicKey.pubkey                   max_size:33
-SteemPublicKey.address			max_size:20
 SteemTxSignature.signature              max_size:65
 SteemTxSignature.digest                 max_size:32
 

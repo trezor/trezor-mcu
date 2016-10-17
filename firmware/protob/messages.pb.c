@@ -4,7 +4,6 @@
 #include "messages.pb.h"
 
 const char GetAddress_coin_name_default[17] = "Bitcoin";
-const InputScriptType GetAddress_script_type_default = InputScriptType_SPENDADDRESS;
 const char LoadDevice_language_default[17] = "english";
 const uint32_t ResetDevice_strength_default = 256u;
 const char ResetDevice_language_default[17] = "english";
@@ -29,7 +28,7 @@ const pb_field_t GetFeatures_fields[1] = {
     PB_LAST_FIELD
 };
 
-const pb_field_t Features_fields[19] = {
+const pb_field_t Features_fields[18] = {
     PB_FIELD2(  1, STRING  , OPTIONAL, STATIC  , FIRST, Features, vendor, vendor, 0),
     PB_FIELD2(  2, UINT32  , OPTIONAL, STATIC  , OTHER, Features, major_version, vendor, 0),
     PB_FIELD2(  3, UINT32  , OPTIONAL, STATIC  , OTHER, Features, minor_version, major_version, 0),
@@ -47,7 +46,6 @@ const pb_field_t Features_fields[19] = {
     PB_FIELD2( 15, BOOL    , OPTIONAL, STATIC  , OTHER, Features, imported, bootloader_hash, 0),
     PB_FIELD2( 16, BOOL    , OPTIONAL, STATIC  , OTHER, Features, pin_cached, imported, 0),
     PB_FIELD2( 17, BOOL    , OPTIONAL, STATIC  , OTHER, Features, passphrase_cached, pin_cached, 0),
-    PB_FIELD2( 18, BOOL    , OPTIONAL, STATIC  , OTHER, Features, firmware_present, passphrase_cached, 0),
     PB_LAST_FIELD
 };
 
@@ -143,12 +141,11 @@ const pb_field_t PublicKey_fields[3] = {
     PB_LAST_FIELD
 };
 
-const pb_field_t GetAddress_fields[6] = {
+const pb_field_t GetAddress_fields[5] = {
     PB_FIELD2(  1, UINT32  , REPEATED, STATIC  , FIRST, GetAddress, address_n, address_n, 0),
     PB_FIELD2(  2, STRING  , OPTIONAL, STATIC  , OTHER, GetAddress, coin_name, address_n, &GetAddress_coin_name_default),
     PB_FIELD2(  3, BOOL    , OPTIONAL, STATIC  , OTHER, GetAddress, show_display, coin_name, 0),
     PB_FIELD2(  4, MESSAGE , OPTIONAL, STATIC  , OTHER, GetAddress, multisig, show_display, &MultisigRedeemScriptType_fields),
-    PB_FIELD2(  5, ENUM    , OPTIONAL, STATIC  , OTHER, GetAddress, script_type, multisig, &GetAddress_script_type_default),
     PB_LAST_FIELD
 };
 
@@ -454,6 +451,35 @@ const pb_field_t DebugLinkFlashErase_fields[2] = {
     PB_LAST_FIELD
 };
 
+const pb_field_t SteemAccountKeyAuth_fields[3] = {
+    PB_FIELD2(  1, BYTES   , REQUIRED, STATIC  , FIRST, SteemAccountKeyAuth, pubkey, pubkey, 0),
+    PB_FIELD2(  2, UINT32  , REQUIRED, STATIC  , OTHER, SteemAccountKeyAuth, weight, pubkey, 0),
+    PB_LAST_FIELD
+};
+
+const pb_field_t SteemAccountAccountAuth_fields[3] = {
+    PB_FIELD2(  1, STRING  , REQUIRED, STATIC  , FIRST, SteemAccountAccountAuth, account, account, 0),
+    PB_FIELD2(  2, UINT32  , REQUIRED, STATIC  , OTHER, SteemAccountAccountAuth, weight, account, 0),
+    PB_LAST_FIELD
+};
+
+const pb_field_t SteemPermission_fields[4] = {
+    PB_FIELD2(  1, UINT32  , REQUIRED, STATIC  , FIRST, SteemPermission, weight_threshold, weight_threshold, 0),
+    PB_FIELD2(  2, MESSAGE , REPEATED, STATIC  , OTHER, SteemPermission, account_auths, weight_threshold, &SteemAccountAccountAuth_fields),
+    PB_FIELD2(  3, MESSAGE , REPEATED, STATIC  , OTHER, SteemPermission, key_auths, account_auths, &SteemAccountKeyAuth_fields),
+    PB_LAST_FIELD
+};
+
+const pb_field_t SteemOperationAccountUpdate_fields[7] = {
+    PB_FIELD2(  1, STRING  , REQUIRED, STATIC  , FIRST, SteemOperationAccountUpdate, account, account, 0),
+    PB_FIELD2(  2, BYTES   , REQUIRED, STATIC  , OTHER, SteemOperationAccountUpdate, memo_key, account, 0),
+    PB_FIELD2(  3, STRING  , REQUIRED, STATIC  , OTHER, SteemOperationAccountUpdate, json_metadata, memo_key, 0),
+    PB_FIELD2(  4, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemOperationAccountUpdate, owner, json_metadata, &SteemPermission_fields),
+    PB_FIELD2(  5, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemOperationAccountUpdate, active, owner, &SteemPermission_fields),
+    PB_FIELD2(  6, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemOperationAccountUpdate, posting, active, &SteemPermission_fields),
+    PB_LAST_FIELD
+};
+
 const pb_field_t SteemOperationTransfer_fields[6] = {
     PB_FIELD2(  1, STRING  , REQUIRED, STATIC  , FIRST, SteemOperationTransfer, from, from, 0),
     PB_FIELD2(  2, STRING  , REQUIRED, STATIC  , OTHER, SteemOperationTransfer, to, from, 0),
@@ -463,11 +489,12 @@ const pb_field_t SteemOperationTransfer_fields[6] = {
     PB_LAST_FIELD
 };
 
-const pb_field_t SteemSignTx_fields[5] = {
+const pb_field_t SteemSignTx_fields[6] = {
     PB_FIELD2(  1, UINT32  , REQUIRED, STATIC  , FIRST, SteemSignTx, ref_block_num, ref_block_num, 0),
     PB_FIELD2(  2, UINT32  , REQUIRED, STATIC  , OTHER, SteemSignTx, ref_block_prefix, ref_block_num, 0),
     PB_FIELD2(  3, UINT32  , REQUIRED, STATIC  , OTHER, SteemSignTx, expiration, ref_block_prefix, 0),
     PB_FIELD2(  4, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemSignTx, transfer, expiration, &SteemOperationTransfer_fields),
+    PB_FIELD2(  5, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemSignTx, account_update, transfer, &SteemOperationAccountUpdate_fields),
     PB_LAST_FIELD
 };
 
@@ -498,7 +525,7 @@ const pb_field_t SteemPublicKey_fields[2] = {
  * numbers or field sizes that are larger than what can fit in 8 or 16 bit
  * field descriptors.
  */
-STATIC_ASSERT((pb_membersize(Features, coins[0]) < 65536 && pb_membersize(PublicKey, node) < 65536 && pb_membersize(GetAddress, multisig) < 65536 && pb_membersize(LoadDevice, node) < 65536 && pb_membersize(SimpleSignTx, inputs[0]) < 65536 && pb_membersize(SimpleSignTx, outputs[0]) < 65536 && pb_membersize(SimpleSignTx, transactions[0]) < 65536 && pb_membersize(TxRequest, details) < 65536 && pb_membersize(TxRequest, serialized) < 65536 && pb_membersize(TxAck, tx) < 65536 && pb_membersize(SignIdentity, identity) < 65536 && pb_membersize(GetECDHSessionKey, identity) < 65536 && pb_membersize(DebugLinkState, node) < 65536 && pb_membersize(SteemSignTx, transfer) < 65536), YOU_MUST_DEFINE_PB_FIELD_32BIT_FOR_MESSAGES_Initialize_GetFeatures_Features_ClearSession_ApplySettings_ChangePin_Ping_Success_Failure_ButtonRequest_ButtonAck_PinMatrixRequest_PinMatrixAck_Cancel_PassphraseRequest_PassphraseAck_GetEntropy_Entropy_GetPublicKey_PublicKey_GetAddress_EthereumGetAddress_Address_EthereumAddress_WipeDevice_LoadDevice_ResetDevice_EntropyRequest_EntropyAck_RecoveryDevice_WordRequest_WordAck_SignMessage_VerifyMessage_MessageSignature_EncryptMessage_EncryptedMessage_DecryptMessage_DecryptedMessage_CipherKeyValue_CipheredKeyValue_EstimateTxSize_TxSize_SignTx_SimpleSignTx_TxRequest_TxAck_EthereumSignTx_EthereumTxRequest_EthereumTxAck_SignIdentity_SignedIdentity_GetECDHSessionKey_ECDHSessionKey_SetU2FCounter_FirmwareErase_FirmwareUpload_DebugLinkDecision_DebugLinkGetState_DebugLinkState_DebugLinkStop_DebugLinkLog_DebugLinkMemoryRead_DebugLinkMemory_DebugLinkMemoryWrite_DebugLinkFlashErase_SteemOperationTransfer_SteemSignTx_SteemTxSignature_SteemGetPublicKey_SteemPublicKey)
+STATIC_ASSERT((pb_membersize(Features, coins[0]) < 65536 && pb_membersize(PublicKey, node) < 65536 && pb_membersize(GetAddress, multisig) < 65536 && pb_membersize(LoadDevice, node) < 65536 && pb_membersize(SimpleSignTx, inputs[0]) < 65536 && pb_membersize(SimpleSignTx, outputs[0]) < 65536 && pb_membersize(SimpleSignTx, transactions[0]) < 65536 && pb_membersize(TxRequest, details) < 65536 && pb_membersize(TxRequest, serialized) < 65536 && pb_membersize(TxAck, tx) < 65536 && pb_membersize(SignIdentity, identity) < 65536 && pb_membersize(GetECDHSessionKey, identity) < 65536 && pb_membersize(DebugLinkState, node) < 65536 && pb_membersize(SteemPermission, account_auths[0]) < 65536 && pb_membersize(SteemPermission, key_auths[0]) < 65536 && pb_membersize(SteemOperationAccountUpdate, owner) < 65536 && pb_membersize(SteemOperationAccountUpdate, active) < 65536 && pb_membersize(SteemOperationAccountUpdate, posting) < 65536 && pb_membersize(SteemSignTx, transfer) < 65536 && pb_membersize(SteemSignTx, account_update) < 65536), YOU_MUST_DEFINE_PB_FIELD_32BIT_FOR_MESSAGES_Initialize_GetFeatures_Features_ClearSession_ApplySettings_ChangePin_Ping_Success_Failure_ButtonRequest_ButtonAck_PinMatrixRequest_PinMatrixAck_Cancel_PassphraseRequest_PassphraseAck_GetEntropy_Entropy_GetPublicKey_PublicKey_GetAddress_EthereumGetAddress_Address_EthereumAddress_WipeDevice_LoadDevice_ResetDevice_EntropyRequest_EntropyAck_RecoveryDevice_WordRequest_WordAck_SignMessage_VerifyMessage_MessageSignature_EncryptMessage_EncryptedMessage_DecryptMessage_DecryptedMessage_CipherKeyValue_CipheredKeyValue_EstimateTxSize_TxSize_SignTx_SimpleSignTx_TxRequest_TxAck_EthereumSignTx_EthereumTxRequest_EthereumTxAck_SignIdentity_SignedIdentity_GetECDHSessionKey_ECDHSessionKey_SetU2FCounter_FirmwareErase_FirmwareUpload_DebugLinkDecision_DebugLinkGetState_DebugLinkState_DebugLinkStop_DebugLinkLog_DebugLinkMemoryRead_DebugLinkMemory_DebugLinkMemoryWrite_DebugLinkFlashErase_SteemAccountKeyAuth_SteemAccountAccountAuth_SteemPermission_SteemOperationAccountUpdate_SteemOperationTransfer_SteemSignTx_SteemTxSignature_SteemGetPublicKey_SteemPublicKey)
 #endif
 
 #if !defined(PB_FIELD_16BIT) && !defined(PB_FIELD_32BIT)

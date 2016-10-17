@@ -74,6 +74,10 @@ typedef enum _MessageType {
     MessageType_MessageType_SteemTxSignature = 66,
     MessageType_MessageType_SteemSignTx = 67,
     MessageType_MessageType_SteemOperationTransfer = 68,
+    MessageType_MessageType_SteemOperationAccountUpdate = 69,
+    MessageType_MessageType_SteemPermission = 70,
+    MessageType_MessageType_SteemAccountAccountAuth = 71,
+    MessageType_MessageType_SteemAccountKeyAuth = 72,
     MessageType_MessageType_DebugLinkDecision = 100,
     MessageType_MessageType_DebugLinkGetState = 101,
     MessageType_MessageType_DebugLinkState = 102,
@@ -554,8 +558,6 @@ typedef struct _Features {
     bool pin_cached;
     bool has_passphrase_cached;
     bool passphrase_cached;
-    bool has_firmware_present;
-    bool firmware_present;
 } Features;
 
 typedef struct {
@@ -576,8 +578,6 @@ typedef struct _GetAddress {
     bool show_display;
     bool has_multisig;
     MultisigRedeemScriptType multisig;
-    bool has_script_type;
-    InputScriptType script_type;
 } GetAddress;
 
 typedef struct {
@@ -775,6 +775,21 @@ typedef struct _SimpleSignTx {
     uint32_t lock_time;
 } SimpleSignTx;
 
+typedef struct _SteemAccountAccountAuth {
+    char account[16];
+    uint32_t weight;
+} SteemAccountAccountAuth;
+
+typedef struct {
+    size_t size;
+    uint8_t bytes[33];
+} SteemAccountKeyAuth_pubkey_t;
+
+typedef struct _SteemAccountKeyAuth {
+    SteemAccountKeyAuth_pubkey_t pubkey;
+    uint32_t weight;
+} SteemAccountKeyAuth;
+
 typedef struct _SteemGetPublicKey {
     size_t address_n_count;
     uint32_t address_n[8];
@@ -865,17 +880,43 @@ typedef struct _WordAck {
     char word[12];
 } WordAck;
 
+typedef struct _SteemPermission {
+    uint32_t weight_threshold;
+    size_t account_auths_count;
+    SteemAccountAccountAuth account_auths[4];
+    size_t key_auths_count;
+    SteemAccountKeyAuth key_auths[4];
+} SteemPermission;
+
+typedef struct {
+    size_t size;
+    uint8_t bytes[33];
+} SteemOperationAccountUpdate_memo_key_t;
+
+typedef struct _SteemOperationAccountUpdate {
+    char account[16];
+    SteemOperationAccountUpdate_memo_key_t memo_key;
+    char json_metadata[256];
+    bool has_owner;
+    SteemPermission owner;
+    bool has_active;
+    SteemPermission active;
+    bool has_posting;
+    SteemPermission posting;
+} SteemOperationAccountUpdate;
+
 typedef struct _SteemSignTx {
     uint32_t ref_block_num;
     uint32_t ref_block_prefix;
     uint32_t expiration;
     bool has_transfer;
     SteemOperationTransfer transfer;
+    bool has_account_update;
+    SteemOperationAccountUpdate account_update;
 } SteemSignTx;
 
 /* Default values for struct fields */
 extern const char GetAddress_coin_name_default[17];
-extern const InputScriptType GetAddress_script_type_default;
 extern const char LoadDevice_language_default[17];
 extern const uint32_t ResetDevice_strength_default;
 extern const char ResetDevice_language_default[17];
@@ -894,7 +935,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 /* Initializer values for message structs */
 #define Initialize_init_default                  {0}
 #define GetFeatures_init_default                 {0}
-#define Features_init_default                    {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0}
+#define Features_init_default                    {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0}
 #define ClearSession_init_default                {0}
 #define ApplySettings_init_default               {false, "", false, "", false, 0, false, {0, {0}}}
 #define ChangePin_init_default                   {false, 0}
@@ -912,7 +953,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define Entropy_init_default                     {{0, {0}}}
 #define GetPublicKey_init_default                {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "", false, 0}
 #define PublicKey_init_default                   {HDNodeType_init_default, false, ""}
-#define GetAddress_init_default                  {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "Bitcoin", false, 0, false, MultisigRedeemScriptType_init_default, false, InputScriptType_SPENDADDRESS}
+#define GetAddress_init_default                  {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "Bitcoin", false, 0, false, MultisigRedeemScriptType_init_default}
 #define EthereumGetAddress_init_default          {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
 #define Address_init_default                     {""}
 #define EthereumAddress_init_default             {{0, {0}}}
@@ -958,14 +999,18 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define DebugLinkMemory_init_default             {false, {0, {0}}}
 #define DebugLinkMemoryWrite_init_default        {false, 0, false, {0, {0}}, false, 0}
 #define DebugLinkFlashErase_init_default         {false, 0}
+#define SteemAccountKeyAuth_init_default         {{0, {0}}, 0}
+#define SteemAccountAccountAuth_init_default     {"", 0}
+#define SteemPermission_init_default             {0, 0, {SteemAccountAccountAuth_init_default, SteemAccountAccountAuth_init_default, SteemAccountAccountAuth_init_default, SteemAccountAccountAuth_init_default}, 0, {SteemAccountKeyAuth_init_default, SteemAccountKeyAuth_init_default, SteemAccountKeyAuth_init_default, SteemAccountKeyAuth_init_default}}
+#define SteemOperationAccountUpdate_init_default {"", {0, {0}}, "", false, SteemPermission_init_default, false, SteemPermission_init_default, false, SteemPermission_init_default}
 #define SteemOperationTransfer_init_default      {"", "", 0, "", false, ""}
-#define SteemSignTx_init_default                 {0, 0, 0, false, SteemOperationTransfer_init_default}
+#define SteemSignTx_init_default                 {0, 0, 0, false, SteemOperationTransfer_init_default, false, SteemOperationAccountUpdate_init_default}
 #define SteemTxSignature_init_default            {{0, {0}}, false, {0, {0}}}
 #define SteemGetPublicKey_init_default           {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
 #define SteemPublicKey_init_default              {{0, {0}}}
 #define Initialize_init_zero                     {0}
 #define GetFeatures_init_zero                    {0}
-#define Features_init_zero                       {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0}
+#define Features_init_zero                       {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0}
 #define ClearSession_init_zero                   {0}
 #define ApplySettings_init_zero                  {false, "", false, "", false, 0, false, {0, {0}}}
 #define ChangePin_init_zero                      {false, 0}
@@ -983,7 +1028,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define Entropy_init_zero                        {{0, {0}}}
 #define GetPublicKey_init_zero                   {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "", false, 0}
 #define PublicKey_init_zero                      {HDNodeType_init_zero, false, ""}
-#define GetAddress_init_zero                     {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "", false, 0, false, MultisigRedeemScriptType_init_zero, false, (InputScriptType)0}
+#define GetAddress_init_zero                     {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, "", false, 0, false, MultisigRedeemScriptType_init_zero}
 #define EthereumGetAddress_init_zero             {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
 #define Address_init_zero                        {""}
 #define EthereumAddress_init_zero                {{0, {0}}}
@@ -1029,8 +1074,12 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define DebugLinkMemory_init_zero                {false, {0, {0}}}
 #define DebugLinkMemoryWrite_init_zero           {false, 0, false, {0, {0}}, false, 0}
 #define DebugLinkFlashErase_init_zero            {false, 0}
+#define SteemAccountKeyAuth_init_zero            {{0, {0}}, 0}
+#define SteemAccountAccountAuth_init_zero        {"", 0}
+#define SteemPermission_init_zero                {0, 0, {SteemAccountAccountAuth_init_zero, SteemAccountAccountAuth_init_zero, SteemAccountAccountAuth_init_zero, SteemAccountAccountAuth_init_zero}, 0, {SteemAccountKeyAuth_init_zero, SteemAccountKeyAuth_init_zero, SteemAccountKeyAuth_init_zero, SteemAccountKeyAuth_init_zero}}
+#define SteemOperationAccountUpdate_init_zero    {"", {0, {0}}, "", false, SteemPermission_init_zero, false, SteemPermission_init_zero, false, SteemPermission_init_zero}
 #define SteemOperationTransfer_init_zero         {"", "", 0, "", false, ""}
-#define SteemSignTx_init_zero                    {0, 0, 0, false, SteemOperationTransfer_init_zero}
+#define SteemSignTx_init_zero                    {0, 0, 0, false, SteemOperationTransfer_init_zero, false, SteemOperationAccountUpdate_init_zero}
 #define SteemTxSignature_init_zero               {{0, {0}}, false, {0, {0}}}
 #define SteemGetPublicKey_init_zero              {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
 #define SteemPublicKey_init_zero                 {{0, {0}}}
@@ -1128,13 +1177,11 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define Features_imported_tag                    15
 #define Features_pin_cached_tag                  16
 #define Features_passphrase_cached_tag           17
-#define Features_firmware_present_tag            18
 #define FirmwareUpload_payload_tag               1
 #define GetAddress_address_n_tag                 1
 #define GetAddress_coin_name_tag                 2
 #define GetAddress_show_display_tag              3
 #define GetAddress_multisig_tag                  4
-#define GetAddress_script_type_tag               5
 #define GetECDHSessionKey_identity_tag           1
 #define GetECDHSessionKey_peer_public_key_tag    2
 #define GetECDHSessionKey_ecdsa_curve_name_tag   3
@@ -1194,6 +1241,10 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define SimpleSignTx_coin_name_tag               4
 #define SimpleSignTx_version_tag                 5
 #define SimpleSignTx_lock_time_tag               6
+#define SteemAccountAccountAuth_account_tag      1
+#define SteemAccountAccountAuth_weight_tag       2
+#define SteemAccountKeyAuth_pubkey_tag           1
+#define SteemAccountKeyAuth_weight_tag           2
 #define SteemGetPublicKey_address_n_tag          1
 #define SteemGetPublicKey_show_display_tag       2
 #define SteemOperationTransfer_from_tag          1
@@ -1215,15 +1266,25 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define VerifyMessage_message_tag                3
 #define VerifyMessage_coin_name_tag              4
 #define WordAck_word_tag                         1
+#define SteemPermission_weight_threshold_tag     1
+#define SteemPermission_account_auths_tag        2
+#define SteemPermission_key_auths_tag            3
+#define SteemOperationAccountUpdate_account_tag  1
+#define SteemOperationAccountUpdate_memo_key_tag 2
+#define SteemOperationAccountUpdate_json_metadata_tag 3
+#define SteemOperationAccountUpdate_owner_tag    4
+#define SteemOperationAccountUpdate_active_tag   5
+#define SteemOperationAccountUpdate_posting_tag  6
 #define SteemSignTx_ref_block_num_tag            1
 #define SteemSignTx_ref_block_prefix_tag         2
 #define SteemSignTx_expiration_tag               3
 #define SteemSignTx_transfer_tag                 4
+#define SteemSignTx_account_update_tag           5
 
 /* Struct field encoding specification for nanopb */
 extern const pb_field_t Initialize_fields[1];
 extern const pb_field_t GetFeatures_fields[1];
-extern const pb_field_t Features_fields[19];
+extern const pb_field_t Features_fields[18];
 extern const pb_field_t ClearSession_fields[1];
 extern const pb_field_t ApplySettings_fields[5];
 extern const pb_field_t ChangePin_fields[2];
@@ -1241,7 +1302,7 @@ extern const pb_field_t GetEntropy_fields[2];
 extern const pb_field_t Entropy_fields[2];
 extern const pb_field_t GetPublicKey_fields[4];
 extern const pb_field_t PublicKey_fields[3];
-extern const pb_field_t GetAddress_fields[6];
+extern const pb_field_t GetAddress_fields[5];
 extern const pb_field_t EthereumGetAddress_fields[3];
 extern const pb_field_t Address_fields[2];
 extern const pb_field_t EthereumAddress_fields[2];
@@ -1287,8 +1348,12 @@ extern const pb_field_t DebugLinkMemoryRead_fields[3];
 extern const pb_field_t DebugLinkMemory_fields[2];
 extern const pb_field_t DebugLinkMemoryWrite_fields[4];
 extern const pb_field_t DebugLinkFlashErase_fields[2];
+extern const pb_field_t SteemAccountKeyAuth_fields[3];
+extern const pb_field_t SteemAccountAccountAuth_fields[3];
+extern const pb_field_t SteemPermission_fields[4];
+extern const pb_field_t SteemOperationAccountUpdate_fields[7];
 extern const pb_field_t SteemOperationTransfer_fields[6];
-extern const pb_field_t SteemSignTx_fields[5];
+extern const pb_field_t SteemSignTx_fields[6];
 extern const pb_field_t SteemTxSignature_fields[3];
 extern const pb_field_t SteemGetPublicKey_fields[3];
 extern const pb_field_t SteemPublicKey_fields[2];
@@ -1296,7 +1361,7 @@ extern const pb_field_t SteemPublicKey_fields[2];
 /* Maximum encoded size of messages (where known) */
 #define Initialize_size                          0
 #define GetFeatures_size                         0
-#define Features_size                            (257 + 8*CoinType_size)
+#define Features_size                            (254 + 8*CoinType_size)
 #define ClearSession_size                        0
 #define ApplySettings_size                       1083
 #define ChangePin_size                           2
@@ -1314,7 +1379,7 @@ extern const pb_field_t SteemPublicKey_fields[2];
 #define Entropy_size                             1027
 #define GetPublicKey_size                        84
 #define PublicKey_size                           (121 + HDNodeType_size)
-#define GetAddress_size                          (81 + MultisigRedeemScriptType_size)
+#define GetAddress_size                          (75 + MultisigRedeemScriptType_size)
 #define EthereumGetAddress_size                  50
 #define Address_size                             43
 #define EthereumAddress_size                     22
@@ -1360,8 +1425,12 @@ extern const pb_field_t SteemPublicKey_fields[2];
 #define DebugLinkMemory_size                     1027
 #define DebugLinkMemoryWrite_size                1035
 #define DebugLinkFlashErase_size                 6
+#define SteemAccountKeyAuth_size                 41
+#define SteemAccountAccountAuth_size             24
+#define SteemPermission_size                     282
+#define SteemOperationAccountUpdate_size         1167
 #define SteemOperationTransfer_size              123
-#define SteemSignTx_size                         143
+#define SteemSignTx_size                         1313
 #define SteemTxSignature_size                    101
 #define SteemGetPublicKey_size                   50
 #define SteemPublicKey_size                      35

@@ -1087,18 +1087,28 @@ void fsm_msgSteemSignTx(SteemSignTx *msg)
 {
 	RESP_INIT(SteemTxSignature);
 
-	layout_steem_confirm_transfer(
-		msg->transfer.from,
-		msg->transfer.to,
-		msg->transfer.asset,
-		msg->transfer.amount
-	);
-	// true: right, false: left
-	if (!protectButton(ButtonRequestType_ButtonRequest_SignTx, false)) {
-		fsm_sendFailure(FailureType_Failure_ActionCancelled, "Signing Canceled");
-		layoutHome();
-		return;
-	}
+    if (msg->has_transfer) {
+        layout_steem_confirm_transfer(
+                msg->transfer.from,
+                msg->transfer.to,
+                msg->transfer.asset,
+                msg->transfer.amount
+                );
+        // true: right, false: left
+        if (!protectButton(ButtonRequestType_ButtonRequest_SignTx, false)) {
+            fsm_sendFailure(FailureType_Failure_ActionCancelled, "Signing Canceled");
+            layoutHome();
+            return;
+        }
+    } else if (msg->has_account_update) {
+        layout_steem_confirm_account_update(msg->account_update.account);
+        // true: right, false: left
+        if (!protectButton(ButtonRequestType_ButtonRequest_SignTx, false)) {
+            fsm_sendFailure(FailureType_Failure_ActionCancelled, "Signing Canceled");
+            layoutHome();
+            return;
+        }
+    }
 
 	const uint8_t chainid[32] = {0};
 
@@ -1112,22 +1122,101 @@ void fsm_msgSteemSignTx(SteemSignTx *msg)
 
 	gph_ser_varint(&ctx, 1); // one operation
 
-	/**
-	 * Transfer specific
-	 */
-	gph_ser_varint(&ctx, 2); // transfer operation
-	gph_ser_string(&ctx, msg->transfer.from);
-	gph_ser_string(&ctx, msg->transfer.to);
-	if(steem_ser_amount(&ctx, msg->transfer.amount, msg->transfer.asset))
-	{
-		fsm_sendFailure(FailureType_Failure_Other, "Unknown Asset");
-	}
-	if (msg->transfer.has_memo && msg->transfer.memo) {
-		gph_ser_string(&ctx, msg->transfer.memo);
-	}
+    /**
+     * transfer specific
+     */
+    if (msg->has_transfer) {
+        gph_ser_varint(&ctx, 2); // transfer operation
+        gph_ser_string(&ctx, msg->transfer.from);
+        gph_ser_string(&ctx, msg->transfer.to);
+        if(steem_ser_amount(&ctx, msg->transfer.amount, msg->transfer.asset))
+        {
+            fsm_sendFailure(FailureType_Failure_Other, "Unknown Asset");
+        }
+        if (msg->transfer.has_memo) {
+            gph_ser_string(&ctx, msg->transfer.memo);
+        } else {
+            gph_ser_string(&ctx, "");
+        }
+
+    /**
+     * account_update specific
+     */
+    } else if (msg->has_account_update) {
+        gph_ser_varint(&ctx, 10); // account_update
+        // account
+        gph_ser_string(&ctx, msg->account_update.account);
+        // owner
+        gph_ser_bool(&ctx, msg->account_update.has_owner);  // Optional(owner)
+        if (msg->account_update.has_owner)
+        {
+            // weight_threshold
+            gph_ser_int32(&ctx, msg->account_update.owner.weight_threshold);
+            // account_auths
+            gph_ser_varint(&ctx, msg->account_update.owner.account_auths_count);
+            for ( uint8_t i = 0; i < msg->account_update.owner.account_auths_count; ++i)
+            {
+                gph_ser_string(&ctx, msg->account_update.owner.account_auths[i].account);
+                gph_ser_int16(&ctx, msg->account_update.owner.account_auths[i].weight);
+            }
+            // key_auths
+            gph_ser_varint(&ctx, msg->account_update.owner.key_auths_count);
+            for ( uint8_t i = 0; i < msg->account_update.owner.key_auths_count; ++i)
+            {
+                gph_ser_bytes(&ctx, msg->account_update.owner.key_auths[i].pubkey.bytes, 33);
+                gph_ser_int16(&ctx, msg->account_update.owner.key_auths[i].weight);
+            }
+        }
+        // active
+        gph_ser_bool(&ctx, msg->account_update.has_active);  // Optional(active)
+        if (msg->account_update.has_active)
+        {
+            // weight_threshold
+            gph_ser_int32(&ctx, msg->account_update.active.weight_threshold);
+            // account_auths
+            gph_ser_varint(&ctx, msg->account_update.active.account_auths_count);
+            for ( uint8_t i = 0; i < msg->account_update.active.account_auths_count; ++i)
+            {
+                gph_ser_string(&ctx, msg->account_update.active.account_auths[i].account);
+                gph_ser_int16(&ctx, msg->account_update.active.account_auths[i].weight);
+            }
+            // key_auths
+            gph_ser_varint(&ctx, msg->account_update.active.key_auths_count);
+            for ( uint8_t i = 0; i < msg->account_update.active.key_auths_count; ++i)
+            {
+                gph_ser_bytes(&ctx, msg->account_update.active.key_auths[i].pubkey.bytes, 33);
+                gph_ser_int16(&ctx, msg->account_update.active.key_auths[i].weight);
+            }
+        }
+        // posting
+        gph_ser_bool(&ctx, msg->account_update.has_posting);  // Optional(posting)
+        if (msg->account_update.has_posting)
+        {
+            // weight_threshold
+            gph_ser_int32(&ctx, msg->account_update.posting.weight_threshold);
+            // account_auths
+            gph_ser_varint(&ctx, msg->account_update.posting.account_auths_count);
+            for ( uint8_t i = 0; i < msg->account_update.posting.account_auths_count; ++i)
+            {
+                gph_ser_string(&ctx, msg->account_update.posting.account_auths[i].account);
+                gph_ser_int16(&ctx, msg->account_update.posting.account_auths[i].weight);
+            }
+            // key_auths
+            gph_ser_varint(&ctx, msg->account_update.posting.key_auths_count);
+            for ( uint8_t i = 0; i < msg->account_update.posting.key_auths_count; ++i)
+            {
+                gph_ser_bytes(&ctx, msg->account_update.posting.key_auths[i].pubkey.bytes, 33);
+                gph_ser_int16(&ctx, msg->account_update.posting.key_auths[i].weight);
+            }
+        }
+        // memo_key
+        gph_ser_bytes(&ctx, msg->account_update.memo_key.bytes, 33);
+        // json_metadata
+        gph_ser_string(&ctx, "");
+    }
 
 	/**
-	 * End of transfer specific
+	 * End of operation specific
 	 */
 	gph_ser_varint(&ctx, 0); // extension
 
