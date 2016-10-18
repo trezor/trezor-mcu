@@ -32,6 +32,12 @@ const CoinType coins[COINS_COUNT] = {
 	{true, "Dash",          true, "DASH", true,     76, true,     100000, true,     16, false, 0, false, 0, true, "\x19" "DarkCoin Signed Message:\n"},
 	{true, "Zcash",         true, "ZEC",  true, 0x1CBD, true,    1000000, true, 0x1CB8, false, 0, false, 0, true, "\x16" "Zcash Signed Message:\n"},
 	{true, "Zcash Testnet", true, "TAZ",  true, 0x1D25, true,    1000000, true, 0x1CBA, false, 0, false, 0, true, "\x16" "Zcash Signed Message:\n"},
+	/*
+	 * Remarks:
+	 * ---------
+	 *  * STEEM: The underlying blockchain protocol is vastly different to
+	 *    satoshi/bitcoin-based networks and thus not part of this struct
+	 */
 };
 
 const CoinType *coinByShortcut(const char *shortcut)
