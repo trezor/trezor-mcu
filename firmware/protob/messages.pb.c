@@ -489,12 +489,13 @@ const pb_field_t SteemOperationTransfer_fields[6] = {
     PB_LAST_FIELD
 };
 
-const pb_field_t SteemSignTx_fields[6] = {
-    PB_FIELD2(  1, UINT32  , REQUIRED, STATIC  , FIRST, SteemSignTx, ref_block_num, ref_block_num, 0),
-    PB_FIELD2(  2, UINT32  , REQUIRED, STATIC  , OTHER, SteemSignTx, ref_block_prefix, ref_block_num, 0),
-    PB_FIELD2(  3, UINT32  , REQUIRED, STATIC  , OTHER, SteemSignTx, expiration, ref_block_prefix, 0),
-    PB_FIELD2(  4, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemSignTx, transfer, expiration, &SteemOperationTransfer_fields),
-    PB_FIELD2(  5, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemSignTx, account_update, transfer, &SteemOperationAccountUpdate_fields),
+const pb_field_t SteemSignTx_fields[7] = {
+    PB_FIELD2(  1, UINT32  , REPEATED, STATIC  , FIRST, SteemSignTx, pubkey_n, pubkey_n, 0),
+    PB_FIELD2(  2, UINT32  , REQUIRED, STATIC  , OTHER, SteemSignTx, ref_block_num, pubkey_n, 0),
+    PB_FIELD2(  3, UINT32  , REQUIRED, STATIC  , OTHER, SteemSignTx, ref_block_prefix, ref_block_num, 0),
+    PB_FIELD2(  4, UINT32  , REQUIRED, STATIC  , OTHER, SteemSignTx, expiration, ref_block_prefix, 0),
+    PB_FIELD2(  5, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemSignTx, transfer, expiration, &SteemOperationTransfer_fields),
+    PB_FIELD2(  6, MESSAGE , OPTIONAL, STATIC  , OTHER, SteemSignTx, account_update, transfer, &SteemOperationAccountUpdate_fields),
     PB_LAST_FIELD
 };
 
@@ -505,8 +506,8 @@ const pb_field_t SteemTxSignature_fields[3] = {
 };
 
 const pb_field_t SteemGetPublicKey_fields[3] = {
-    PB_FIELD2(  1, UINT32  , REPEATED, STATIC  , FIRST, SteemGetPublicKey, address_n, address_n, 0),
-    PB_FIELD2(  2, BOOL    , OPTIONAL, STATIC  , OTHER, SteemGetPublicKey, show_display, address_n, 0),
+    PB_FIELD2(  1, UINT32  , REPEATED, STATIC  , FIRST, SteemGetPublicKey, pubkey_n, pubkey_n, 0),
+    PB_FIELD2(  2, BOOL    , OPTIONAL, STATIC  , OTHER, SteemGetPublicKey, show_display, pubkey_n, 0),
     PB_LAST_FIELD
 };
 

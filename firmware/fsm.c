@@ -1229,9 +1229,12 @@ void fsm_msgSteemSignTx(SteemSignTx *msg)
 	resp->digest.size = 32;
 	memcpy(resp->digest.bytes, digest, 32);
 
+    // Obtain private key from pubkey-bip32-path
+	HDNode *node = fsm_getDerivedNode(SECP256K1_NAME, msg->pubkey_n, msg->pubkey_n_count);
+	if (!node) return;
+	// hdnode_fill_public_key(node);
+
 	// Sign the digest
-	HDNode *node = fsm_getDerivedNode(SECP256K1_NAME, NULL, 0); // FIXME
-	hdnode_fill_public_key(node);
 	graphene_sign_digest(node, digest, resp->signature.bytes);
 	resp->signature.size = 65;
 
@@ -1255,7 +1258,7 @@ void fsm_msgSteemGetPublicKey(SteemGetPublicKey *msg)
 		return;
 	}
 
-	const HDNode *node = fsm_getDerivedNode(SECP256K1_NAME, msg->address_n, msg->address_n_count);
+	const HDNode *node = fsm_getDerivedNode(SECP256K1_NAME, msg->pubkey_n, msg->pubkey_n_count);
 	if (!node) return;
 
 	resp->pubkey.size = 33;

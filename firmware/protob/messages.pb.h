@@ -791,8 +791,8 @@ typedef struct _SteemAccountKeyAuth {
 } SteemAccountKeyAuth;
 
 typedef struct _SteemGetPublicKey {
-    size_t address_n_count;
-    uint32_t address_n[8];
+    size_t pubkey_n_count;
+    uint32_t pubkey_n[8];
     bool has_show_display;
     bool show_display;
 } SteemGetPublicKey;
@@ -906,6 +906,8 @@ typedef struct _SteemOperationAccountUpdate {
 } SteemOperationAccountUpdate;
 
 typedef struct _SteemSignTx {
+    size_t pubkey_n_count;
+    uint32_t pubkey_n[8];
     uint32_t ref_block_num;
     uint32_t ref_block_prefix;
     uint32_t expiration;
@@ -1004,7 +1006,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define SteemPermission_init_default             {0, 0, {SteemAccountAccountAuth_init_default, SteemAccountAccountAuth_init_default, SteemAccountAccountAuth_init_default, SteemAccountAccountAuth_init_default}, 0, {SteemAccountKeyAuth_init_default, SteemAccountKeyAuth_init_default, SteemAccountKeyAuth_init_default, SteemAccountKeyAuth_init_default}}
 #define SteemOperationAccountUpdate_init_default {"", {0, {0}}, "", false, SteemPermission_init_default, false, SteemPermission_init_default, false, SteemPermission_init_default}
 #define SteemOperationTransfer_init_default      {"", "", 0, "", false, ""}
-#define SteemSignTx_init_default                 {0, 0, 0, false, SteemOperationTransfer_init_default, false, SteemOperationAccountUpdate_init_default}
+#define SteemSignTx_init_default                 {0, {0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, 0, false, SteemOperationTransfer_init_default, false, SteemOperationAccountUpdate_init_default}
 #define SteemTxSignature_init_default            {{0, {0}}, false, {0, {0}}}
 #define SteemGetPublicKey_init_default           {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
 #define SteemPublicKey_init_default              {{0, {0}}}
@@ -1079,7 +1081,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define SteemPermission_init_zero                {0, 0, {SteemAccountAccountAuth_init_zero, SteemAccountAccountAuth_init_zero, SteemAccountAccountAuth_init_zero, SteemAccountAccountAuth_init_zero}, 0, {SteemAccountKeyAuth_init_zero, SteemAccountKeyAuth_init_zero, SteemAccountKeyAuth_init_zero, SteemAccountKeyAuth_init_zero}}
 #define SteemOperationAccountUpdate_init_zero    {"", {0, {0}}, "", false, SteemPermission_init_zero, false, SteemPermission_init_zero, false, SteemPermission_init_zero}
 #define SteemOperationTransfer_init_zero         {"", "", 0, "", false, ""}
-#define SteemSignTx_init_zero                    {0, 0, 0, false, SteemOperationTransfer_init_zero, false, SteemOperationAccountUpdate_init_zero}
+#define SteemSignTx_init_zero                    {0, {0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, 0, false, SteemOperationTransfer_init_zero, false, SteemOperationAccountUpdate_init_zero}
 #define SteemTxSignature_init_zero               {{0, {0}}, false, {0, {0}}}
 #define SteemGetPublicKey_init_zero              {0, {0, 0, 0, 0, 0, 0, 0, 0}, false, 0}
 #define SteemPublicKey_init_zero                 {{0, {0}}}
@@ -1245,7 +1247,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define SteemAccountAccountAuth_weight_tag       2
 #define SteemAccountKeyAuth_pubkey_tag           1
 #define SteemAccountKeyAuth_weight_tag           2
-#define SteemGetPublicKey_address_n_tag          1
+#define SteemGetPublicKey_pubkey_n_tag           1
 #define SteemGetPublicKey_show_display_tag       2
 #define SteemOperationTransfer_from_tag          1
 #define SteemOperationTransfer_to_tag            2
@@ -1275,11 +1277,12 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define SteemOperationAccountUpdate_owner_tag    4
 #define SteemOperationAccountUpdate_active_tag   5
 #define SteemOperationAccountUpdate_posting_tag  6
-#define SteemSignTx_ref_block_num_tag            1
-#define SteemSignTx_ref_block_prefix_tag         2
-#define SteemSignTx_expiration_tag               3
-#define SteemSignTx_transfer_tag                 4
-#define SteemSignTx_account_update_tag           5
+#define SteemSignTx_pubkey_n_tag                 1
+#define SteemSignTx_ref_block_num_tag            2
+#define SteemSignTx_ref_block_prefix_tag         3
+#define SteemSignTx_expiration_tag               4
+#define SteemSignTx_transfer_tag                 5
+#define SteemSignTx_account_update_tag           6
 
 /* Struct field encoding specification for nanopb */
 extern const pb_field_t Initialize_fields[1];
@@ -1353,7 +1356,7 @@ extern const pb_field_t SteemAccountAccountAuth_fields[3];
 extern const pb_field_t SteemPermission_fields[4];
 extern const pb_field_t SteemOperationAccountUpdate_fields[7];
 extern const pb_field_t SteemOperationTransfer_fields[6];
-extern const pb_field_t SteemSignTx_fields[6];
+extern const pb_field_t SteemSignTx_fields[7];
 extern const pb_field_t SteemTxSignature_fields[3];
 extern const pb_field_t SteemGetPublicKey_fields[3];
 extern const pb_field_t SteemPublicKey_fields[2];
@@ -1430,7 +1433,7 @@ extern const pb_field_t SteemPublicKey_fields[2];
 #define SteemPermission_size                     282
 #define SteemOperationAccountUpdate_size         1167
 #define SteemOperationTransfer_size              123
-#define SteemSignTx_size                         1313
+#define SteemSignTx_size                         1361
 #define SteemTxSignature_size                    101
 #define SteemGetPublicKey_size                   50
 #define SteemPublicKey_size                      35
