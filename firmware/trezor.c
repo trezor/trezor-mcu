@@ -28,12 +28,48 @@
 #include "layout2.h"
 #include "rng.h"
 
+#include "buttons.h"
+
 uint32_t __stack_chk_guard;
 
 void __attribute__((noreturn)) __stack_chk_fail(void)
 {
 	layoutDialog(&bmp_icon_error, NULL, NULL, NULL, "Stack smashing", "detected.", NULL, "Please unplug", "the device.", NULL);
 	for (;;) {} // loop forever
+}
+
+void lock_device(void)
+{
+	static bool lockButtonDown = false;
+
+	buttonUpdate();
+	if (button.YesDown >= 100000) {
+		/* Button held down for long enough, wait for button release */
+		lockButtonDown = true;
+	} else if (lockButtonDown && button.YesUp) {
+		/* Button released */
+		lockButtonDown = false;
+
+		layoutDialog(&bmp_icon_question, "Cancel", "Lock Device", NULL, "Do you really want to", "lock your TREZOR?", NULL, NULL, NULL, NULL);
+
+        usbTiny(1);
+		do {
+			usbDelay(3300);
+			buttonUpdate();
+		} while (!button.YesUp && !button.NoUp);
+        usbTiny(0);
+
+		if (button.YesUp) {
+			/* Lock the device */
+			session_clear(true);
+			layoutScreensaver();
+		} else {
+			layoutHome();
+		}
+	} else {
+		/* Button possibly released during usbPoll() */
+		lockButtonDown = false;
+	}
 }
 
 int main(void)
@@ -61,6 +97,7 @@ int main(void)
 	usbInit();
 	for (;;) {
 		usbPoll();
+        lock_device();
 	}
 
 	return 0;
