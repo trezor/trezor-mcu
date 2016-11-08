@@ -7,6 +7,8 @@ OBJS += setup.o
 OBJS += util.o
 OBJS += memory.o
 OBJS += timer.o
+OBJS += usb21_standard.o
+OBJS += webusb.o
 OBJS += gen/bitmaps.o
 OBJS += gen/fonts.o
 
