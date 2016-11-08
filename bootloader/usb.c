@@ -34,13 +34,18 @@
 #include "signatures.h"
 #include "sha2.h"
 
+#include "usb21_standard.h"
+#include "webusb.h"
+
+#define USB_INTERFACE_INDEX_MAIN 0
+
 #define ENDPOINT_ADDRESS_IN         (0x81)
 #define ENDPOINT_ADDRESS_OUT        (0x01)
 
 static const struct usb_device_descriptor dev_descr = {
 	.bLength = USB_DT_DEVICE_SIZE,
 	.bDescriptorType = USB_DT_DEVICE,
-	.bcdUSB = 0x0200,
+	.bcdUSB = 0x0210,
 	.bDeviceClass = 0,
 	.bDeviceSubClass = 0,
 	.bDeviceProtocol = 0,
@@ -112,7 +117,7 @@ static const struct usb_endpoint_descriptor hid_endpoints[2] = {{
 static const struct usb_interface_descriptor hid_iface[] = {{
 	.bLength = USB_DT_INTERFACE_SIZE,
 	.bDescriptorType = USB_DT_INTERFACE,
-	.bInterfaceNumber = 0,
+	.bInterfaceNumber = USB_INTERFACE_INDEX_MAIN,
 	.bAlternateSetting = 0,
 	.bNumEndpoints = 2,
 	.bInterfaceClass = USB_CLASS_HID,
@@ -157,10 +162,8 @@ static int hid_control_request(usbd_device *dev, struct usb_setup_data *req, uin
 	    (req->wValue != 0x2200))
 		return 0;
 
-	/* Handle the HID report descriptor. */
 	*buf = (uint8_t *)hid_report_descriptor;
 	*len = sizeof(hid_report_descriptor);
-
 	return 1;
 }
 
@@ -463,24 +466,39 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue)
 {
 	(void)wValue;
 
-	usbd_ep_setup(dev, ENDPOINT_ADDRESS_IN, USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
+	usbd_ep_setup(dev, ENDPOINT_ADDRESS_IN,  USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, hid_rx_callback);
 
 	usbd_register_control_callback(
 		dev,
 		USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_INTERFACE,
 		USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
-		hid_control_request
-	);
+		hid_control_request);
 }
 
 static usbd_device *usbd_dev;
-static uint8_t usbd_control_buffer[128];
+static uint8_t usbd_control_buffer[256] __attribute__ ((aligned (2)));
+
+static const struct usb_device_capability_descriptor* capabilities[] = {
+	(const struct usb_device_capability_descriptor*)&webusb_platform_capability_descriptor,
+};
+
+static const struct usb_bos_descriptor bos_descriptor = {
+	.bLength = USB_DT_BOS_SIZE,
+	.bDescriptorType = USB_DT_BOS,
+	.bNumDeviceCaps = sizeof(capabilities)/sizeof(capabilities[0]),
+	.capabilities = capabilities
+};
 
 void usbInit(void)
 {
-	usbd_dev = usbd_init(&otgfs_usb_driver, &dev_descr, &config, usb_strings, 3, usbd_control_buffer, sizeof(usbd_control_buffer));
+	usbd_dev = usbd_init(&otgfs_usb_driver, &dev_descr, &config, usb_strings, sizeof(usb_strings)/sizeof(const char *), usbd_control_buffer, sizeof(usbd_control_buffer));
 	usbd_register_set_config_callback(usbd_dev, hid_set_config);
+	usb21_setup(usbd_dev, &bos_descriptor);
+	static const char* origin_urls[] = {
+		"trezor.io/start",
+	};
+	webusb_setup(usbd_dev, origin_urls, sizeof(origin_urls)/sizeof(origin_urls[0]), USB_INTERFACE_INDEX_MAIN);
 }
 
 void checkButtons(void)
