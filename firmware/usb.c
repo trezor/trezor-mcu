@@ -29,6 +29,9 @@
 #include "util.h"
 #include "timer.h"
 
+#include "usb21_standard.h"
+#include "webusb.h"
+
 #define USB_INTERFACE_INDEX_MAIN 0
 #if DEBUG_LINK
 #define USB_INTERFACE_INDEX_DEBUG 1
@@ -68,7 +71,7 @@ static const char *usb_strings[] = {
 static const struct usb_device_descriptor dev_descr = {
 	.bLength = USB_DT_DEVICE_SIZE,
 	.bDescriptorType = USB_DT_DEVICE,
-	.bcdUSB = 0x0200,
+	.bcdUSB = 0x0210,
 	.bDeviceClass = 0,
 	.bDeviceSubClass = 0,
 	.bDeviceProtocol = 0,
@@ -399,12 +402,28 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue)
 }
 
 static usbd_device *usbd_dev;
-static uint8_t usbd_control_buffer[128];
+static uint8_t usbd_control_buffer[256] __attribute__ ((aligned (2)));
+
+static const struct usb_device_capability_descriptor* capabilities[] = {
+	(const struct usb_device_capability_descriptor*)&webusb_platform_capability_descriptor,
+};
+
+static const struct usb_bos_descriptor bos_descriptor = {
+	.bLength = USB_DT_BOS_SIZE,
+	.bDescriptorType = USB_DT_BOS,
+	.bNumDeviceCaps = sizeof(capabilities)/sizeof(capabilities[0]),
+	.capabilities = capabilities
+};
 
 void usbInit(void)
 {
 	usbd_dev = usbd_init(&otgfs_usb_driver, &dev_descr, &config, usb_strings, sizeof(usb_strings) / sizeof(*usb_strings), usbd_control_buffer, sizeof(usbd_control_buffer));
 	usbd_register_set_config_callback(usbd_dev, hid_set_config);
+	usb21_setup(usbd_dev, &bos_descriptor);
+	static const char* origin_urls[] = {
+		"trezor.io/start",
+	};
+	webusb_setup(usbd_dev, origin_urls, sizeof(origin_urls)/sizeof(origin_urls[0]), USB_INTERFACE_INDEX_MAIN);
 }
 
 void usbPoll(void)
