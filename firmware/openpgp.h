@@ -23,10 +23,12 @@
 #include "apdu.h"
 #include "ccid.h"
 #include "sha2.h"
+#include "messages.pb.h"
 
 #include <stdint.h>
 
 void ccid_OpenPGP(const APDU_HEADER *APDU, uint8_t length, struct RDR_to_PC_DataBlock *response);
+void openpgp_construct_pubkey(OpenPGPMessage *resp);
 
 #define OPENPGP_VERSION      0x0003 // OpenPGP Card 3.0
 #define OPENPGP_MANUFACTURER 0x4C53 // TODO: choose a valid value

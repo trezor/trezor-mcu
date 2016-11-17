@@ -70,6 +70,7 @@ typedef enum _MessageType {
     MessageType_MessageType_ECDHSessionKey = 62,
     MessageType_MessageType_SetU2FCounter = 63,
     MessageType_MessageType_InitializeOpenPGP = 64,
+    MessageType_MessageType_OpenPGPMessage = 65,
     MessageType_MessageType_DebugLinkDecision = 100,
     MessageType_MessageType_DebugLinkGetState = 101,
     MessageType_MessageType_DebugLinkState = 102,
@@ -637,6 +638,16 @@ typedef struct _MessageSignature {
     MessageSignature_signature_t signature;
 } MessageSignature;
 
+typedef struct {
+    size_t size;
+    uint8_t bytes[1024];
+} OpenPGPMessage_message_t;
+
+typedef struct _OpenPGPMessage {
+    bool has_message;
+    OpenPGPMessage_message_t message;
+} OpenPGPMessage;
+
 typedef struct _PassphraseAck {
     char passphrase[51];
 } PassphraseAck;
@@ -911,6 +922,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define ECDHSessionKey_init_default              {false, {0, {0}}}
 #define SetU2FCounter_init_default               {false, 0}
 #define InitializeOpenPGP_init_default           {false, 0, false, ""}
+#define OpenPGPMessage_init_default              {false, {0, {0}}}
 #define FirmwareErase_init_default               {0}
 #define FirmwareUpload_init_default              {{0, {0}}}
 #define DebugLinkDecision_init_default           {0}
@@ -978,6 +990,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define ECDHSessionKey_init_zero                 {false, {0, {0}}}
 #define SetU2FCounter_init_zero                  {false, 0}
 #define InitializeOpenPGP_init_zero              {false, 0, false, ""}
+#define OpenPGPMessage_init_zero                 {false, {0, {0}}}
 #define FirmwareErase_init_zero                  {0}
 #define FirmwareUpload_init_zero                 {{0, {0}}}
 #define DebugLinkDecision_init_zero              {0}
@@ -1109,6 +1122,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define LoadDevice_u2f_counter_tag               8
 #define MessageSignature_address_tag             1
 #define MessageSignature_signature_tag           2
+#define OpenPGPMessage_message_tag               1
 #define PassphraseAck_passphrase_tag             1
 #define PinMatrixAck_pin_tag                     1
 #define PinMatrixRequest_type_tag                1
@@ -1225,6 +1239,7 @@ extern const pb_field_t GetECDHSessionKey_fields[4];
 extern const pb_field_t ECDHSessionKey_fields[2];
 extern const pb_field_t SetU2FCounter_fields[2];
 extern const pb_field_t InitializeOpenPGP_fields[3];
+extern const pb_field_t OpenPGPMessage_fields[2];
 extern const pb_field_t FirmwareErase_fields[1];
 extern const pb_field_t FirmwareUpload_fields[2];
 extern const pb_field_t DebugLinkDecision_fields[2];
@@ -1294,6 +1309,7 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 #define ECDHSessionKey_size                      67
 #define SetU2FCounter_size                       6
 #define InitializeOpenPGP_size                   40
+#define OpenPGPMessage_size                      1027
 #define FirmwareErase_size                       0
 #define FirmwareUpload_size                      2
 #define DebugLinkDecision_size                   2

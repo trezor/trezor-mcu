@@ -37,6 +37,7 @@ static void OpenPGP_VERIFY(const uint8_t *data, uint8_t length, struct RDR_to_PC
 static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_DataBlock *response);
 
 static int openpgp_derive_nodes(void);
+
 static const HDNode *openpgp_derive_root_node(void);
 
 static const HDNode *NODE;
@@ -318,7 +319,7 @@ static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_
 	APDU_SW(response, APDU_SUCCESS);
 }
 
-int OpenPGP_initializeNode(void) {
+int openpgp_derive_nodes(void) {
 	NODE = openpgp_derive_root_node();
 
 	if (NODE == NULL) {
@@ -359,6 +360,10 @@ const HDNode *openpgp_derive_root_node() {
 		return NULL;
 
 	return &node;
+}
+
+void openpgp_construct_pubkey(OpenPGPMessage *response) {
+	(void) response;
 }
 
 void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node, uint32_t timestamp) {

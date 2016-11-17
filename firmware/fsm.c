@@ -1045,7 +1045,11 @@ void fsm_msgInitializeOpenPGP(InitializeOpenPGP *msg)
 
 	storage_commit();
 
-	fsm_sendSuccess("OpenPGP initialized");
+	RESP_INIT(OpenPGPMessage);
+	resp->has_message = true;
+	openpgp_construct_pubkey(resp);
+	msg_write(MessageType_MessageType_OpenPGPMessage, resp);
+
 	layoutHome();
 }
 

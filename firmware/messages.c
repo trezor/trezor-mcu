@@ -92,6 +92,7 @@ static const struct MessagesMap_t MessagesMap[] = {
 	{'n', 'o', MessageType_MessageType_MessageSignature,	MessageSignature_fields,	0},
 	{'n', 'o', MessageType_MessageType_SignedIdentity,		SignedIdentity_fields,		0},
 	{'n', 'o', MessageType_MessageType_ECDHSessionKey,		ECDHSessionKey_fields,		0},
+	{'n', 'o', MessageType_MessageType_OpenPGPMessage,		OpenPGPMessage_fields,		0},
 /* ECIES disabled
 	{'n', 'o', MessageType_MessageType_EncryptedMessage,	EncryptedMessage_fields,	0},
 	{'n', 'o', MessageType_MessageType_DecryptedMessage,	DecryptedMessage_fields,	0},
