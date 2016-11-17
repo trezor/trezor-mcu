@@ -36,6 +36,7 @@ static void OpenPGP_VERIFY(const uint8_t *data, uint8_t length, struct RDR_to_PC
 
 static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_DataBlock *response);
 
+static int openpgp_derive_nodes(void);
 static const HDNode *openpgp_derive_root_node(void);
 
 static const HDNode *NODE;
@@ -57,20 +58,9 @@ static const OPENPGP_EXTENDED_CAPS EXTENDED_CAPS;
  * Handle all OpenPGP APDUs received
  */
 void ccid_OpenPGP(const APDU_HEADER *APDU, const uint8_t length, struct RDR_to_PC_DataBlock *response) {
-	if (protectUnlocked(true)) {
-		NODE = openpgp_derive_root_node();
-		if (NODE == NULL) {
-			APDU_SW(response, APDU_UNRECOVERABLE);
-			return;
-		}
-
-		// Initialize specific keys
-		NODE_SIG = *NODE; // Digital Signature
-		hdnode_private_ckd(&NODE_SIG, OPENPGP_BIP32_INDEX_SIG);
-		NODE_DEC = *NODE; // Confidentiality
-		hdnode_private_ckd(&NODE_DEC, OPENPGP_BIP32_INDEX_DEC);
-		NODE_AUT = *NODE; // Authentication
-		hdnode_private_ckd(&NODE_AUT, OPENPGP_BIP32_INDEX_AUT);
+	if (protectUnlocked(true) && openpgp_derive_nodes() == -1) {
+		APDU_SW(response, APDU_UNRECOVERABLE);
+		return;
 	}
 
 	const uint16_t TAG = APDU->P1 << 8 | APDU->P2;
@@ -326,6 +316,24 @@ static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_
 	APDU_CONSTRUCT(response, 0x86, buffer, sizeof(buffer));
 	APDU_CONSTRUCT_END(response);
 	APDU_SW(response, APDU_SUCCESS);
+}
+
+int OpenPGP_initializeNode(void) {
+	NODE = openpgp_derive_root_node();
+
+	if (NODE == NULL) {
+		return -1;
+	}
+
+	// Initialize specific keys
+	NODE_SIG = *NODE; // Digital Signature
+	hdnode_private_ckd(&NODE_SIG, OPENPGP_BIP32_INDEX_SIG);
+	NODE_DEC = *NODE; // Confidentiality
+	hdnode_private_ckd(&NODE_DEC, OPENPGP_BIP32_INDEX_DEC);
+	NODE_AUT = *NODE; // Authentication
+	hdnode_private_ckd(&NODE_AUT, OPENPGP_BIP32_INDEX_AUT);
+
+	return 0;
 }
 
 const HDNode *openpgp_derive_root_node() {
