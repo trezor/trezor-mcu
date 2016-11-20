@@ -37,11 +37,15 @@ static void OpenPGP_VERIFY(const uint8_t *data, uint8_t length, struct RDR_to_PC
 static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_DataBlock *response);
 
 static int openpgp_derive_nodes(void);
-
 static const HDNode *openpgp_derive_root_node(void);
 
 static const HDNode *NODE;
 static HDNode NODE_SIG, NODE_DEC, NODE_AUT;
+
+void *openpgp_append_tag(OpenPGPMessage_message_t *message, uint8_t tag, uint32_t length);
+
+#define OPENPGP_APPEND_TAG(MESSAGE, TAG, TYPE) \
+	(TYPE *) openpgp_append_tag(MESSAGE, TAG, sizeof(TYPE))
 
 void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node, uint32_t timestamp);
 void openpgp_fingerprint(const HDNode *node, uint8_t fingerprint[OPENPGP_FINGERPRINT_LENGTH], uint32_t timestamp);
@@ -363,7 +367,39 @@ const HDNode *openpgp_derive_root_node() {
 }
 
 void openpgp_construct_pubkey(OpenPGPMessage *response) {
-	(void) response;
+	// Initialize NODE, NODE_*
+	openpgp_derive_nodes();
+
+	response->has_message = true;
+	OpenPGPMessage_message_t *message = &response->message;
+
+	// TODO: Ed25519 support
+	OPENPGP_NISTP256_PACKET *root = OPENPGP_APPEND_TAG(message,
+			0x06, // Public-Key Packet
+			OPENPGP_NISTP256_PACKET);
+
+	openpgp_nistp256_packet(root, &NODE_SIG, storage.openpgp_timestamp);
+}
+
+void *openpgp_append_tag(OpenPGPMessage_message_t *message, uint8_t tag, uint32_t length) {
+	message->bytes[message->size++] = 0b11000000 | tag;
+
+	if (length < 192) {
+		message->bytes[message->size++] = length;
+	} else if (length < 8384) {
+		message->bytes[message->size++] = (length >> 8) + 191;
+		message->bytes[message->size++] = (length & 0xFF) + 0x40;
+	} else {
+		message->bytes[message->size++] = 255;
+		message->bytes[message->size++] = (length & 0xFF000000) >> 24;
+		message->bytes[message->size++] = (length & 0x00FF0000) >> 16;
+		message->bytes[message->size++] = (length & 0x0000FF00) >>  8;
+		message->bytes[message->size++] = (length & 0xFF0000FF);
+	}
+
+	void *data = &message->bytes[message->size];
+	message->size += length;
+	return data;
 }
 
 void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node, uint32_t timestamp) {
@@ -376,9 +412,13 @@ void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node
 
 // TODO: Ed25519 support
 void openpgp_fingerprint(const HDNode *node, uint8_t *fingerprint, const uint32_t timestamp) {
-	static OPENPGP_NISTP256_PACKET packet;
+	static uint8_t buffer[3 + sizeof(OPENPGP_NISTP256_PACKET)];
 
-	openpgp_nistp256_packet(&packet, node, timestamp);
+	buffer[0] = 0x99;
+	buffer[1] = sizeof(OPENPGP_NISTP256_PACKET) >> 8;
+	buffer[2] = sizeof(OPENPGP_NISTP256_PACKET) & 0xFF;
 
-	sha1_Raw((uint8_t *) &packet, sizeof(packet), fingerprint);
+	openpgp_nistp256_packet((OPENPGP_NISTP256_PACKET *) &buffer[3], node, timestamp);
+
+	sha1_Raw(buffer, sizeof(buffer), fingerprint);
 }
