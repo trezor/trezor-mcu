@@ -44,9 +44,6 @@ static HDNode NODE_SIG, NODE_DEC, NODE_AUT;
 
 void *openpgp_append_tag(OpenPGPMessage_message_t *message, uint8_t tag, uint32_t length);
 
-#define OPENPGP_APPEND_TAG(MESSAGE, TAG, TYPE) \
-	(TYPE *) openpgp_append_tag(MESSAGE, TAG, sizeof(TYPE))
-
 void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node, uint32_t timestamp);
 void openpgp_fingerprint(const HDNode *node, uint8_t fingerprint[OPENPGP_FINGERPRINT_LENGTH], uint32_t timestamp);
 
@@ -374,11 +371,20 @@ void openpgp_construct_pubkey(OpenPGPMessage *response) {
 	OpenPGPMessage_message_t *message = &response->message;
 
 	// TODO: Ed25519 support
-	OPENPGP_NISTP256_PACKET *root = OPENPGP_APPEND_TAG(message,
-			0x06, // Public-Key Packet
-			OPENPGP_NISTP256_PACKET);
+	OPENPGP_NISTP256_PACKET *root = openpgp_append_tag(message,
+			6, // Public-Key Packet
+			sizeof(OPENPGP_NISTP256_PACKET));
 
 	openpgp_nistp256_packet(root, &NODE_SIG, storage.openpgp_timestamp);
+
+	const char *name = storage_getName();
+
+	char *userID = openpgp_append_tag(message,
+			13, // User ID Packet
+			strlen(name));
+
+	// Avoid null termination
+	strncpy(userID, name, strlen(name));
 }
 
 void *openpgp_append_tag(OpenPGPMessage_message_t *message, uint8_t tag, uint32_t length) {

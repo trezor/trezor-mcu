@@ -435,7 +435,8 @@ const uint8_t *storage_getHomescreen(void)
 
 const char *storage_getName(void)
 {
-	return storage.has_name ? storage.name : 0;
+	// A default (non-empty) name is useful in a number of places
+	return storage.has_name ? storage.name : "TREZOR";
 }
 
 /* Check whether pin matches storage.  The pin must be a null-terminated
