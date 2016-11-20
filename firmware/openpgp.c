@@ -28,6 +28,7 @@
 #include "protect.h"
 #include "storage.h"
 #include "util.h"
+#include "nist256p1.h"
 
 static void OpenPGP_GET_DATA(uint16_t TAG, struct RDR_to_PC_DataBlock *response);
 static void OpenPGP_PUT_DATA(uint16_t TAG, const uint8_t *data, struct RDR_to_PC_DataBlock *response);
@@ -35,6 +36,8 @@ static void OpenPGP_PUT_DATA(uint16_t TAG, const uint8_t *data, struct RDR_to_PC
 static void OpenPGP_VERIFY(const uint8_t *data, uint8_t length, struct RDR_to_PC_DataBlock *response);
 
 static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_DataBlock *response);
+
+static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_to_PC_DataBlock *response);
 
 static int openpgp_derive_nodes(void);
 static const HDNode *openpgp_derive_root_node(void);
@@ -81,6 +84,23 @@ void ccid_OpenPGP(const APDU_HEADER *APDU, const uint8_t length, struct RDR_to_P
 
 	case OPENPGP_GENERATE_ASYMMETRIC_KEY_PAIR:
 		OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(*APDU->data, response);
+		break;
+
+	case OPENPGP_PERFORM_SECURITY_OPERATION:
+		if (TAG == 0x9E9A) { // COMPUTE DIGITAL SIGNATURE
+			// SHA256 is 256-bit
+			if ((length - sizeof(*APDU)) != 32) {
+				debugLog(0, "", "APDU: DSI not SHA256?");
+
+				// TODO: We should probably be able to handle other algorithms
+				APDU_SW(response, APDU_PARAM_DATA_INCORRECT);
+			}
+
+			OpenPGP_COMPUTE_DIGITAL_SIGNATURE(APDU->data, response);
+		} else {
+			debugLog(0, "", "APDU: Unknown PSO");
+			APDU_SW(response, APDU_NOT_SUPPORTED);
+		}
 		break;
 
 	default:
@@ -317,6 +337,19 @@ static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_
 	APDU_CONSTRUCT(response, 0x7F49, NULL, 0);
 	APDU_CONSTRUCT(response, 0x86, buffer, sizeof(buffer));
 	APDU_CONSTRUCT_END(response);
+	APDU_SW(response, APDU_SUCCESS);
+}
+
+static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_to_PC_DataBlock *response) {
+	static uint8_t signature[64];
+
+	// TODO: Ed25519 support
+	if (ecdsa_sign_digest(&nist256p1, NODE_SIG.private_key, digest, signature, NULL, NULL) != 0) {
+		debugLog(0, "", "PSO: Signing failed");
+		APDU_SW(response, APDU_UNRECOVERABLE);
+	}
+
+	APDU_WRITE(response, signature, sizeof(signature));
 	APDU_SW(response, APDU_SUCCESS);
 }
 
