@@ -518,6 +518,38 @@ void usbSleep(uint32_t millis)
 	}
 }
 
+void ccidSleep(uint32_t millis, const CCID_HEADER *header)
+{
+	static struct RDR_to_PC_DataBlock response = {
+		.bMessageType = RDR_to_PC_DataBlock,
+
+		/*
+		 * Block Waiting Time Multiplier
+		 *
+		 * XXX: I don't really understand this but this value works
+		 */
+		.bError = CCID_TIME_EXTENSION_BWI,
+
+		// Time Extension
+		.bmCommandStatus = 2,
+	};
+
+	response.bSlot = header->bSlot;
+	response.bSeq  = header->bSeq;
+
+	// Handle remainder
+	usbSleep(millis % CCID_TIME_EXTENSION_INTERVAL);
+	ccid_tx((CCID_HEADER *) &response);
+
+	uint32_t cycles = millis / CCID_TIME_EXTENSION_INTERVAL;
+	while (cycles--) {
+	    usbSleep(CCID_TIME_EXTENSION_INTERVAL);
+
+	    // Request Time Extension
+	    ccid_tx((CCID_HEADER *) &response);
+	}
+}
+
 void ccid_tx(const CCID_HEADER *request) {
 	const uint8_t *data = (uint8_t *) request;
 	uint8_t remaining = sizeof(*request) + request->dwLength;

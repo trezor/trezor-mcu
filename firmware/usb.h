@@ -27,7 +27,9 @@ void usbInit(void);
 void usbPoll(void);
 void usbReconnect(void);
 char usbTiny(char set);
+
 void usbSleep(uint32_t millis);
+void ccidSleep(uint32_t millis, const CCID_HEADER *header);
 
 void ccid_tx(const CCID_HEADER *request);
 

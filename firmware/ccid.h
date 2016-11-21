@@ -128,4 +128,10 @@ struct RDR_to_PC_SlotStatus {
 	uint8_t  bClockStatus;
 } __attribute__((packed));
 
+// Multiplier for Block Waiting Time
+#define CCID_TIME_EXTENSION_BWI 10
+
+// Interval between requesting Time Extensions in milliseconds
+#define CCID_TIME_EXTENSION_INTERVAL 100
+
 #endif
