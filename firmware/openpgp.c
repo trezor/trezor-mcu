@@ -233,10 +233,18 @@ static void OpenPGP_PUT_DATA(const uint16_t TAG, const uint8_t *data, struct RDR
 
 	switch (TAG) {
 	case 0x005B: // Name according to ISO/IEC 7501-1
+		layoutDialogSwipe(&bmp_icon_question, "Cancel", "Confirm", NULL, "Do you really want to", "set the name to", (const char *) data, NULL, NULL, NULL);
+		if (!ccidProtectButton(false, (CCID_HEADER *) response)) {
+			APDU_SW(response, APDU_SECURITY_COND_FAIL);
+			layoutHome();
+			return;
+		}
+
 		storage_setName((const char *) data);
 		storage_commit();
 
 		APDU_SW(response, APDU_SUCCESS);
+		layoutHome();
 		break;
 
 	default:
