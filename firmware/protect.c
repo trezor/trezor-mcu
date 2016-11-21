@@ -196,6 +196,7 @@ uint32_t *ccidPinWait(const CCID_HEADER *header)
 {
 	uint32_t *fails = storage_getPinFailsPtr();
 	uint32_t wait = ~*fails;
+	usbTiny(1);
 	while (wait > 0) {
 		// convert wait to secstr string
 		char secstrbuf[20];
@@ -215,6 +216,7 @@ uint32_t *ccidPinWait(const CCID_HEADER *header)
 		ccidSleep(1000, header);
 		wait--;
 	}
+	usbTiny(0);
 
 	return fails;
 }
