@@ -192,6 +192,33 @@ bool protectPin(bool use_cached)
 	}
 }
 
+uint32_t *ccidPinWait(const CCID_HEADER *header)
+{
+	uint32_t *fails = storage_getPinFailsPtr();
+	uint32_t wait = ~*fails;
+	while (wait > 0) {
+		// convert wait to secstr string
+		char secstrbuf[20];
+		strlcpy(secstrbuf, "________0 seconds", sizeof(secstrbuf));
+		char *secstr = secstrbuf + 9;
+		uint32_t secs = wait;
+		while (secs > 0 && secstr >= secstrbuf) {
+			secstr--;
+			*secstr = (secs % 10) + '0';
+			secs /= 10;
+		}
+		if (wait == 1) {
+			secstrbuf[16] = 0;
+		}
+		layoutDialog(&bmp_icon_info, NULL, NULL, NULL, "Wrong PIN entered", NULL, "Please wait", secstr, "to continue ...", NULL);
+		// wait one second
+		ccidSleep(1000, header);
+		wait--;
+	}
+
+	return fails;
+}
+
 bool protectChangePin(void)
 {
 	const char *pin;

@@ -269,6 +269,9 @@ static void OpenPGP_VERIFY(const uint8_t *data, const uint8_t length, struct RDR
 
 		APDU_SW(response, APDU_SUCCESS);
 	} else {
+		// Handle PIN Failures Delay
+		uint32_t *fails = ccidPinWait((CCID_HEADER *) response);
+
 		static char PIN[10];
 
 		uint8_t limit = length;
@@ -291,11 +294,13 @@ static void OpenPGP_VERIFY(const uint8_t *data, const uint8_t length, struct RDR
 		pinmatrix_done(PIN);
 		if (storage_isPinCorrect(PIN)) {
 			session_cachePin();
+			storage_resetPinFails(fails);
 			if (passphrase) {
 				session_cachePassphrase(passphrase);
 			}
 			APDU_SW(response, APDU_SUCCESS);
 		} else {
+			storage_increasePinFails(fails);
 			APDU_SW(response, APDU_SECURITY_COND_FAIL);
 		}
 

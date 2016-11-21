@@ -23,9 +23,11 @@
 #include <stdbool.h>
 #include "storage.h"
 #include "types.pb.h"
+#include "ccid.h"
 
 bool protectButton(ButtonRequestType type, bool confirm_only);
 bool protectPin(bool use_cached);
+uint32_t *ccidPinWait(const CCID_HEADER *header);
 bool protectChangePin(void);
 bool protectPassphrase(void);
 
