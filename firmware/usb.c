@@ -423,7 +423,7 @@ static void ccid_rx_callback(usbd_device *dev, uint8_t ep)
 
 	uint16_t len = usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_CCID_OUT, buf, sizeof(buf) - 1);
 	if (len != sizeof(*header) + header->dwLength) return;
-	ccid_rx(header);
+	ccid_rx(header, tiny);
 }
 
 #if DEBUG_LINK

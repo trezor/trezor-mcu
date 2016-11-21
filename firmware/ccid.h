@@ -31,7 +31,7 @@ typedef struct {
 	uint8_t  abData[];
 } __attribute__((packed)) CCID_HEADER;
 
-void ccid_rx(const CCID_HEADER *request);
+void ccid_rx(const CCID_HEADER *request, char tiny);
 
 /*
  * USB CCID Descriptor

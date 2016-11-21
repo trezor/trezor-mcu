@@ -48,7 +48,7 @@ typedef enum {
 /*
  * Handle CCID message, expecting request->dwLength to be accurate.
  */
-void ccid_rx(const CCID_HEADER *request) {
+void ccid_rx(const CCID_HEADER *request, char tiny) {
 	switch (request->bMessageType) {
 		case PC_to_RDR_IccPowerOn:
 			ccid_IccPowerOn(request);
@@ -60,7 +60,15 @@ void ccid_rx(const CCID_HEADER *request) {
 			break;
 
 		case PC_to_RDR_XfrBlock:
-			ccid_XfrBlock((struct PC_to_RDR_XfrBlock *) request);
+			/*
+			 * CCID should NOT attempt to talk to the card whilst awaiting responses
+			 *
+			 * XXX: We cannot handle requests while the other interfaces are engaged
+			 */
+			if (!tiny) {
+				ccid_XfrBlock((struct PC_to_RDR_XfrBlock *) request);
+			}
+
 			break;
 
 		default:
