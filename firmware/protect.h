@@ -26,6 +26,7 @@
 #include "ccid.h"
 
 bool protectButton(ButtonRequestType type, bool confirm_only);
+bool ccidProtectButton(bool confirm_only, const CCID_HEADER *header);
 bool protectPin(bool use_cached);
 uint32_t *ccidPinWait(const CCID_HEADER *header);
 bool protectChangePin(void);

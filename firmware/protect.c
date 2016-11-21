@@ -105,6 +105,32 @@ bool protectButton(ButtonRequestType type, bool confirm_only)
 	return result;
 }
 
+bool ccidProtectButton(bool confirm_only, const CCID_HEADER *header)
+{
+	bool result = false;
+
+	usbTiny(1);
+	buttonUpdate(); // Clear button state
+
+	for (;;) {
+		ccidSleep(5, header);
+
+		buttonUpdate();
+		if (button.YesUp) {
+			result = true;
+			break;
+		}
+		if (!confirm_only && button.NoUp) {
+			result = false;
+			break;
+		}
+	}
+
+	usbTiny(0);
+
+	return result;
+}
+
 const char *requestPin(PinMatrixRequestType type, const char *text)
 {
 	PinMatrixRequest resp;
