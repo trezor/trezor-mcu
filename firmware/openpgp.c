@@ -341,6 +341,11 @@ static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_
 }
 
 static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_to_PC_DataBlock *response) {
+	if (!protectUnlocked(true)) {
+		APDU_SW(response, APDU_SECURITY_COND_FAIL);
+		return;
+	}
+
 	static uint8_t signature[64];
 
 	// TODO: Ed25519 support
