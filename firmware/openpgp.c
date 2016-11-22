@@ -477,13 +477,16 @@ void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node
 
 // TODO: Ed25519 support
 void openpgp_fingerprint(const HDNode *node, uint8_t *fingerprint, const uint32_t timestamp) {
-	static uint8_t buffer[3 + sizeof(OPENPGP_NISTP256_PACKET)];
+	static SHA1_CTX context;
+	static OPENPGP_NISTP256_PACKET packet;
+	static uint8_t header[] = { 0x99, sizeof(packet) >> 8, sizeof(packet) & 0xFF };
 
-	buffer[0] = 0x99;
-	buffer[1] = sizeof(OPENPGP_NISTP256_PACKET) >> 8;
-	buffer[2] = sizeof(OPENPGP_NISTP256_PACKET) & 0xFF;
+	sha1_Init(&context);
 
-	openpgp_nistp256_packet((OPENPGP_NISTP256_PACKET *) &buffer[3], node, timestamp);
+	sha1_Update(&context, header, sizeof(header));
 
-	sha1_Raw(buffer, sizeof(buffer), fingerprint);
+	openpgp_nistp256_packet(&packet, node, timestamp);
+	sha1_Update(&context, (const uint8_t *) &packet, sizeof(packet));
+
+	sha1_Final(&context, fingerprint);
 }
