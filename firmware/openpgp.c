@@ -359,6 +359,13 @@ static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_
 		return;
 	}
 
+	layoutDialogSwipe(&bmp_icon_question, "Cancel", "Confirm", NULL, "Do you really want to", "compute an OpenPGP", "signature?", NULL, NULL, NULL);
+	if (!ccidProtectButton(false, (CCID_HEADER *) response)) {
+		APDU_SW(response, APDU_SECURITY_COND_FAIL);
+		layoutHome();
+		return;
+	}
+
 	static uint8_t signature[64];
 
 	// TODO: Ed25519 support
@@ -369,6 +376,7 @@ static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_
 
 	APDU_WRITE(response, signature, sizeof(signature));
 	APDU_SW(response, APDU_SUCCESS);
+	layoutHome();
 }
 
 int openpgp_derive_nodes(void) {
