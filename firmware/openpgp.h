@@ -36,8 +36,10 @@ void openpgp_construct_pubkey(OpenPGPMessage *resp);
 static const uint8_t OPENPGP_APPLICATION_ID[] = { 0xD2, 0x76, 0x00, 0x01, 0x24, 0x01 };
 
 // OpenPGP Algorithms
+#define OPENPGP_SHA256_ID    8
+
 #define OPENPGP_NISTP256_ID 19
-#define OPENPGP_ED25519_ID 22
+#define OPENPGP_ED25519_ID  22
 
 #define OPENPGP_NISTP256_MPI_LENGTH (3 + 2 * 32 * 8) // 04 || x || y
 
@@ -72,6 +74,26 @@ static const OPENPGP_NISTP256_PACKET OPENPGP_NISTP256_PACKET_DEFAULT = {
 	.mpi_length = ((OPENPGP_NISTP256_MPI_LENGTH & 0xFF) << 8) |
 	              ((OPENPGP_NISTP256_MPI_LENGTH >> 8) & 0xFF),
 	// .mpi =
+};
+
+typedef struct {
+	uint8_t  version;      // Signature Packet version (0x04)
+	uint8_t	 type;	       // Signature Type
+
+	uint8_t	 algorithm;    // ECC Algorithm ID
+	uint8_t  hash;	       // Hash Algorithm ID
+
+	uint16_t hashed_count; // Length in octets of all of the hashed subpackets
+} __attribute__((packed)) OPENPGP_SIGNATURE_HEADER;
+
+static const OPENPGP_SIGNATURE_HEADER OPENPGP_SIGNATURE_HEADER_DEFAULT = {
+	.version = 0x04,
+	// .type =
+
+	.algorithm = OPENPGP_NISTP256_ID,
+	.hash = OPENPGP_SHA256_ID,
+
+	// .hashed_count =
 };
 
 // OpenPGP Key Derivation
