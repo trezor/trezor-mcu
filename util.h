@@ -48,11 +48,17 @@ void __attribute__((noreturn)) system_reset(void);
 // #if BYTE_ORDER == LITTLE_ENDIAN
 
 // Host byte order to network byte order
+static inline uint16_t htons(const uint16_t hostshort) {
+	return	(hostshort & 0xFF00) >>  8 |
+		(hostshort & 0x00FF) <<  8;
+}
+
+// Host byte order to network byte order
 static inline uint32_t htonl(const uint32_t hostlong) {
-	return (hostlong & 0xFF000000) >> 24 |
-		   (hostlong & 0x00FF0000) >>  8 |
-		   (hostlong & 0x0000FF00) <<  8 |
-		   (hostlong & 0x000000FF) << 24;
+	return	(hostlong & 0xFF000000) >> 24 |
+		(hostlong & 0x00FF0000) >>  8 |
+		(hostlong & 0x0000FF00) <<  8 |
+		(hostlong & 0x000000FF) << 24;
 }
 
 // #endif

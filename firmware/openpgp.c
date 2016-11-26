@@ -36,11 +36,8 @@ typedef OpenPGPMessage_message_t OpenPGPPayload;
 
 static void OpenPGP_GET_DATA(uint16_t TAG, struct RDR_to_PC_DataBlock *response);
 static void OpenPGP_PUT_DATA(uint16_t TAG, const uint8_t *data, struct RDR_to_PC_DataBlock *response);
-
 static void OpenPGP_VERIFY(const uint8_t *data, uint8_t length, struct RDR_to_PC_DataBlock *response);
-
 static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_DataBlock *response);
-
 static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_to_PC_DataBlock *response);
 
 static int openpgp_derive_nodes(void);
@@ -50,16 +47,23 @@ static int openpgp_derive_nodes_slip13(void);
 static const HDNode *NODE;
 static HDNode NODE_SIG, NODE_DEC, NODE_AUT;
 
+// Packets
 void *openpgp_append_tag(OpenPGPPayload *message, uint8_t tag, uint32_t length);
 uint16_t openpgp_mpi(const uint8_t *data, uint16_t length);
 
+// High-level packet mutation
 void openpgp_append_user_id(OpenPGPPayload *message, const char *user_id, const HDNode *node, const OPENPGP_NISTP256_PACKET *public_key);
 
+// Signature packets
 OPENPGP_SIGNATURE_HEADER *openpgp_start_signature(OpenPGPPayload *signature, SHA256_CTX *context, const OPENPGP_NISTP256_PACKET *public_key);
+void openpgp_start_unhashed(OpenPGPPayload *signature, OPENPGP_SIGNATURE_HEADER *header);
+void openpgp_subpacket(OpenPGPPayload *signature, uint8_t type, const uint8_t *data, uint32_t length);
+void openpgp_end_unhashed(OpenPGPPayload *signature, OPENPGP_SIGNATURE_HEADER *header, const OPENPGP_NISTP256_PACKET *public_key);
 void openpgp_end_signature(OpenPGPPayload *message, OpenPGPPayload *signature, SHA256_CTX *context, OPENPGP_SIGNATURE_HEADER *header, const HDNode *node);
 
+// Key material
 void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node, uint32_t timestamp);
-void openpgp_fingerprint(const HDNode *node, uint8_t fingerprint[OPENPGP_FINGERPRINT_LENGTH], uint32_t timestamp);
+void openpgp_fingerprint(const HDNode *node, uint8_t fingerprint[OPENPGP_FINGERPRINT_LENGTH], uint32_t timestamp, const OPENPGP_NISTP256_PACKET *cached);
 
 static const OPENPGP_PW_STATUS PW_STATUS = {
 	.Validity = 0x1,
@@ -190,13 +194,13 @@ void OpenPGP_GET_DATA(const uint16_t TAG, struct RDR_to_PC_DataBlock *response) 
 		static uint8_t fingerprint[OPENPGP_FINGERPRINT_LENGTH];
 		APDU_CONSTRUCT(response, 0x00C5, NULL, OPENPGP_FINGERPRINT_LENGTH * 3);
 		// Digital Signature
-		openpgp_fingerprint(&NODE_SIG, fingerprint, storage.openpgp_timestamp);
+		openpgp_fingerprint(&NODE_SIG, fingerprint, storage.openpgp_timestamp, NULL);
 		APDU_WRITE(response, fingerprint, sizeof(fingerprint));
 		// Confidentiality
-		openpgp_fingerprint(&NODE_DEC, fingerprint, storage.openpgp_timestamp);
+		openpgp_fingerprint(&NODE_DEC, fingerprint, storage.openpgp_timestamp, NULL);
 		APDU_WRITE(response, fingerprint, sizeof(fingerprint));
 		// Authentication
-		openpgp_fingerprint(&NODE_AUT, fingerprint, storage.openpgp_timestamp);
+		openpgp_fingerprint(&NODE_AUT, fingerprint, storage.openpgp_timestamp, NULL);
 		APDU_WRITE(response, fingerprint, sizeof(fingerprint));
 
 		// List of generation dates/times of public key pairs
@@ -574,16 +578,56 @@ void openpgp_append_user_id(OpenPGPPayload *message, const char *user_id, const 
 
 	uint8_t body_header[] = {
 		0xB4, // User ID certification
-		length & 0xFF000000 >> 24,
-		length & 0x00FF0000 >> 16,
-		length & 0x0000FF00 >>  8,
-		length & 0x000000FF,
+		(length & 0xFF000000) >> 24,
+		(length & 0x00FF0000) >> 16,
+		(length & 0x0000FF00) >>  8,
+		(length & 0x000000FF),
 	};
 	sha256_Update(&context, body_header, sizeof(body_header));
+	sha256_Update(&context, (uint8_t *) user_id, length);
 
-	// TODO: Actually do subpackets here
-	signature.bytes[signature.size++] = 0x00; // Unhashed count
-	signature.bytes[signature.size++] = 0x00;
+	// Hashed subpackets
+
+	openpgp_subpacket(&signature,
+		2, // Signature Creation Time
+		(uint8_t *) &public_key->timestamp,
+		sizeof(public_key->timestamp));
+
+	openpgp_subpacket(&signature,
+		27, // Key Flags
+		& (uint8_t) { 0x01 | 0x02 }, // [SC]
+		sizeof(uint8_t));
+
+	openpgp_subpacket(&signature,
+		11, // Preferred Symmetric Algorithms
+		& (uint8_t) { 9 }, // AES-256
+		sizeof(uint8_t));
+
+	openpgp_subpacket(&signature,
+		21, // Preferred Hash Algorithms
+		& (uint8_t) { OPENPGP_SHA256_ID },
+		sizeof(uint8_t));
+
+	openpgp_subpacket(&signature,
+		22, // Preferred Compression Algorithms
+		& (uint8_t) { 0 }, // Uncompressed
+		sizeof(uint8_t));
+
+	openpgp_subpacket(&signature,
+		30, // Features
+		& (uint8_t) { 0x01 }, // Modification detection
+		sizeof(uint8_t));
+
+	openpgp_subpacket(&signature,
+		23, // Key Server Preferences
+		& (uint8_t) { 0x80 }, // No-modify
+		sizeof(uint8_t));
+
+	openpgp_start_unhashed(&signature, header);
+
+	// Unhashed subpackets
+
+	openpgp_end_unhashed(&signature, header, public_key);
 
 	openpgp_end_signature(message, &signature, &context, header, node);
 }
@@ -602,20 +646,78 @@ OPENPGP_SIGNATURE_HEADER *openpgp_start_signature(OpenPGPPayload *signature, SHA
 	return header;
 }
 
+void openpgp_start_unhashed(OpenPGPPayload *signature, OPENPGP_SIGNATURE_HEADER *header) {
+	uint8_t *start = (uint8_t *) header;
+	header->hashed_count = &signature->bytes[signature->size] - &start[sizeof(*header)];
+
+	// Reserve unhashed count
+	signature->size += 2;
+}
+
+void openpgp_subpacket(OpenPGPPayload *signature, uint8_t type, const uint8_t *data, uint32_t length) {
+	// Length should include type octet
+	uint32_t subpacket_length = length + 1;
+
+	// Length
+	if (subpacket_length < 192) {
+		signature->bytes[signature->size++] = subpacket_length;
+	} else if (subpacket_length < 8384) {
+		signature->bytes[signature->size++] = (subpacket_length >> 8) + 191;
+		signature->bytes[signature->size++] = (subpacket_length & 0xFF) + 0x40;
+	} else {
+		signature->bytes[signature->size++] = 255;
+		signature->bytes[signature->size++] = (subpacket_length & 0xFF000000) >> 24;
+		signature->bytes[signature->size++] = (subpacket_length & 0x00FF0000) >> 16;
+		signature->bytes[signature->size++] = (subpacket_length & 0x0000FF00) >>  8;
+		signature->bytes[signature->size++] = (subpacket_length & 0xFF0000FF);
+	}
+
+	// Type
+	signature->bytes[signature->size++] = type;
+
+	// Data
+	memcpy(&signature->bytes[signature->size], data, length);
+	signature->size += length;
+}
+
+void openpgp_end_unhashed(OpenPGPPayload *signature, OPENPGP_SIGNATURE_HEADER *header, const OPENPGP_NISTP256_PACKET *public_key) {
+	if (public_key != NULL) {
+		static uint8_t fingerprint[OPENPGP_FINGERPRINT_LENGTH];
+		openpgp_fingerprint(NULL, fingerprint, 0, public_key);
+
+		openpgp_subpacket(signature,
+			16, // Issuer
+			&fingerprint[OPENPGP_FINGERPRINT_LENGTH - 8],
+			8);
+	}
+
+	// Calculate length
+	uint8_t *start = (uint8_t *) header;
+	uint8_t *length = &start[sizeof(*header) + header->hashed_count];
+
+	uint16_t native_length = &signature->bytes[signature->size] - &length[2];
+	length[0] = native_length >> 8;
+	length[1] = native_length & 0xFF;
+}
+
 void openpgp_end_signature(OpenPGPPayload *message, OpenPGPPayload *signature, SHA256_CTX *context, OPENPGP_SIGNATURE_HEADER *header, const HDNode *node) {
 	uint8_t *start = (uint8_t *) header;
 
-	sha256_Update(context, start, sizeof(*header)); // Signature header
-	sha256_Update(context, start + sizeof(*header), header->hashed_count); // Hashed subpackets
+	// Fix up endianess
+	uint16_t hashed_count = header->hashed_count;
+	header->hashed_count = htons(hashed_count);
 
-	uint32_t hashed_length = context->bitcount >> 3;
+	sha256_Update(context, start, sizeof(*header)); // Signature header
+	sha256_Update(context, start + sizeof(*header), hashed_count); // Hashed subpackets
+
+	uint32_t hashed_length = sizeof(*header) + hashed_count;
 	uint8_t trailer[] = {
 		0x04, // Version number
 		0xFF,
-		hashed_length & 0xFF000000 >> 24,
-		hashed_length & 0x00FF0000 >> 16,
-		hashed_length & 0x0000FF00 >>  8,
-		hashed_length & 0x000000FF,
+		(hashed_length & 0xFF000000) >> 24,
+		(hashed_length & 0x00FF0000) >> 16,
+		(hashed_length & 0x0000FF00) >>  8,
+		(hashed_length & 0x000000FF),
 	};
 	sha256_Update(context, trailer, sizeof(trailer));
 
@@ -662,7 +764,7 @@ void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node
 };
 
 // TODO: Ed25519 support
-void openpgp_fingerprint(const HDNode *node, uint8_t *fingerprint, const uint32_t timestamp) {
+void openpgp_fingerprint(const HDNode *node, uint8_t *fingerprint, const uint32_t timestamp, const OPENPGP_NISTP256_PACKET *cached) {
 	static SHA1_CTX context;
 	static OPENPGP_NISTP256_PACKET packet;
 	static uint8_t header[] = { 0x99, sizeof(packet) >> 8, sizeof(packet) & 0xFF };
@@ -671,8 +773,12 @@ void openpgp_fingerprint(const HDNode *node, uint8_t *fingerprint, const uint32_
 
 	sha1_Update(&context, header, sizeof(header));
 
-	openpgp_nistp256_packet(&packet, node, timestamp);
-	sha1_Update(&context, (const uint8_t *) &packet, sizeof(packet));
+	if (cached == NULL) {
+		openpgp_nistp256_packet(&packet, node, timestamp);
+		sha1_Update(&context, (uint8_t *) &packet, sizeof(packet));
+	} else {
+		sha1_Update(&context, (uint8_t *) cached, sizeof(*cached));
+	}
 
 	sha1_Final(&context, fingerprint);
 }
