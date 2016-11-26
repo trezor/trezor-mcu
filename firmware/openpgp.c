@@ -52,6 +52,7 @@ void *openpgp_append_tag(OpenPGPPayload *message, uint8_t tag, uint32_t length);
 uint16_t openpgp_mpi(const uint8_t *data, uint16_t length);
 
 // High-level packet mutation
+OPENPGP_NISTP256_PACKET *openpgp_append_public_key(OpenPGPPayload *message, const HDNode *node, uint32_t timestamp, const char *user_id);
 void openpgp_append_user_id(OpenPGPPayload *message, const char *user_id, const HDNode *node, const OPENPGP_NISTP256_PACKET *public_key);
 
 // Signature packets
@@ -503,14 +504,23 @@ void openpgp_construct_pubkey(OpenPGPMessage *response, const char *user_id) {
 	response->has_message = true;
 	OpenPGPPayload *message = &response->message;
 
+	OPENPGP_NISTP256_PACKET *public_key = openpgp_append_public_key(message,
+		&NODE_SIG, storage.openpgp_timestamp, user_id);
+
+	(void) public_key;
+}
+
+OPENPGP_NISTP256_PACKET *openpgp_append_public_key(OpenPGPPayload *message, const HDNode *node, uint32_t timestamp, const char *user_id) {
 	// TODO: Ed25519 support
-	OPENPGP_NISTP256_PACKET *root = openpgp_append_tag(message,
+	OPENPGP_NISTP256_PACKET *packet = openpgp_append_tag(message,
 			6, // Public-Key Packet
 			sizeof(OPENPGP_NISTP256_PACKET));
 
-	openpgp_nistp256_packet(root, &NODE_SIG, storage.openpgp_timestamp);
+	openpgp_nistp256_packet(packet, node, timestamp);
 
-	openpgp_append_user_id(message, user_id, &NODE_SIG, root);
+	openpgp_append_user_id(message, user_id, node, packet);
+
+	return packet;
 }
 
 uint16_t openpgp_mpi(const uint8_t *data, uint16_t length) {
