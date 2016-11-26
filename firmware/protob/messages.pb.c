@@ -393,10 +393,11 @@ const pb_field_t SetU2FCounter_fields[2] = {
     PB_LAST_FIELD
 };
 
-const pb_field_t InitializeOpenPGP_fields[4] = {
+const pb_field_t InitializeOpenPGP_fields[5] = {
     PB_FIELD2(  1, UINT32  , OPTIONAL, STATIC  , FIRST, InitializeOpenPGP, time, time, 0),
     PB_FIELD2(  2, STRING  , OPTIONAL, STATIC  , OTHER, InitializeOpenPGP, ecdsa_curve_name, time, 0),
     PB_FIELD2(  3, STRING  , OPTIONAL, STATIC  , OTHER, InitializeOpenPGP, user_id, ecdsa_curve_name, 0),
+    PB_FIELD2(  4, ENUM    , OPTIONAL, STATIC  , OTHER, InitializeOpenPGP, derivation, user_id, 0),
     PB_LAST_FIELD
 };
 

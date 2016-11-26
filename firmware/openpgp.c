@@ -20,15 +20,17 @@
 
 #include "openpgp.h"
 
+#include "crypto.h"
 #include "curves.h"
 #include "debug.h"
+#include "fsm.h"
 #include "layout2.h"
 #include "macros.h"
+#include "nist256p1.h"
 #include "pinmatrix.h"
 #include "protect.h"
 #include "storage.h"
 #include "util.h"
-#include "nist256p1.h"
 
 typedef OpenPGPMessage_message_t OpenPGPPayload;
 
@@ -43,6 +45,7 @@ static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_
 
 static int openpgp_derive_nodes(void);
 static const HDNode *openpgp_derive_root_node(void);
+static int openpgp_derive_nodes_slip13(void);
 
 static const HDNode *NODE;
 static HDNode NODE_SIG, NODE_DEC, NODE_AUT;
@@ -388,35 +391,93 @@ static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_
 }
 
 int openpgp_derive_nodes(void) {
-	NODE = openpgp_derive_root_node();
+	if (!storage.has_openpgp_derivation || !storage.has_openpgp_curve_name || !storage.has_openpgp_timestamp)
+		// OpenPGP not initialized yet
+		return -1;
 
-	if (NODE == NULL) {
+	if (!protectUnlocked(true))
+		// PIN or passphrase required
+		return -1;
+
+	if (storage.openpgp_derivation == OpenPGPDerivationType_OpenPGPDerivation_Simple) {
+		NODE = openpgp_derive_root_node();
+
+		if (NODE == NULL) {
+			return -1;
+		}
+
+		// Initialize specific keys
+		NODE_SIG = *NODE; // Digital Signature
+		hdnode_private_ckd(&NODE_SIG, OPENPGP_BIP32_INDEX_SIG);
+		NODE_DEC = *NODE; // Confidentiality
+		hdnode_private_ckd(&NODE_DEC, OPENPGP_BIP32_INDEX_DEC);
+		NODE_AUT = *NODE; // Authentication
+		hdnode_private_ckd(&NODE_AUT, OPENPGP_BIP32_INDEX_AUT);
+
+		return 0;
+	} else if (storage.openpgp_derivation == OpenPGPDerivationType_OpenPGPDerivation_SLIP13) {
+		return openpgp_derive_nodes_slip13();
+	} else {
+		// Should not reach here
+		return -1;
+	}
+}
+
+// https://github.com/romanz/trezor-agent/blob/master/trezor_agent/gpg/client.py
+int openpgp_derive_nodes_slip13() {
+	// "gpg://First Last <user@domain.tld>"
+	IdentityType identity = {
+		.has_index = true,
+		.index = 0,
+
+		.has_proto = true,
+		.proto = "gpg",
+
+		.has_host = true,
+	};
+	strlcpy(identity.host, storage.openpgp_user_id, sizeof(identity.host));
+
+	uint8_t hash[32];
+	if (!cryptoIdentityFingerprint(&identity, hash)) {
 		return -1;
 	}
 
-	// Initialize specific keys
-	NODE_SIG = *NODE; // Digital Signature
-	hdnode_private_ckd(&NODE_SIG, OPENPGP_BIP32_INDEX_SIG);
-	NODE_DEC = *NODE; // Confidentiality
-	hdnode_private_ckd(&NODE_DEC, OPENPGP_BIP32_INDEX_DEC);
-	NODE_AUT = *NODE; // Authentication
-	hdnode_private_ckd(&NODE_AUT, OPENPGP_BIP32_INDEX_AUT);
+	uint32_t address_n[5];
+	address_n[0] = 0x80000000 | 13;
+	address_n[1] = 0x80000000 | hash[ 0] | (hash[ 1] << 8) | (hash[ 2] << 16) | (hash[ 3] << 24);
+	address_n[2] = 0x80000000 | hash[ 4] | (hash[ 5] << 8) | (hash[ 6] << 16) | (hash[ 7] << 24);
+	address_n[3] = 0x80000000 | hash[ 8] | (hash[ 9] << 8) | (hash[10] << 16) | (hash[11] << 24);
+	address_n[4] = 0x80000000 | hash[12] | (hash[13] << 8) | (hash[14] << 16) | (hash[15] << 24);
+
+	static const uint32_t address_n_count = sizeof(address_n) / sizeof(uint32_t);
+
+	static HDNode node;
+	if (!storage_getRootNode(&node, storage.openpgp_curve_name, true))
+		// Failed to derive root node
+		return -1;
+
+	NODE_SIG = node;
+	if (!hdnode_private_ckd_cached(&NODE_SIG, address_n, address_n_count, NULL)) {
+		return -1;
+	}
+
+	// TODO: Use a different key?
+	NODE_AUT = NODE_SIG;
+
+	address_n[0] = 0x80000000 | 17; // ECDH
+	NODE_DEC = node;
+	if (!hdnode_private_ckd_cached(&NODE_DEC, address_n, address_n_count, NULL)) {
+		return -1;
+	}
 
 	return 0;
 }
 
+// Used for simple derivation
 const HDNode *openpgp_derive_root_node() {
 	static HDNode node;
 	static uint32_t address_n[] = { OPENPGP_DERIVATION_PATH, 0 };
 	static const uint8_t address_n_count = sizeof(address_n) / sizeof(uint32_t);
-
-	if (!protectUnlocked(true))
-		// PIN or passphrase required
-		return NULL;
-
-	if (!storage.has_openpgp_curve_name || !storage.has_openpgp_timestamp)
-		// OpenPGP not initialized yet
-		return NULL;
 
 	if (!storage_getRootNode(&node, storage.openpgp_curve_name, true))
 		// Failed to derive root node
@@ -432,7 +493,8 @@ const HDNode *openpgp_derive_root_node() {
 
 void openpgp_construct_pubkey(OpenPGPMessage *response, const char *user_id) {
 	// Initialize NODE, NODE_*
-	openpgp_derive_nodes();
+	if (openpgp_derive_nodes() == -1)
+		fsm_sendFailure(FailureType_Failure_Other, "Failed to derive OpenPGP nodes");
 
 	response->has_message = true;
 	OpenPGPPayload *message = &response->message;

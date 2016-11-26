@@ -4,5 +4,6 @@ Storage.language	max_size:17
 Storage.label		max_size:33
 Storage.homescreen	max_size:1024
 
-Storage.name				max_size:40
+Storage.name			max_size:40
 Storage.openpgp_curve_name	max_size:32
+Storage.openpgp_user_id         max_size:256

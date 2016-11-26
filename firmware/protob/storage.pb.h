@@ -54,13 +54,17 @@ typedef struct _Storage {
     char openpgp_curve_name[32];
     bool has_openpgp_timestamp;
     uint32_t openpgp_timestamp;
+    bool has_openpgp_derivation;
+    OpenPGPDerivationType openpgp_derivation;
+    bool has_openpgp_user_id;
+    char openpgp_user_id[256];
 } Storage;
 
 /* Default values for struct fields */
 
 /* Initializer values for message structs */
-#define Storage_init_default                     {0, false, HDNodeType_init_default, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0, false, "", false, 0}
-#define Storage_init_zero                        {0, false, HDNodeType_init_zero, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0, false, "", false, 0}
+#define Storage_init_default                     {0, false, HDNodeType_init_default, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0, false, "", false, 0, false, (OpenPGPDerivationType)0, false, ""}
+#define Storage_init_zero                        {0, false, HDNodeType_init_zero, false, "", false, 0, false, 0, false, "", false, "", false, "", false, 0, false, {0, {0}}, false, 0, false, "", false, (ISO5218)0, false, "", false, 0, false, (OpenPGPDerivationType)0, false, ""}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define Storage_version_tag                      1
@@ -78,12 +82,14 @@ typedef struct _Storage {
 #define Storage_sex_tag                          13
 #define Storage_openpgp_curve_name_tag           14
 #define Storage_openpgp_timestamp_tag            15
+#define Storage_openpgp_derivation_tag           16
+#define Storage_openpgp_user_id_tag              17
 
 /* Struct field encoding specification for nanopb */
-extern const pb_field_t Storage_fields[16];
+extern const pb_field_t Storage_fields[18];
 
 /* Maximum encoded size of messages (where known) */
-#define Storage_size                             (1453 + HDNodeType_size)
+#define Storage_size                             (1720 + HDNodeType_size)
 
 #ifdef __cplusplus
 } /* extern "C" */

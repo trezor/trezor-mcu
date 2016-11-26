@@ -607,6 +607,8 @@ typedef struct _InitializeOpenPGP {
     char ecdsa_curve_name[32];
     bool has_user_id;
     char user_id[256];
+    bool has_derivation;
+    OpenPGPDerivationType derivation;
 } InitializeOpenPGP;
 
 typedef struct _LoadDevice {
@@ -923,7 +925,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define GetECDHSessionKey_init_default           {false, IdentityType_init_default, false, {0, {0}}, false, ""}
 #define ECDHSessionKey_init_default              {false, {0, {0}}}
 #define SetU2FCounter_init_default               {false, 0}
-#define InitializeOpenPGP_init_default           {false, 0, false, "", false, ""}
+#define InitializeOpenPGP_init_default           {false, 0, false, "", false, "", false, (OpenPGPDerivationType)0}
 #define OpenPGPMessage_init_default              {false, {0, {0}}}
 #define FirmwareErase_init_default               {0}
 #define FirmwareUpload_init_default              {{0, {0}}}
@@ -991,7 +993,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define GetECDHSessionKey_init_zero              {false, IdentityType_init_zero, false, {0, {0}}, false, ""}
 #define ECDHSessionKey_init_zero                 {false, {0, {0}}}
 #define SetU2FCounter_init_zero                  {false, 0}
-#define InitializeOpenPGP_init_zero              {false, 0, false, "", false, ""}
+#define InitializeOpenPGP_init_zero              {false, 0, false, "", false, "", false, (OpenPGPDerivationType)0}
 #define OpenPGPMessage_init_zero                 {false, {0, {0}}}
 #define FirmwareErase_init_zero                  {0}
 #define FirmwareUpload_init_zero                 {{0, {0}}}
@@ -1115,6 +1117,7 @@ extern const uint32_t SimpleSignTx_lock_time_default;
 #define InitializeOpenPGP_time_tag               1
 #define InitializeOpenPGP_ecdsa_curve_name_tag   2
 #define InitializeOpenPGP_user_id_tag            3
+#define InitializeOpenPGP_derivation_tag         4
 #define LoadDevice_mnemonic_tag                  1
 #define LoadDevice_node_tag                      2
 #define LoadDevice_pin_tag                       3
@@ -1241,7 +1244,7 @@ extern const pb_field_t SignedIdentity_fields[4];
 extern const pb_field_t GetECDHSessionKey_fields[4];
 extern const pb_field_t ECDHSessionKey_fields[2];
 extern const pb_field_t SetU2FCounter_fields[2];
-extern const pb_field_t InitializeOpenPGP_fields[4];
+extern const pb_field_t InitializeOpenPGP_fields[5];
 extern const pb_field_t OpenPGPMessage_fields[2];
 extern const pb_field_t FirmwareErase_fields[1];
 extern const pb_field_t FirmwareUpload_fields[2];
@@ -1311,7 +1314,7 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 #define GetECDHSessionKey_size                   (107 + IdentityType_size)
 #define ECDHSessionKey_size                      67
 #define SetU2FCounter_size                       6
-#define InitializeOpenPGP_size                   299
+#define InitializeOpenPGP_size                   305
 #define OpenPGPMessage_size                      1027
 #define FirmwareErase_size                       0
 #define FirmwareUpload_size                      2

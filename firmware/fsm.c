@@ -1008,6 +1008,11 @@ void fsm_msgInitializeOpenPGP(InitializeOpenPGP *msg)
 
 	const char *user_id = msg->has_user_id ? msg->user_id : storage_getName();
 
+	OpenPGPDerivationType derivation = OpenPGPDerivationType_OpenPGPDerivation_Simple;
+	if (msg->has_derivation) {
+		derivation = msg->derivation;
+	}
+
 	CHECK_PARAM(
 		strcmp(curve, NIST256P1_NAME) == 0 /* TODO: || strcmp(curve, ED25519_NAME) == 0 */,
 		"Unsupported curve for OpenPGP"
@@ -1044,6 +1049,12 @@ void fsm_msgInitializeOpenPGP(InitializeOpenPGP *msg)
 
 	storage.has_openpgp_timestamp = true;
 	storage.openpgp_timestamp = msg->time;
+
+	storage.has_openpgp_derivation = true;
+	storage.openpgp_derivation = derivation;
+
+	storage.has_openpgp_user_id = true;
+	strlcpy(storage.openpgp_user_id, user_id, sizeof(storage.openpgp_user_id));
 
 	storage_commit();
 

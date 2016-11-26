@@ -80,6 +80,11 @@ typedef enum _WordRequestType {
     WordRequestType_WordRequestType_Matrix6 = 2
 } WordRequestType;
 
+typedef enum _OpenPGPDerivationType {
+    OpenPGPDerivationType_OpenPGPDerivation_Simple = 0,
+    OpenPGPDerivationType_OpenPGPDerivation_SLIP13 = 1
+} OpenPGPDerivationType;
+
 /* Struct definitions */
 typedef struct _CoinType {
     bool has_coin_name;
