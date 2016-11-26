@@ -28,7 +28,7 @@
 #include <stdint.h>
 
 void ccid_OpenPGP(const APDU_HEADER *APDU, uint8_t length, struct RDR_to_PC_DataBlock *response);
-void openpgp_construct_pubkey(OpenPGPMessage *resp);
+void openpgp_construct_pubkey(OpenPGPMessage *resp, const char *user_id);
 
 #define OPENPGP_VERSION      0x0003 // OpenPGP Card 3.0
 #define OPENPGP_MANUFACTURER 0x4C53 // TODO: choose a valid value

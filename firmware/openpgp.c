@@ -430,7 +430,7 @@ const HDNode *openpgp_derive_root_node() {
 	return &node;
 }
 
-void openpgp_construct_pubkey(OpenPGPMessage *response) {
+void openpgp_construct_pubkey(OpenPGPMessage *response, const char *user_id) {
 	// Initialize NODE, NODE_*
 	openpgp_derive_nodes();
 
@@ -444,7 +444,7 @@ void openpgp_construct_pubkey(OpenPGPMessage *response) {
 
 	openpgp_nistp256_packet(root, &NODE_SIG, storage.openpgp_timestamp);
 
-	openpgp_append_user_id(message, storage_getName(), &NODE_SIG, root);
+	openpgp_append_user_id(message, user_id, &NODE_SIG, root);
 }
 
 uint16_t openpgp_mpi(const uint8_t *data, uint16_t length) {

@@ -1006,6 +1006,8 @@ void fsm_msgInitializeOpenPGP(InitializeOpenPGP *msg)
 		curve = msg->ecdsa_curve_name;
 	}
 
+	const char *user_id = msg->has_user_id ? msg->user_id : storage_getName();
+
 	CHECK_PARAM(
 		strcmp(curve, NIST256P1_NAME) == 0 /* TODO: || strcmp(curve, ED25519_NAME) == 0 */,
 		"Unsupported curve for OpenPGP"
@@ -1046,7 +1048,7 @@ void fsm_msgInitializeOpenPGP(InitializeOpenPGP *msg)
 	storage_commit();
 
 	RESP_INIT(OpenPGPMessage);
-	openpgp_construct_pubkey(resp);
+	openpgp_construct_pubkey(resp, user_id);
 	msg_write(MessageType_MessageType_OpenPGPMessage, resp);
 
 	layoutHome();
