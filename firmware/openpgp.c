@@ -385,7 +385,7 @@ static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_
 	static uint8_t signature[64];
 
 	// TODO: Ed25519 support
-	if (ecdsa_sign_digest(&nist256p1, NODE_SIG.private_key, digest, signature, NULL, NULL) != 0) {
+	if (ecdsa_sign_digest(NODE_SIG.curve->params, NODE_SIG.private_key, digest, signature, NULL, NULL) != 0) {
 		debugLog(0, "", "PSO: Signing failed");
 		APDU_SW(response, APDU_UNRECOVERABLE);
 	}
@@ -740,7 +740,7 @@ void openpgp_end_signature(OpenPGPPayload *message, OpenPGPPayload *signature, S
 
 	// Error checking?
 	static uint8_t signature_data[64];
-	ecdsa_sign_digest(&nist256p1, node->private_key, digest, signature_data, NULL, NULL);
+	ecdsa_sign_digest(node->curve->params, node->private_key, digest, signature_data, NULL, NULL);
 
 	// First signature parameter
 	uint16_t mpi = openpgp_mpi(signature_data, 32);
