@@ -75,6 +75,9 @@ static const OPENPGP_PW_STATUS PW_STATUS = {
 
 static const OPENPGP_EXTENDED_CAPS EXTENDED_CAPS;
 
+// Stolen from ykneo-openpgp, seems quite generic
+static const uint8_t HISTORICAL[] = { 0x00, 0x73, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
 /*
  * Handle all OpenPGP APDUs received
  */
@@ -190,6 +193,9 @@ void OpenPGP_GET_DATA(const uint16_t TAG, struct RDR_to_PC_DataBlock *response) 
 		}
 
 		APDU_CONSTRUCT(response, TAG, NULL, 0);
+
+		// Historical bytes
+		APDU_CONSTRUCT(response, 0x5F52, HISTORICAL, sizeof(HISTORICAL));
 
 		// Fingerprints
 		static uint8_t fingerprint[OPENPGP_FINGERPRINT_LENGTH];
