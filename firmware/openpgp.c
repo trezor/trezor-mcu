@@ -52,15 +52,15 @@ void *openpgp_append_tag(OpenPGPPayload *message, uint8_t tag, uint32_t length);
 uint16_t openpgp_mpi(const uint8_t *data, uint16_t length);
 
 // High-level packet mutation
-OPENPGP_NISTP256_PACKET *openpgp_append_public_key(OpenPGPPayload *message, const HDNode *node, uint32_t timestamp, const char *user_id);
-void openpgp_append_user_id(OpenPGPPayload *message, const char *user_id, const HDNode *node, const OPENPGP_NISTP256_PACKET *public_key);
+OPENPGP_NISTP256_PACKET *openpgp_append_public_key(OpenPGPPayload *message, HDNode *node, uint32_t timestamp, const char *user_id);
+void openpgp_append_user_id(OpenPGPPayload *message, const char *user_id, HDNode *node, const OPENPGP_NISTP256_PACKET *public_key);
 
 // Signature packets
 OPENPGP_SIGNATURE_HEADER *openpgp_start_signature(OpenPGPPayload *signature, SHA256_CTX *context, const OPENPGP_NISTP256_PACKET *public_key);
 void openpgp_start_unhashed(OpenPGPPayload *signature, OPENPGP_SIGNATURE_HEADER *header);
 void openpgp_subpacket(OpenPGPPayload *signature, uint8_t type, const uint8_t *data, uint32_t length);
 void openpgp_end_unhashed(OpenPGPPayload *signature, OPENPGP_SIGNATURE_HEADER *header, const OPENPGP_NISTP256_PACKET *public_key);
-void openpgp_end_signature(OpenPGPPayload *message, OpenPGPPayload *signature, SHA256_CTX *context, OPENPGP_SIGNATURE_HEADER *header, const HDNode *node);
+void openpgp_end_signature(OpenPGPPayload *message, OpenPGPPayload *signature, SHA256_CTX *context, OPENPGP_SIGNATURE_HEADER *header, HDNode *node);
 
 // Key material
 void openpgp_nistp256_packet(OPENPGP_NISTP256_PACKET *packet, const HDNode *node, uint32_t timestamp);
@@ -390,8 +390,7 @@ static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_
 
 	static uint8_t signature[64];
 
-	// TODO: Ed25519 support
-	if (ecdsa_sign_digest(NODE_SIG.curve->params, NODE_SIG.private_key, digest, signature, NULL, NULL) != 0) {
+	if (hdnode_sign_digest(&NODE_SIG, digest, signature, NULL, NULL) != 0) {
 		debugLog(0, "", "PSO: Signing failed");
 		APDU_SW(response, APDU_UNRECOVERABLE);
 	}
@@ -516,7 +515,7 @@ void openpgp_construct_pubkey(OpenPGPMessage *response, const char *user_id) {
 	(void) public_key;
 }
 
-OPENPGP_NISTP256_PACKET *openpgp_append_public_key(OpenPGPPayload *message, const HDNode *node, uint32_t timestamp, const char *user_id) {
+OPENPGP_NISTP256_PACKET *openpgp_append_public_key(OpenPGPPayload *message, HDNode *node, uint32_t timestamp, const char *user_id) {
 	// TODO: Ed25519 support
 	OPENPGP_NISTP256_PACKET *packet = openpgp_append_tag(message,
 			6, // Public-Key Packet
@@ -574,7 +573,7 @@ void *openpgp_append_tag(OpenPGPPayload *message, uint8_t tag, uint32_t length) 
 	return data;
 }
 
-void openpgp_append_user_id(OpenPGPPayload *message, const char *user_id, const HDNode *node, const OPENPGP_NISTP256_PACKET *public_key) {
+void openpgp_append_user_id(OpenPGPPayload *message, const char *user_id, HDNode *node, const OPENPGP_NISTP256_PACKET *public_key) {
 	uint32_t length = strlen(user_id);
 
 	char *packet = openpgp_append_tag(message,
@@ -716,7 +715,7 @@ void openpgp_end_unhashed(OpenPGPPayload *signature, OPENPGP_SIGNATURE_HEADER *h
 	length[1] = native_length & 0xFF;
 }
 
-void openpgp_end_signature(OpenPGPPayload *message, OpenPGPPayload *signature, SHA256_CTX *context, OPENPGP_SIGNATURE_HEADER *header, const HDNode *node) {
+void openpgp_end_signature(OpenPGPPayload *message, OpenPGPPayload *signature, SHA256_CTX *context, OPENPGP_SIGNATURE_HEADER *header, HDNode *node) {
 	uint8_t *start = (uint8_t *) header;
 
 	// Fix up endianess
@@ -746,7 +745,7 @@ void openpgp_end_signature(OpenPGPPayload *message, OpenPGPPayload *signature, S
 
 	// Error checking?
 	static uint8_t signature_data[64];
-	ecdsa_sign_digest(node->curve->params, node->private_key, digest, signature_data, NULL, NULL);
+	hdnode_sign_digest(node, digest, signature_data, NULL, NULL);
 
 	// First signature parameter
 	uint16_t mpi = openpgp_mpi(signature_data, 32);
