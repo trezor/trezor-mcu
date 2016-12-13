@@ -38,7 +38,7 @@ static void OpenPGP_GET_DATA(uint16_t TAG, struct RDR_to_PC_DataBlock *response)
 static void OpenPGP_PUT_DATA(uint16_t TAG, const uint8_t *data, struct RDR_to_PC_DataBlock *response);
 static void OpenPGP_VERIFY(const uint8_t *data, uint8_t length, struct RDR_to_PC_DataBlock *response);
 static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_DataBlock *response);
-static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_to_PC_DataBlock *response);
+static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_to_PC_DataBlock *response, bool authenticate);
 
 static int openpgp_derive_nodes(void);
 static const HDNode *openpgp_derive_root_node(void);
@@ -119,11 +119,23 @@ void ccid_OpenPGP(const APDU_HEADER *APDU, const uint8_t length, struct RDR_to_P
 				APDU_SW(response, APDU_PARAM_DATA_INCORRECT);
 			}
 
-			OpenPGP_COMPUTE_DIGITAL_SIGNATURE(APDU->data, response);
+			OpenPGP_COMPUTE_DIGITAL_SIGNATURE(APDU->data, response, false);
 		} else {
 			debugLog(0, "", "APDU: Unknown PSO");
 			APDU_SW(response, APDU_NOT_SUPPORTED);
 		}
+		break;
+
+	case 0x88: // INTERNAL AUTHENTICATE
+		// SHA256 is 256-bit
+		if ((length - sizeof(*APDU)) != 32) {
+			debugLog(0, "", "APDU: DSI not SHA256?");
+
+			// TODO: We should probably be able to handle other algorithms
+			APDU_SW(response, APDU_PARAM_DATA_INCORRECT);
+		}
+
+		OpenPGP_COMPUTE_DIGITAL_SIGNATURE(APDU->data, response, true);
 		break;
 
 	default:
@@ -379,13 +391,18 @@ static void OpenPGP_GENERATE_ASYMMETRIC_KEY_PAIR(uint8_t type, struct RDR_to_PC_
 	APDU_SW(response, APDU_SUCCESS);
 }
 
-static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_to_PC_DataBlock *response) {
+static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_to_PC_DataBlock *response, bool authenticate) {
 	if (!protectUnlocked(true)) {
 		APDU_SW(response, APDU_SECURITY_COND_FAIL);
 		return;
 	}
 
-	layoutDialogSwipe(&bmp_icon_question, "Cancel", "Confirm", NULL, "Do you really want to", "compute an OpenPGP", "signature?", NULL, NULL, NULL);
+	if (authenticate) {
+		layoutDialogSwipe(&bmp_icon_question, "Cancel", "Confirm", NULL, "Do you really want to", "authenticate with", "OpenPGP?", NULL, NULL, NULL);
+	} else {
+		layoutDialogSwipe(&bmp_icon_question, "Cancel", "Confirm", NULL, "Do you really want to", "compute an OpenPGP", "signature?", NULL, NULL, NULL);
+	}
+
 	if (!ccidProtectButton(false, (CCID_HEADER *) response)) {
 		APDU_SW(response, APDU_SECURITY_COND_FAIL);
 		layoutHome();
@@ -394,7 +411,7 @@ static void OpenPGP_COMPUTE_DIGITAL_SIGNATURE(const uint8_t *digest, struct RDR_
 
 	static uint8_t signature[64];
 
-	if (hdnode_sign_digest(&NODE_SIG, digest, signature, NULL, NULL) != 0) {
+	if (hdnode_sign_digest(authenticate ? &NODE_AUT : &NODE_SIG, digest, signature, NULL, NULL) != 0) {
 		debugLog(0, "", "PSO: Signing failed");
 		APDU_SW(response, APDU_UNRECOVERABLE);
 	}
