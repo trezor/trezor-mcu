@@ -36,14 +36,18 @@
 #if DEBUG_LINK
 #define USB_INTERFACE_INDEX_DEBUG 1
 #define USB_INTERFACE_INDEX_U2F 2
+#define USB_INTERFACE_INDEX_WEBUSB 3
 #else
 #define USB_INTERFACE_INDEX_U2F 1
+#define USB_INTERFACE_INDEX_WEBUSB 2
 #endif
 
 #define ENDPOINT_ADDRESS_IN         (0x81)
 #define ENDPOINT_ADDRESS_OUT        (0x01)
+
 #define ENDPOINT_ADDRESS_DEBUG_IN   (0x82)
 #define ENDPOINT_ADDRESS_DEBUG_OUT  (0x02)
+
 #define ENDPOINT_ADDRESS_U2F_IN     (0x83)
 #define ENDPOINT_ADDRESS_U2F_OUT    (0x03)
 
@@ -278,7 +282,39 @@ static const struct usb_interface_descriptor hid_iface_debug[] = {{
 	.extra = &hid_function,
 	.extralen = sizeof(hid_function),
 }};
+
 #endif
+
+static const struct usb_endpoint_descriptor hid_endpoints_webusb[2] = {{
+	.bLength = USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType = USB_DT_ENDPOINT,
+	.bEndpointAddress = ENDPOINT_ADDRESS_IN,
+	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
+	.wMaxPacketSize = 64,
+	.bInterval = 2,
+}, {
+	.bLength = USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType = USB_DT_ENDPOINT,
+	.bEndpointAddress = ENDPOINT_ADDRESS_OUT,
+	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
+	.wMaxPacketSize = 64,
+	.bInterval = 2,
+}};
+
+static const struct usb_interface_descriptor hid_iface_webusb[] = {{
+	.bLength = USB_DT_INTERFACE_SIZE,
+	.bDescriptorType = USB_DT_INTERFACE,
+	.bInterfaceNumber = USB_INTERFACE_INDEX_WEBUSB,
+	.bAlternateSetting = 0,
+	.bNumEndpoints = 2,
+	.bInterfaceClass = USB_CLASS_VENDOR,
+	.bInterfaceSubClass = 0,
+	.bInterfaceProtocol = 0,
+	.iInterface = 0,
+	.endpoint = hid_endpoints_webusb,
+	.extra = NULL,
+	.extralen = 0,
+}};
 
 static const struct usb_interface ifaces[] = {{
 	.num_altsetting = 1,
@@ -291,6 +327,9 @@ static const struct usb_interface ifaces[] = {{
 }, {
 	.num_altsetting = 1,
 	.altsetting = hid_iface_u2f,
+}, {
+	.num_altsetting = 1,
+	.altsetting = hid_iface_webusb,
 }};
 
 static const struct usb_config_descriptor config = {
@@ -298,9 +337,9 @@ static const struct usb_config_descriptor config = {
 	.bDescriptorType = USB_DT_CONFIGURATION,
 	.wTotalLength = 0,
 #if DEBUG_LINK
-	.bNumInterfaces = 3,
+	.bNumInterfaces = 4,
 #else
-	.bNumInterfaces = 2,
+	.bNumInterfaces = 3,
 #endif
 	.bConfigurationValue = 1,
 	.iConfiguration = 0,
@@ -422,8 +461,13 @@ void usbInit(void)
 	usb21_setup(usbd_dev, &bos_descriptor);
 	static const char* origin_urls[] = {
 		"trezor.io/start",
+		"wallet.trezor.io",
+		"beta-wallet.trezor.io",
+		"old-wallet.trezor.io",
+		"dev.trezor.io",
+		"localhost:8000",
 	};
-	webusb_setup(usbd_dev, origin_urls, sizeof(origin_urls)/sizeof(origin_urls[0]), USB_INTERFACE_INDEX_MAIN);
+	webusb_setup(usbd_dev, origin_urls, sizeof(origin_urls)/sizeof(origin_urls[0]), USB_INTERFACE_INDEX_WEBUSB);
 }
 
 void usbPoll(void)
