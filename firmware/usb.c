@@ -38,12 +38,17 @@
 #define USB_INTERFACE_INDEX_U2F 2
 #else
 #define USB_INTERFACE_INDEX_U2F 1
+#define USB_INTERFACE_INDEX_WEBUSB 2
 #endif
 
 #define ENDPOINT_ADDRESS_IN         (0x81)
 #define ENDPOINT_ADDRESS_OUT        (0x01)
+
 #define ENDPOINT_ADDRESS_DEBUG_IN   (0x82)
 #define ENDPOINT_ADDRESS_DEBUG_OUT  (0x02)
+#define ENDPOINT_ADDRESS_WEBUSB_IN     (0x82)
+#define ENDPOINT_ADDRESS_WEBUSB_OUT    (0x02)
+
 #define ENDPOINT_ADDRESS_U2F_IN     (0x83)
 #define ENDPOINT_ADDRESS_U2F_OUT    (0x03)
 
@@ -257,6 +262,40 @@ static const struct usb_interface_descriptor hid_iface_debug[] = {{
 	.extra = &hid_function,
 	.extralen = sizeof(hid_function),
 }};
+
+#else
+
+static const struct usb_endpoint_descriptor hid_endpoints_webusb[2] = {{
+	.bLength = USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType = USB_DT_ENDPOINT,
+	.bEndpointAddress = ENDPOINT_ADDRESS_WEBUSB_IN,
+	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
+	.wMaxPacketSize = 64,
+	.bInterval = 2,
+}, {
+	.bLength = USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType = USB_DT_ENDPOINT,
+	.bEndpointAddress = ENDPOINT_ADDRESS_WEBUSB_OUT,
+	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
+	.wMaxPacketSize = 64,
+	.bInterval = 2,
+}};
+
+static const struct usb_interface_descriptor hid_iface_webusb[] = {{
+	.bLength = USB_DT_INTERFACE_SIZE,
+	.bDescriptorType = USB_DT_INTERFACE,
+	.bInterfaceNumber = USB_INTERFACE_INDEX_WEBUSB,
+	.bAlternateSetting = 0,
+	.bNumEndpoints = 2,
+	.bInterfaceClass = USB_CLASS_VENDOR,
+	.bInterfaceSubClass = 0,
+	.bInterfaceProtocol = 0,
+	.iInterface = 0,
+	.endpoint = hid_endpoints_webusb,
+	.extra = NULL,
+	.extralen = 0,
+}};
+
 #endif
 
 static const struct usb_interface ifaces[] = {{
@@ -270,17 +309,18 @@ static const struct usb_interface ifaces[] = {{
 }, {
 	.num_altsetting = 1,
 	.altsetting = hid_iface_u2f,
+#if !(DEBUG_LINK)
+}, {
+	.num_altsetting = 1,
+	.altsetting = hid_iface_webusb,
+#endif
 }};
 
 static const struct usb_config_descriptor config = {
 	.bLength = USB_DT_CONFIGURATION_SIZE,
 	.bDescriptorType = USB_DT_CONFIGURATION,
 	.wTotalLength = 0,
-#if DEBUG_LINK
 	.bNumInterfaces = 3,
-#else
-	.bNumInterfaces = 2,
-#endif
 	.bConfigurationValue = 1,
 	.iConfiguration = 0,
 	.bmAttributes = 0x80,
@@ -328,18 +368,40 @@ static int hid_control_request(usbd_device *dev, struct usb_setup_data *req, uin
 
 static volatile char tiny = 0;
 
-static void hid_rx_callback(usbd_device *dev, uint8_t ep)
+#if !(DEBUG_LINK)
+static volatile char webusb_communication = 0;
+#endif
+
+static void rx_callback_common(usbd_device *dev, uint8_t ep, uint8_t address_out)
 {
 	(void)ep;
 	static uint8_t buf[64] __attribute__ ((aligned(4)));
-	if ( usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_OUT, buf, 64) != 64) return;
-	debugLog(0, "", "hid_rx_callback");
+	if ( usbd_ep_read_packet(dev, address_out, buf, 64) != 64) return;
+	debugLog(0, "", "hid_rx_callback_common");
 	if (!tiny) {
 		msg_read(buf, 64);
 	} else {
 		msg_read_tiny(buf, 64);
 	}
 }
+
+static void hid_rx_callback(usbd_device *dev, uint8_t ep)
+{
+#if !(DEBUG_LINK)
+	webusb_communication = 0;
+#endif
+	debugLog(0, "", "hid_rx_callback");
+	rx_callback_common(dev, ep, ENDPOINT_ADDRESS_OUT);
+}
+
+#if !(DEBUG_LINK)
+static void hid_webusb_rx_callback(usbd_device *dev, uint8_t ep)
+{
+	webusb_communication = 1;
+	debugLog(0, "", "hid_webusb_rx_callback");
+	rx_callback_common(dev, ep, ENDPOINT_ADDRESS_WEBUSB_OUT);
+}
+#endif
 
 static void hid_u2f_rx_callback(usbd_device *dev, uint8_t ep)
 {
@@ -377,6 +439,9 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue)
 #if DEBUG_LINK
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_DEBUG_IN,  USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_DEBUG_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, hid_debug_rx_callback);
+#else
+	usbd_ep_setup(dev, ENDPOINT_ADDRESS_WEBUSB_IN,  USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
+	usbd_ep_setup(dev, ENDPOINT_ADDRESS_WEBUSB_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, hid_webusb_rx_callback);
 #endif
 
 	usbd_register_control_callback(
@@ -405,10 +470,13 @@ void usbInit(void)
 	usbd_dev = usbd_init(&otgfs_usb_driver, &dev_descr, &config, usb_strings, sizeof(usb_strings)/sizeof(const char *), usbd_control_buffer, sizeof(usbd_control_buffer));
 	usbd_register_set_config_callback(usbd_dev, hid_set_config);
 	usb21_setup(usbd_dev, &bos_descriptor);
+#if !(DEBUG_LINK)
 	static const char* origin_urls[] = {
 		"trezor.io/start",
+		"localhost:8000",
 	};
-	webusb_setup(usbd_dev, origin_urls, sizeof(origin_urls)/sizeof(origin_urls[0]), USB_INTERFACE_INDEX_MAIN);
+	webusb_setup(usbd_dev, origin_urls, sizeof(origin_urls)/sizeof(origin_urls[0]), USB_INTERFACE_INDEX_WEBUSB);
+#endif
 }
 
 void usbPoll(void)
@@ -419,7 +487,15 @@ void usbPoll(void)
 	// write pending data
 	data = msg_out_data();
 	if (data) {
+#if DEBUG_LINK
 		while ( usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_IN, data, 64) != 64 ) {}
+#else
+		if (webusb_communication == 0) {
+				while ( usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_IN, data, 64) != 64 ) {}
+		} else {
+				while ( usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_WEBUSB_IN, data, 64) != 64 ) {}
+		}
+#endif
 	}
 	data = u2f_out_data();
 	if (data) {
