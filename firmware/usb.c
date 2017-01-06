@@ -474,6 +474,8 @@ void usbInit(void)
 	static const char* origin_urls[] = {
 		"trezor.io/start",
 		"localhost:8000",
+		"wallet.trezor.io",
+		"beta-wallet.trezor.io",
 	};
 	webusb_setup(usbd_dev, origin_urls, sizeof(origin_urls)/sizeof(origin_urls[0]), USB_INTERFACE_INDEX_WEBUSB);
 #endif
