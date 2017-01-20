@@ -46,8 +46,6 @@
 
 #define ENDPOINT_ADDRESS_DEBUG_IN   (0x82)
 #define ENDPOINT_ADDRESS_DEBUG_OUT  (0x02)
-#define ENDPOINT_ADDRESS_WEBUSB_IN     (0x82)
-#define ENDPOINT_ADDRESS_WEBUSB_OUT    (0x02)
 
 #define ENDPOINT_ADDRESS_U2F_IN     (0x83)
 #define ENDPOINT_ADDRESS_U2F_OUT    (0x03)
@@ -268,14 +266,14 @@ static const struct usb_interface_descriptor hid_iface_debug[] = {{
 static const struct usb_endpoint_descriptor hid_endpoints_webusb[2] = {{
 	.bLength = USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType = USB_DT_ENDPOINT,
-	.bEndpointAddress = ENDPOINT_ADDRESS_WEBUSB_IN,
+	.bEndpointAddress = ENDPOINT_ADDRESS_IN,
 	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
 	.wMaxPacketSize = 64,
 	.bInterval = 2,
 }, {
 	.bLength = USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType = USB_DT_ENDPOINT,
-	.bEndpointAddress = ENDPOINT_ADDRESS_WEBUSB_OUT,
+	.bEndpointAddress = ENDPOINT_ADDRESS_OUT,
 	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
 	.wMaxPacketSize = 64,
 	.bInterval = 2,
@@ -368,10 +366,6 @@ static int hid_control_request(usbd_device *dev, struct usb_setup_data *req, uin
 
 static volatile char tiny = 0;
 
-#if !(DEBUG_LINK)
-static volatile char webusb_communication = 0;
-#endif
-
 static void rx_callback_common(usbd_device *dev, uint8_t ep, uint8_t address_out)
 {
 	(void)ep;
@@ -387,21 +381,9 @@ static void rx_callback_common(usbd_device *dev, uint8_t ep, uint8_t address_out
 
 static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 {
-#if !(DEBUG_LINK)
-	webusb_communication = 0;
-#endif
 	debugLog(0, "", "hid_rx_callback");
 	rx_callback_common(dev, ep, ENDPOINT_ADDRESS_OUT);
 }
-
-#if !(DEBUG_LINK)
-static void hid_webusb_rx_callback(usbd_device *dev, uint8_t ep)
-{
-	webusb_communication = 1;
-	debugLog(0, "", "hid_webusb_rx_callback");
-	rx_callback_common(dev, ep, ENDPOINT_ADDRESS_WEBUSB_OUT);
-}
-#endif
 
 static void hid_u2f_rx_callback(usbd_device *dev, uint8_t ep)
 {
@@ -439,9 +421,6 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue)
 #if DEBUG_LINK
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_DEBUG_IN,  USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
 	usbd_ep_setup(dev, ENDPOINT_ADDRESS_DEBUG_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, hid_debug_rx_callback);
-#else
-	usbd_ep_setup(dev, ENDPOINT_ADDRESS_WEBUSB_IN,  USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
-	usbd_ep_setup(dev, ENDPOINT_ADDRESS_WEBUSB_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, hid_webusb_rx_callback);
 #endif
 
 	usbd_register_control_callback(
@@ -491,15 +470,7 @@ void usbPoll(void)
 	// write pending data
 	data = msg_out_data();
 	if (data) {
-#if DEBUG_LINK
 		while ( usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_IN, data, 64) != 64 ) {}
-#else
-		if (webusb_communication == 0) {
-				while ( usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_IN, data, 64) != 64 ) {}
-		} else {
-				while ( usbd_ep_write_packet(usbd_dev, ENDPOINT_ADDRESS_WEBUSB_IN, data, 64) != 64 ) {}
-		}
-#endif
 	}
 	data = u2f_out_data();
 	if (data) {
