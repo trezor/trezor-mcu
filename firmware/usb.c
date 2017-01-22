@@ -32,6 +32,19 @@
 #include "usb21_standard.h"
 #include "webusb.h"
 
+/*
+ * USB interfaces are virtually unlimited and should be used when necessary.
+ *
+ * STM32F205RE has three bi-directional endpoints when using full speed mode.
+ * You can use five bi-directional endpoints with high speed mode (which does
+ * not require a high speed PHY).
+ *
+ * TREZOR is shipped in full speed mode. This can only be changed from hardware.
+ *
+ * One endpoint can be assigned to multiple interfaces, which can be useful for
+ * multiplexing endpoints.
+ */
+
 #define USB_INTERFACE_INDEX_MAIN 0
 #if DEBUG_LINK
 #define USB_INTERFACE_INDEX_DEBUG 1
@@ -41,6 +54,8 @@
 #define USB_INTERFACE_INDEX_U2F 1
 #define USB_INTERFACE_INDEX_WEBUSB 2
 #endif
+
+#define USB_INTERFACE_COUNT (USB_INTERFACE_INDEX_WEBUSB + 1)
 
 #define ENDPOINT_ADDRESS_IN         (0x81)
 #define ENDPOINT_ADDRESS_OUT        (0x01)
@@ -55,9 +70,10 @@
 	X(MANUFACTURER, "SatoshiLabs") \
 	X(PRODUCT, "TREZOR") \
 	X(SERIAL_NUMBER, storage_uuid_str) \
-	X(INTERFACE_MAIN,  "TREZOR Interface") \
-	X(INTERFACE_DEBUG, "TREZOR Debug Link Interface") \
-	X(INTERFACE_U2F,   "U2F Interface")
+	X(INTERFACE_MAIN,   "TREZOR Interface") \
+	X(INTERFACE_DEBUG,  "TREZOR Debug Link Interface") \
+	X(INTERFACE_U2F,    "U2F Interface") \
+	X(INTERFACE_WEBUSB, "TREZOR WebUSB Interface")
 
 #define X(name, value) USB_STRING_##name,
 enum {
@@ -310,7 +326,7 @@ static const struct usb_interface_descriptor hid_iface_webusb[] = {{
 	.bInterfaceClass = USB_CLASS_VENDOR,
 	.bInterfaceSubClass = 0,
 	.bInterfaceProtocol = 0,
-	.iInterface = 0,
+	.iInterface = USB_STRING_INTERFACE_WEBUSB,
 	.endpoint = hid_endpoints_webusb,
 	.extra = NULL,
 	.extralen = 0,
@@ -336,11 +352,7 @@ static const struct usb_config_descriptor config = {
 	.bLength = USB_DT_CONFIGURATION_SIZE,
 	.bDescriptorType = USB_DT_CONFIGURATION,
 	.wTotalLength = 0,
-#if DEBUG_LINK
-	.bNumInterfaces = 4,
-#else
-	.bNumInterfaces = 3,
-#endif
+	.bNumInterfaces = USB_INTERFACE_COUNT,
 	.bConfigurationValue = 1,
 	.iConfiguration = 0,
 	.bmAttributes = 0x80,
