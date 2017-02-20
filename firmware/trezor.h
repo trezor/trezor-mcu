@@ -31,6 +31,10 @@
 #define DEBUG_LINK 0
 #endif
 
+#ifndef DEBUG_RNG
+#define DEBUG_RNG 0
+#endif
+
 #ifndef DEBUG_LOG
 #define DEBUG_LOG 0
 #endif

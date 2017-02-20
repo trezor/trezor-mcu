@@ -292,12 +292,14 @@ void fsm_msgFirmwareUpload(FirmwareUpload *msg)
 
 void fsm_msgGetEntropy(GetEntropy *msg)
 {
+#if !DEBUG_RNG
 	layoutDialogSwipe(&bmp_icon_question, "Cancel", "Confirm", NULL, "Do you really want to", "send entropy?", NULL, NULL, NULL, NULL);
 	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
 		fsm_sendFailure(FailureType_Failure_ActionCancelled, "Entropy cancelled");
 		layoutHome();
 		return;
 	}
+#endif
 	RESP_INIT(Entropy);
 	uint32_t len = msg->size;
 	if (len > 1024) {

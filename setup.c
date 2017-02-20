@@ -42,7 +42,7 @@ void setup(void)
 
 	// enable RNG
 	rcc_periph_clock_enable(RCC_RNG);
-	RNG_CR |= RNG_CR_IE | RNG_CR_RNGEN;
+	RNG_CR |= RNG_CR_RNGEN;
 	// to be extra careful and heed the STM32F205xx Reference manual, Section 20.3.1
 	// we don't use the first random number generated after setting the RNGEN bit in setup
 	random32();
