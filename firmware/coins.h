@@ -22,7 +22,7 @@
 
 #include "types.pb.h"
 
-#define COINS_COUNT 8
+#define COINS_COUNT 9
 
 extern const CoinType coins[COINS_COUNT];
 
