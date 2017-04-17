@@ -32,6 +32,10 @@
 #include "messages.pb.h"
 #include "types.pb.h"
 
+#define TRANSACTION_OVERHEAD_SIZE 10
+#define MAXIMUM_INPUT_SIZE 149
+#define OUTPUT_SIZE 34
+
 uint32_t op_push(uint32_t i, uint8_t *out) {
 	if (i < 0x4C) {
 		out[0] = i & 0xFF;
@@ -457,7 +461,7 @@ void tx_hash_final(TxStruct *t, uint8_t *hash, bool reverse)
 
 uint32_t transactionEstimateSize(uint32_t inputs, uint32_t outputs)
 {
-	return 10 + inputs * 149 + outputs * 35;
+	return TRANSACTION_OVERHEAD_SIZE + inputs * MAXIMUM_INPUT_SIZE + outputs * OUTPUT_SIZE;
 }
 
 uint32_t transactionEstimateSizeKb(uint32_t inputs, uint32_t outputs)
