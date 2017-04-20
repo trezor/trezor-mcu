@@ -534,7 +534,7 @@ typedef struct _Features {
     bool has_label;
     char label[33];
     size_t coins_count;
-    CoinType coins[8];
+    CoinType coins[9];
     bool has_initialized;
     bool initialized;
     bool has_revision;
@@ -1230,7 +1230,7 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 /* Maximum encoded size of messages (where known) */
 #define Initialize_size                          0
 #define GetFeatures_size                         0
-#define Features_size                            (257 + 8*CoinType_size)
+#define Features_size                            (257 + 9*CoinType_size)
 #define ClearSession_size                        0
 #define ApplySettings_size                       1083
 #define ChangePin_size                           2
