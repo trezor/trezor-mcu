@@ -728,6 +728,20 @@ void fsm_msgSignIdentity(SignIdentity *msg)
 
 	CHECK_INITIALIZED
 
+	CHECK_PARAM(msg->has_identity, "Invalid identity");
+	// data starting with 0x01 gets special display/zooming treatment in oledDrawString.
+	// avoid bad user experience by filtering out data with this control character.
+	// todo: it might be a good idea to also allow only ascii encoded text that matches the rules
+	// in https://github.com/satoshilabs/slips/blob/master/slip-0013.md. the spec does not
+	// specify ascii, but the font in the device only really supports ascii right now.
+	CHECK_PARAM(!msg->identity.has_proto || msg->identity.proto[0] != 0x01, "Invalid proto");
+	CHECK_PARAM(!msg->identity.has_user  || msg->identity.user[0]  != 0x01, "Invalid user");
+	CHECK_PARAM(!msg->identity.has_host  || msg->identity.host[0]  != 0x01, "Invalid host");
+	CHECK_PARAM(!msg->identity.has_port  || msg->identity.port[0]  != 0x01, "Invalid port");
+	CHECK_PARAM(!msg->identity.has_path  || msg->identity.path[0]  != 0x01, "Invalid path");
+
+	CHECK_PARAM(!msg->has_challenge_visual || msg->challenge_visual[0] != 0x01, "Invalid challenge visual");
+
 	layoutSignIdentity(&(msg->identity), msg->has_challenge_visual ? msg->challenge_visual : 0);
 	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
 		fsm_sendFailure(FailureType_Failure_ActionCancelled, "Sign identity cancelled");
@@ -738,7 +752,7 @@ void fsm_msgSignIdentity(SignIdentity *msg)
 	CHECK_PIN
 
 	uint8_t hash[32];
-	if (!msg->has_identity || cryptoIdentityFingerprint(&(msg->identity), hash) == 0) {
+	if (cryptoIdentityFingerprint(&(msg->identity), hash) == 0) {
 		fsm_sendFailure(FailureType_Failure_Other, "Invalid identity");
 		layoutHome();
 		return;
