@@ -2,6 +2,10 @@ sudo: false
 dist: trusty
 language: c
 
+env:
+  global:
+    - MAKEFLAGS=-j2
+
 addons:
   apt:
     packages:
@@ -13,7 +17,7 @@ install:
   - export PATH="$PWD/gcc-arm-none-eabi-4_9-2015q3/bin:$PATH"
 
 script:
-  - CFLAGS="-std=c99" make -C vendor/libopencm3
+  - CFLAGS="-std=c99" make -C vendor/libopencm3 lib/stm32/f2
   - make
   - make -C firmware
   - make -C bootloader
