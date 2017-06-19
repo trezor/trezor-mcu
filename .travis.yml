@@ -5,10 +5,12 @@ language: c
 addons:
   apt:
     packages:
-    - build-essential
-    - git
-    - gcc-arm-none-eabi
-    - libnewlib-arm-none-eabi
+      - libc6-i386
+      - make
+
+install:
+  - curl -L https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/+download/gcc-arm-none-eabi-4_9-2015q3-20150921-linux.tar.bz2 | tar xjf -
+  - export PATH="$PWD/gcc-arm-none-eabi-4_9-2015q3/bin:$PATH"
 
 script:
   - CFLAGS="-std=c99" make -C vendor/libopencm3
