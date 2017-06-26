@@ -42,6 +42,7 @@ typedef enum _MessageType {
     MessageType_MessageType_ButtonAck = 27,
     MessageType_MessageType_GetAddress = 29,
     MessageType_MessageType_Address = 30,
+    MessageType_MessageType_BackupDevice = 34,
     MessageType_MessageType_EntropyRequest = 35,
     MessageType_MessageType_EntropyAck = 36,
     MessageType_MessageType_SignMessage = 38,
@@ -82,6 +83,10 @@ typedef enum _MessageType {
 } MessageType;
 
 /* Struct definitions */
+typedef struct _BackupDevice {
+    uint8_t dummy_field;
+} BackupDevice;
+
 typedef struct _ButtonAck {
     uint8_t dummy_field;
 } ButtonAck;
@@ -602,6 +607,8 @@ typedef struct _ResetDevice {
     char label[33];
     bool has_u2f_counter;
     uint32_t u2f_counter;
+    bool has_skip_backup;
+    bool skip_backup;
 } ResetDevice;
 
 typedef struct _SetU2FCounter {
@@ -764,7 +771,8 @@ extern const uint32_t SignTx_lock_time_default;
 #define EthereumAddress_init_default             {{0, {0}}}
 #define WipeDevice_init_default                  {0}
 #define LoadDevice_init_default                  {false, "", false, HDNodeType_init_default, false, "", false, 0, false, "english", false, "", false, 0, false, 0}
-#define ResetDevice_init_default                 {false, 0, false, 256u, false, 0, false, 0, false, "english", false, "", false, 0}
+#define ResetDevice_init_default                 {false, 0, false, 256u, false, 0, false, 0, false, "english", false, "", false, 0, false, 0}
+#define BackupDevice_init_default                {0}
 #define EntropyRequest_init_default              {0}
 #define EntropyAck_init_default                  {false, {0, {0}}}
 #define RecoveryDevice_init_default              {false, 0, false, 0, false, 0, false, "english", false, "", false, 0, false, 0, false, 0, false, 0}
@@ -823,7 +831,8 @@ extern const uint32_t SignTx_lock_time_default;
 #define EthereumAddress_init_zero                {{0, {0}}}
 #define WipeDevice_init_zero                     {0}
 #define LoadDevice_init_zero                     {false, "", false, HDNodeType_init_zero, false, "", false, 0, false, "", false, "", false, 0, false, 0}
-#define ResetDevice_init_zero                    {false, 0, false, 0, false, 0, false, 0, false, "", false, "", false, 0}
+#define ResetDevice_init_zero                    {false, 0, false, 0, false, 0, false, 0, false, "", false, "", false, 0, false, 0}
+#define BackupDevice_init_zero                   {0}
 #define EntropyRequest_init_zero                 {0}
 #define EntropyAck_init_zero                     {false, {0, {0}}}
 #define RecoveryDevice_init_zero                 {false, 0, false, 0, false, 0, false, "", false, "", false, 0, false, 0, false, 0, false, 0}
@@ -986,6 +995,7 @@ extern const uint32_t SignTx_lock_time_default;
 #define ResetDevice_language_tag                 5
 #define ResetDevice_label_tag                    6
 #define ResetDevice_u2f_counter_tag              7
+#define ResetDevice_skip_backup_tag              8
 #define SetU2FCounter_u2f_counter_tag            1
 #define SignIdentity_identity_tag                1
 #define SignIdentity_challenge_hidden_tag        2
@@ -1042,7 +1052,8 @@ extern const pb_field_t Address_fields[2];
 extern const pb_field_t EthereumAddress_fields[2];
 extern const pb_field_t WipeDevice_fields[1];
 extern const pb_field_t LoadDevice_fields[9];
-extern const pb_field_t ResetDevice_fields[8];
+extern const pb_field_t ResetDevice_fields[9];
+extern const pb_field_t BackupDevice_fields[1];
 extern const pb_field_t EntropyRequest_fields[1];
 extern const pb_field_t EntropyAck_fields[2];
 extern const pb_field_t RecoveryDevice_fields[10];
@@ -1103,7 +1114,8 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 #define EthereumAddress_size                     22
 #define WipeDevice_size                          0
 #define LoadDevice_size                          (326 + HDNodeType_size)
-#define ResetDevice_size                         72
+#define ResetDevice_size                         74
+#define BackupDevice_size                        0
 #define EntropyRequest_size                      0
 #define EntropyAck_size                          131
 #define RecoveryDevice_size                      80
