@@ -466,6 +466,8 @@ typedef struct _Features {
     bool passphrase_cached;
     bool has_firmware_present;
     bool firmware_present;
+    bool has_needs_backup;
+    bool needs_backup;
 } Features;
 
 typedef struct _GetAddress {
@@ -747,7 +749,7 @@ extern const uint32_t SignTx_lock_time_default;
 /* Initializer values for message structs */
 #define Initialize_init_default                  {0}
 #define GetFeatures_init_default                 {0}
-#define Features_init_default                    {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0}
+#define Features_init_default                    {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define ClearSession_init_default                {0}
 #define ApplySettings_init_default               {false, "", false, "", false, 0, false, {0, {0}}}
 #define ChangePin_init_default                   {false, 0}
@@ -807,7 +809,7 @@ extern const uint32_t SignTx_lock_time_default;
 #define DebugLinkFlashErase_init_default         {false, 0}
 #define Initialize_init_zero                     {0}
 #define GetFeatures_init_zero                    {0}
-#define Features_init_zero                       {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0}
+#define Features_init_zero                       {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define ClearSession_init_zero                   {0}
 #define ApplySettings_init_zero                  {false, "", false, "", false, 0, false, {0, {0}}}
 #define ChangePin_init_zero                      {false, 0}
@@ -947,6 +949,7 @@ extern const uint32_t SignTx_lock_time_default;
 #define Features_pin_cached_tag                  16
 #define Features_passphrase_cached_tag           17
 #define Features_firmware_present_tag            18
+#define Features_needs_backup_tag                19
 #define GetAddress_address_n_tag                 1
 #define GetAddress_coin_name_tag                 2
 #define GetAddress_show_display_tag              3
@@ -1028,7 +1031,7 @@ extern const uint32_t SignTx_lock_time_default;
 /* Struct field encoding specification for nanopb */
 extern const pb_field_t Initialize_fields[1];
 extern const pb_field_t GetFeatures_fields[1];
-extern const pb_field_t Features_fields[19];
+extern const pb_field_t Features_fields[20];
 extern const pb_field_t ClearSession_fields[1];
 extern const pb_field_t ApplySettings_fields[5];
 extern const pb_field_t ChangePin_fields[2];
@@ -1090,7 +1093,7 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 /* Maximum encoded size of messages (where known) */
 #define Initialize_size                          0
 #define GetFeatures_size                         0
-#define Features_size                            (257 + 8*CoinType_size)
+#define Features_size                            (260 + 8*CoinType_size)
 #define ClearSession_size                        0
 #define ApplySettings_size                       1083
 #define ChangePin_size                           2
