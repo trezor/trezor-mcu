@@ -33,12 +33,14 @@
 static uint32_t strength;
 static uint8_t  int_entropy[32];
 static bool     awaiting_entropy = false;
+static bool     skip_backup = false;
 
-void reset_init(bool display_random, uint32_t _strength, bool passphrase_protection, bool pin_protection, const char *language, const char *label, uint32_t u2f_counter)
+void reset_init(bool display_random, uint32_t _strength, bool passphrase_protection, bool pin_protection, const char *language, const char *label, uint32_t u2f_counter, bool _skip_backup)
 {
 	if (_strength != 128 && _strength != 192 && _strength != 256) return;
 
 	strength = _strength;
+	skip_backup = _skip_backup;
 
 	random_buffer(int_entropy, 32);
 
@@ -75,8 +77,6 @@ void reset_init(bool display_random, uint32_t _strength, bool passphrase_protect
 	awaiting_entropy = true;
 }
 
-static char current_word[10], current_word_display[11];
-
 void reset_entropy(const uint8_t *ext_entropy, uint32_t len)
 {
 	if (!awaiting_entropy) {
@@ -91,6 +91,30 @@ void reset_entropy(const uint8_t *ext_entropy, uint32_t len)
 	strlcpy(storage.mnemonic, mnemonic_from_data(int_entropy, strength / 8), sizeof(storage.mnemonic));
 	memset(int_entropy, 0, 32);
 	awaiting_entropy = false;
+
+	storage.has_mnemonic = true;
+	storage.has_needs_backup = true;
+	storage.needs_backup = true;
+
+	if (skip_backup) {
+		storage_commit();
+		fsm_sendSuccess(_("Device successfully initialized"));
+		layoutHome();
+	} else {
+		reset_backup(false);
+	}
+
+}
+
+static char current_word[10], current_word_display[11];
+
+// separated == true if called as a separate workflow via BackupMessage
+void reset_backup(bool separated)
+{
+	if (!storage_needsBackup()) {
+		fsm_sendFailure(FailureType_Failure_UnexpectedMessage, _("Seed already backed up"));
+		return;
+	}
 
 	int pass, word_pos, i = 0, j;
 
@@ -139,7 +163,9 @@ void reset_entropy(const uint8_t *ext_entropy, uint32_t len)
 				}
 			}
 			if (!protectButton(ButtonRequestType_ButtonRequest_ConfirmWord, true)) {
-				storage_reset();
+				if (!separated) {
+					storage_reset();
+				}
 				layoutHome();
 				fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
 				return;
@@ -147,9 +173,15 @@ void reset_entropy(const uint8_t *ext_entropy, uint32_t len)
 		}
 	}
 
-	storage.has_mnemonic = true;
+	storage.has_needs_backup = true;
+	storage.needs_backup = false;
 	storage_commit();
-	fsm_sendSuccess(_("Device reset"));
+
+	if (separated) {
+		fsm_sendSuccess(_("Seed successfully backed up"));
+	} else {
+		fsm_sendSuccess(_("Device successfully initialized"));
+	}
 	layoutHome();
 }
 

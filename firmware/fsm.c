@@ -234,6 +234,7 @@ void fsm_msgGetFeatures(GetFeatures *msg)
 	resp->has_imported = true; resp->imported = storage.has_imported && storage.imported;
 	resp->has_pin_cached = true; resp->pin_cached = session_isPinCached();
 	resp->has_passphrase_cached = true; resp->passphrase_cached = session_isPassphraseCached();
+	resp->has_needs_backup = true; resp->needs_backup = storage_needsBackup();
 	msg_write(MessageType_MessageType_Features, resp);
 }
 
@@ -442,8 +443,17 @@ void fsm_msgResetDevice(ResetDevice *msg)
 		msg->has_pin_protection && msg->pin_protection,
 		msg->has_language ? msg->language : 0,
 		msg->has_label ? msg->label : 0,
-		msg->has_u2f_counter ? msg->u2f_counter : 0
+		msg->has_u2f_counter ? msg->u2f_counter : 0,
+		msg->has_skip_backup ? msg->skip_backup : false
 	);
+}
+
+void fsm_msgBackupDevice(BackupDevice *msg)
+{
+	CHECK_INITIALIZED
+
+	(void)msg;
+	reset_backup(true);
 }
 
 void fsm_msgSignTx(SignTx *msg)
