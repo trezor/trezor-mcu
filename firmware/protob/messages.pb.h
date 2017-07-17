@@ -500,7 +500,7 @@ typedef struct _Features {
     bool has_label;
     char label[33];
     size_t coins_count;
-    CoinType coins[8];
+    CoinType coins[9];
     bool has_initialized;
     bool initialized;
     bool has_revision;
@@ -792,7 +792,7 @@ extern const uint32_t SignTx_lock_time_default;
 /* Initializer values for message structs */
 #define Initialize_init_default                  {0}
 #define GetFeatures_init_default                 {0}
-#define Features_init_default                    {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0}
+#define Features_init_default                    {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default, CoinType_init_default}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define ClearSession_init_default                {0}
 #define ApplySettings_init_default               {false, "", false, "", false, 0, false, {0, {0}}}
 #define ChangePin_init_default                   {false, 0}
@@ -853,7 +853,7 @@ extern const uint32_t SignTx_lock_time_default;
 #define DebugLinkFlashErase_init_default         {false, 0}
 #define Initialize_init_zero                     {0}
 #define GetFeatures_init_zero                    {0}
-#define Features_init_zero                       {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0}
+#define Features_init_zero                       {false, "", false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, "", false, "", 0, {CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero, CoinType_init_zero}, false, 0, false, {0, {0}}, false, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define ClearSession_init_zero                   {0}
 #define ApplySettings_init_zero                  {false, "", false, "", false, 0, false, {0, {0}}}
 #define ChangePin_init_zero                      {false, 0}
@@ -1142,7 +1142,7 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 /* Maximum encoded size of messages (where known) */
 #define Initialize_size                          0
 #define GetFeatures_size                         0
-#define Features_size                            (260 + 8*CoinType_size)
+#define Features_size                            (260 + 9*CoinType_size)
 #define ClearSession_size                        0
 #define ApplySettings_size                       1083
 #define ChangePin_size                           2
