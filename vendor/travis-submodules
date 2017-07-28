@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -e
+
+if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    git submodule update --init --recursive
+else
+    GH_USER="${TRAVIS_PULL_REQUEST_SLUG%/*}"
+
+    git submodule init
+
+    git submodule--helper list | while read -r mode sha1 stage sm_path
+    do
+        if ! git submodule update --recursive "$sm_path"; then
+            name="$(git submodule--helper name "$sm_path")"
+
+            git config --file .gitmodules submodule."$name".url "https://github.com/$GH_USER/$name.git"
+
+            git submodule sync "$sm_path"
+            git submodule update --recursive "$sm_path"
+        fi
+    done
+fi

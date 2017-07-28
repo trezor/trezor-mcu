@@ -2,6 +2,12 @@ sudo: false
 dist: trusty
 language: c
 
+git:
+  submodules: false
+
+before_install:
+  - vendor/travis-submodules
+
 addons:
   apt:
     packages:
