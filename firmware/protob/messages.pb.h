@@ -1159,7 +1159,7 @@ extern const pb_field_t DebugLinkFlashErase_fields[2];
 /* Maximum encoded size of messages (where known) */
 #define Initialize_size                          0
 #define GetFeatures_size                         0
-#define Features_size                            (279 + 10*CoinType_size)
+#define Features_size                            (279 + 11*CoinType_size)
 #define ClearSession_size                        0
 #define ApplySettings_size                       1083
 #define ApplyFlags_size                          6

@@ -24,9 +24,9 @@
 #include "types.pb.h"
 
 #if DEBUG_LINK
-#define COINS_COUNT 10
+#define COINS_COUNT 11
 #else
-#define COINS_COUNT 8
+#define COINS_COUNT 9
 #endif
 
 _Static_assert(pb_arraysize(Features, coins) >= COINS_COUNT, "Features.coins max_count not large enough");
