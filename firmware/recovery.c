@@ -35,59 +35,59 @@
 #include "recovery-table.h"
 
 /* number of words expected in the new seed */
-static uint32_t word_count;
+static CONFIDENTIAL uint32_t word_count;
 
 /* recovery mode:
  * 0: not recovering
  * 1: recover by scrambled plain text words
  * 2: recover by matrix entry
  */
-static int awaiting_word = 0;
+static CONFIDENTIAL int awaiting_word = 0;
 
 /* True if we should not write anything back to storage
  * (can be used for testing seed for correctness).
  */
-static bool dry_run;
+static CONFIDENTIAL bool dry_run;
 
 /* True if we should check that seed corresponds to bip39.
  */
-static bool enforce_wordlist;
+static CONFIDENTIAL bool enforce_wordlist;
 
 /* For scrambled recovery Trezor may ask for faked words if
  * seed is short.  This contains the fake word.
  */
-static char fake_word[12];
+static CONFIDENTIAL char fake_word[12];
 
 /* Word position in the seed that we are currently asking for.
  * This is 0 if we ask for a fake word.  Only for scrambled recovery.
  */
-static uint32_t word_pos;
+static CONFIDENTIAL uint32_t word_pos;
 
 /* Scrambled recovery:  How many words has the user already entered.
  * Matrix recovery: How many digits has the user already entered.
  */
-static uint32_t word_index;
+static CONFIDENTIAL uint32_t word_index;
 
 /* Order in which we ask for the words.  It holds that
  * word_order[word_index] == word_pos.  Only for scrambled recovery.
  */
-static char word_order[24];
+static CONFIDENTIAL char word_order[24];
 
 /* The recovered seed.  This is filled during the recovery process.
  */
-static char words[24][12];
+static CONFIDENTIAL char words[24][12];
 
 /* The "pincode" of the current word.  This is basically the "pin"
  * that the user would have entered for the current word if the words
  * were displayed in alphabetical order.  Note that it is base 9, not
  * base 10.  Only for matrix recovery.
  */
-static uint16_t word_pincode;
+static CONFIDENTIAL uint16_t word_pincode;
 
 /* The pinmatrix currently displayed on screen.
  * Only for matrix recovery.
  */
-static uint8_t word_matrix[9];
+static CONFIDENTIAL uint8_t word_matrix[9];
 
 #define MASK_IDX(x) ((x) & 0xfff)
 #define TABLE1(x) MASK_IDX(word_table1[x])
@@ -130,7 +130,7 @@ static void recovery_request(void) {
  * Check mnemonic and send success/failure.
  */
 static void recovery_done(void) {
-	char new_mnemonic[sizeof(storage.mnemonic)] = {0};
+	static CONFIDENTIAL char new_mnemonic[sizeof(storage.mnemonic)] = {0};
 
 	strlcpy(new_mnemonic, words[0], sizeof(new_mnemonic));
 	for (uint32_t i = 1; i < word_count; i++) {
