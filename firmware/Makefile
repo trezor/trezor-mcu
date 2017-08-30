@@ -10,6 +10,7 @@ NAME  = trezor
 OBJS += usb.o
 OBJS += u2f.o
 OBJS += messages.o
+OBJS += flash.o
 OBJS += storage.o
 OBJS += trezor.o
 OBJS += pinmatrix.o

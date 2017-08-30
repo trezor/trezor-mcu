@@ -25,10 +25,13 @@
 #include "messages.pb.h"
 #include "bip32.h"
 
+#include "flash.h"
+
+void storage_show_error(void);
+
 void storage_init(void);
 void storage_reset_uuid(void);
 void storage_reset(void);
-void storage_commit(void);
 void session_clear(bool clear_pin);
 
 void storage_loadDevice(LoadDevice *msg);
@@ -58,13 +61,6 @@ bool storage_hasPin(void);
 void storage_setPin(const char *pin);
 void session_cachePin(void);
 bool session_isPinCached(void);
-void storage_clearPinArea(void);
-void storage_resetPinFails(uint32_t *pinfailptr);
-bool storage_increasePinFails(uint32_t *pinfailptr);
-uint32_t *storage_getPinFailsPtr(void);
-
-uint32_t storage_nextU2FCounter(void);
-void storage_setU2FCounter(uint32_t u2fcounter);
 
 bool storage_isInitialized(void);
 
@@ -77,6 +73,7 @@ void storage_wipe(void);
 
 extern Storage storage;
 
+extern uint32_t storage_uuid[12/sizeof(uint32_t)];
 extern char storage_uuid_str[25];
 
 #endif
