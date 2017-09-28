@@ -34,6 +34,7 @@ const CoinType coins[COINS_COUNT] = {
 	{true, "Dogecoin", true, " DOGE", true,   30, true, 1000000000, true,   22, true, "\x19" "Dogecoin Signed Message:\n", true, 0x02facafd, true, 0x02fac398, true, false, false, 0, },
 	{true, "Dash",     true, " DASH", true,   76, true,     100000, true,   16, true, "\x19" "DarkCoin Signed Message:\n", true, 0x02fe52cc, true, 0x02fe52f8, true, false, false, 0, },
 	{true, "Zcash",    true, " ZEC",  true, 7352, true,    1000000, true, 7357, true, "\x16" "Zcash Signed Message:\n",    true, 0x0488b21e, true, 0x0488ade4, true, false, false, 0, },
+	{true, "Monacoin", true, " MONA", true,   50, true,   10000000, true,   55, true, "\x19" "Monacoin Signed Message:\n", true, 0x0488b21e, true, 0x0488ade4, true, true,  false, 0, },
 #if DEBUG_LINK
 	{true, "Bcash Testnet", true, " TBCH", true,  111, true, 10000000, true,  196, true, "\x18" "Bitcoin Signed Message:\n", true, 0x043587cf, true, 0x04358394, true, false, true,  0, },
 	{true, "Zcash Testnet", true, " TAZ",  true, 7461, true, 10000000, true, 7354, true, "\x16" "Zcash Signed Message:\n",   true, 0x043587cf, true, 0x04358394, true, false, false, 0, },
