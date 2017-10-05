@@ -26,6 +26,7 @@ OBJS += ethereum.o
 OBJS += ethereum_tokens.o
 OBJS += nem2.o
 OBJS += nem_mosaics.o
+OBJS += iota.o
 
 OBJS += debug.o
 
@@ -67,6 +68,12 @@ OBJS += ../vendor/trezor-crypto/aes/aes_modes.o
 OBJS += ../vendor/trezor-crypto/nem.o
 
 OBJS += ../vendor/trezor-qrenc/qr_encode.o
+
+OBJS += ../vendor/iota/addresses.o
+OBJS += ../vendor/iota/bigint.o
+OBJS += ../vendor/iota/conversion.o
+OBJS += ../vendor/iota/kerl.o
+OBJS += ../vendor/iota/transaction.o
 
 # OBJS += protob/pb_common.o
 OBJS += protob/pb_decode.o

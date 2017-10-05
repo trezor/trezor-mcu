@@ -162,6 +162,15 @@ CosiSign.global_pubkey			max_size:32
 
 CosiSignature.signature			max_size:32
 
+IotaAddress.address			max_size:81
+
+IotaTxRequest.receiving_address	max_size:82
+IotaTxRequest.tag				max_size:28
+
+IotaSignedTx.bundlehash			max_size:81
+IotaSignedTx.first_signature	max_size:2187
+IotaSignedTx.second_signature	max_size:2187
+
 # deprecated
 SimpleSignTx				skip_message:true
 
