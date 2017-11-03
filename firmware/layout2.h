@@ -22,6 +22,7 @@
 
 #include "layout.h"
 #include "types.pb.h"
+#include "messages.pb.h"
 #include "bitmaps.h"
 #include "bignum.h"
 #include "trezor.h"
@@ -52,6 +53,7 @@ void layoutResetWord(const char *word, int pass, int word_pos, bool last);
 void layoutAddress(const char *address, const char *desc, bool qrcode);
 void layoutPublicKey(const uint8_t *pubkey);
 void layoutSignIdentity(const IdentityType *identity, const char *challenge);
+void layoutSignEcdsa(const SignEcdsa *signEcdsa);
 void layoutDecryptIdentity(const IdentityType *identity);
 void layoutU2FDialog(const char *verb, const char *appname, const BITMAP *appicon);
 
