@@ -110,6 +110,12 @@ int gpgMessageSign(HDNode *node, const uint8_t *message, size_t message_len, uin
 	}
 }
 
+int ecdsaMessageSign(HDNode *node, const uint8_t *message, size_t message_len, uint8_t *signature)
+{
+	signature[0] = 0; // prefix: pad with zero, so all signatures are 65 bytes
+	return hdnode_sign(node, message, message_len, signature + 1, NULL, NULL);
+}
+
 int cryptoMessageSign(const CoinType *coin, HDNode *node, InputScriptType script_type, const uint8_t *message, size_t message_len, uint8_t *signature)
 {
 	SHA256_CTX ctx;

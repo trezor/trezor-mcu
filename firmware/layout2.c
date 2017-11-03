@@ -21,6 +21,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "crypto.h"
 #include "layout2.h"
 #include "storage.h"
 #include "oled.h"
@@ -415,6 +416,24 @@ void layoutSignIdentity(const IdentityType *identity, const char *challenge)
 		row_hostport[0] ? row_hostport : NULL,
 		row_user[0] ? row_user : NULL,
 		challenge,
+		NULL,
+		NULL);
+}
+
+void layoutSignEcdsa(const SignEcdsa *signEcdsa)
+{
+    // Calculate sha256 hash (+1 null byte)
+    char hashHex[65];
+    sha256_Data(signEcdsa->blob.bytes, signEcdsa->blob.size, hashHex);
+
+    const char **str = split_message((const uint8_t *)hashHex, 64, 16);
+
+	layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Sign"),
+		_("^ data has this SHA256 ^"),
+		str[0],
+		str[1],
+		str[2],
+		str[3],
 		NULL,
 		NULL);
 }

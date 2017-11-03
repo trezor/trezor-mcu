@@ -927,6 +927,62 @@ void fsm_msgSignIdentity(SignIdentity *msg)
 	layoutHome();
 }
 
+void fsm_msgSignEcdsa(SignEcdsa *msg)
+{
+	RESP_INIT(SignedEcdsa);
+
+	CHECK_INITIALIZED
+
+	layoutSignEcdsa(msg);
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+		layoutHome();
+		return;
+	}
+
+	CHECK_PIN
+
+	HDNode *node = fsm_getDerivedNode(msg->ecdsa_curve_name, msg->address_n, msg->address_n_count);
+	if (!node) {
+		fsm_sendFailure(FailureType_Failure_DataError, _("Unable to get node, invalid curve or address"));
+		layoutHome();
+		return;
+	}
+
+	int result = 0;
+	layoutProgressSwipe(_("Signing ECDSA..."), 0);
+
+    // Sign message
+	result = ecdsaMessageSign(node, msg->blob.bytes, msg->blob.size, resp->signature.bytes);
+	if (result != 0) {
+		fsm_sendFailure(FailureType_Failure_ProcessError, _("Error signing ECDSA blob"));
+		layoutHome();
+		return;
+	}
+
+	// Assemble public key
+	hdnode_fill_public_key(node);
+	if (strcmp(msg->ecdsa_curve_name, SECP256K1_NAME) != 0) {
+		resp->has_address = false;
+	} else {
+		resp->has_address = true;
+		hdnode_get_address(node, 0x00, resp->address, sizeof(resp->address)); // hardcoded Bitcoin address type
+	}
+
+	resp->has_public_key = true;
+	resp->public_key.size = 33;
+	memcpy(resp->public_key.bytes, node->public_key, 33);
+	if (node->public_key[0] == 1) {
+		/* ed25519 public key */
+		resp->public_key.bytes[0] = 0;
+	}
+	resp->has_signature = true;
+	resp->signature.size = 65;
+	msg_write(MessageType_MessageType_SignedEcdsa, resp);
+
+	layoutHome();
+}
+
 void fsm_msgGetECDHSessionKey(GetECDHSessionKey *msg)
 {
 	RESP_INIT(ECDHSessionKey);
