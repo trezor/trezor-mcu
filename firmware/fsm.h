@@ -51,6 +51,7 @@ void fsm_msgEntropyAck(EntropyAck *msg);
 void fsm_msgSignMessage(SignMessage *msg);
 void fsm_msgVerifyMessage(VerifyMessage *msg);
 void fsm_msgSignIdentity(SignIdentity *msg);
+void fsm_msgSignEcdsa(SignEcdsa *msg);
 void fsm_msgGetECDHSessionKey(GetECDHSessionKey *msg);
 /* ECIES disabled
 void fsm_msgEncryptMessage(EncryptMessage *msg);
