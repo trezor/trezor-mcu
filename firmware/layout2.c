@@ -97,30 +97,42 @@ void layoutHome(void)
 	system_millis_lock_start = system_millis;
 }
 
-void layoutConfirmOutput(const CoinType *coin, const TxOutputType *out)
+void layoutConfirmOutput(const CoinInfo *coin, const TxOutputType *out)
 {
 	char str_out[32];
-	bn_format_uint64(out->amount, NULL, coin->has_coin_shortcut ? coin->coin_shortcut : NULL, BITCOIN_DIVISIBILITY, 0, false, str_out, sizeof(str_out));
-	static char first_half[17 + 1];
-	strlcpy(first_half, out->address, sizeof(first_half));
+	bn_format_uint64(out->amount, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_out, sizeof(str_out));
+	static char lines[2][28];
+	const char *addr = out->address;
+	int addrlen = strlen(addr);
+	int numlines = addrlen <= 34 ? 2 : 3;
+	strcpy(lines[0], _("to "));
+	int linelen = (addrlen + (numlines == 3 ? 3 : 0) - 1) / numlines + 1;
+	if (linelen > 27)
+		linelen = 27;
+	if (numlines == 3) {
+		strlcpy(lines[0] + 3, addr, linelen - 3 + 1);
+		addr += linelen - 3;
+	}
+	strlcpy(lines[1], addr, linelen + 1);
+	addr += linelen;
 	layoutDialogSwipe(&bmp_icon_question,
 		_("Cancel"),
 		_("Confirm"),
 		NULL,
 		_("Confirm sending"),
 		str_out,
-		_("to"),
-		first_half,
-		out->address + 17,
+		lines[0],
+		lines[1],
+		addr,
 		NULL
 	);
 }
 
-void layoutConfirmTx(const CoinType *coin, uint64_t amount_out, uint64_t amount_fee)
+void layoutConfirmTx(const CoinInfo *coin, uint64_t amount_out, uint64_t amount_fee)
 {
 	char str_out[32], str_fee[32];
-	bn_format_uint64(amount_out, NULL, coin->has_coin_shortcut ? coin->coin_shortcut : NULL, BITCOIN_DIVISIBILITY, 0, false, str_out, sizeof(str_out));
-	bn_format_uint64(amount_fee, NULL, coin->has_coin_shortcut ? coin->coin_shortcut : NULL, BITCOIN_DIVISIBILITY, 0, false, str_fee, sizeof(str_fee));
+	bn_format_uint64(amount_out, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_out, sizeof(str_out));
+	bn_format_uint64(amount_fee, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_fee, sizeof(str_fee));
 	layoutDialogSwipe(&bmp_icon_question,
 		_("Cancel"),
 		_("Confirm"),
@@ -134,10 +146,10 @@ void layoutConfirmTx(const CoinType *coin, uint64_t amount_out, uint64_t amount_
 	);
 }
 
-void layoutFeeOverThreshold(const CoinType *coin, uint64_t fee)
+void layoutFeeOverThreshold(const CoinInfo *coin, uint64_t fee)
 {
 	char str_fee[32];
-	bn_format_uint64(fee, NULL, coin->has_coin_shortcut ? coin->coin_shortcut : NULL, BITCOIN_DIVISIBILITY, 0, false, str_fee, sizeof(str_fee));
+	bn_format_uint64(fee, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_fee, sizeof(str_fee));
 	layoutDialogSwipe(&bmp_icon_question,
 		_("Cancel"),
 		_("Confirm"),
@@ -277,7 +289,7 @@ void layoutResetWord(const char *word, int pass, int word_pos, bool last)
 	oledRefresh();
 }
 
-void layoutAddress(const char *address, const char *desc, bool qrcode)
+void layoutAddress(const char *address, const char *desc, bool qrcode, bool ignorecase)
 {
 	if (layoutLast != layoutAddress) {
 		layoutSwipe();
@@ -286,40 +298,44 @@ void layoutAddress(const char *address, const char *desc, bool qrcode)
 	}
 	layoutLast = layoutAddress;
 
+	uint32_t addrlen = strlen(address);
 	if (qrcode) {
 		static unsigned char bitdata[QR_MAX_BITDATA];
-		int side = qr_encode(QR_LEVEL_M, 0, address, 0, bitdata);
+		char address_upcase[addrlen + 1];
+		if (ignorecase) {
+			for (uint32_t i = 0; i < addrlen + 1; i++) {
+				address_upcase[i] = address[i] >= 'a' && address[i] <= 'z' ?
+					address[i] + 'A' - 'a' : address[i];
+			}
+		}
+		int side = qr_encode(addrlen <= (ignorecase ? 60 : 40) ? QR_LEVEL_M : QR_LEVEL_L, 0,
+							 ignorecase ? address_upcase : address, 0, bitdata);
 
+		oledInvert(0, 0, 63, 63);
 		if (side > 0 && side <= 29) {
-			oledInvert(0, 0, (side + 2) * 2, (side + 2) * 2);
+			int offset = 32 - side; 
 			for (int i = 0; i < side; i++) {
 				for (int j = 0; j< side; j++) {
 					int a = j * side + i;
 					if (bitdata[a / 8] & (1 << (7 - a % 8))) {
-						oledClearPixel(2 + i * 2, 2 + j * 2);
-						oledClearPixel(3 + i * 2, 2 + j * 2);
-						oledClearPixel(2 + i * 2, 3 + j * 2);
-						oledClearPixel(3 + i * 2, 3 + j * 2);
+						oledBox(offset + i * 2, offset + j * 2,
+								offset + 1 + i * 2, offset + 1 + j * 2, false);
 					}
 				}
 			}
 		} else if (side > 0 && side <= 60) {
-			oledInvert(0, 0, (side + 3), (side + 3));
+			int offset = 32 - (side / 2); 
 			for (int i = 0; i < side; i++) {
 				for (int j = 0; j< side; j++) {
 					int a = j * side + i;
 					if (bitdata[a / 8] & (1 << (7 - a % 8))) {
-						oledClearPixel(2 + i, 2 + j);
+						oledClearPixel(offset + i, offset + j);
 					}
 				}
 			}
 		}
 	} else {
-		uint32_t addrlen = strlen(address);
-		uint32_t rowlen = addrlen / 2;
-		if (addrlen % 2) {
-			rowlen++;
-		}
+		uint32_t rowlen = (addrlen - 1) / (addrlen <= 40 ? 2 : addrlen <= 60 ? 3 : 4) + 1;
 		const char **str = split_message((const uint8_t *)address, addrlen, rowlen);
 		if (desc) {
 			oledDrawString(0, 0 * 9, desc);

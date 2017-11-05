@@ -30,7 +30,7 @@
 
 static uint32_t inputs_count;
 static uint32_t outputs_count;
-static const CoinType *coin;
+static const CoinInfo *coin;
 static const HDNode *root;
 static CONFIDENTIAL HDNode node;
 static bool signing = false;
@@ -392,7 +392,7 @@ bool compile_input_script_sig(TxInputType *tinput)
 	if (!multisig_fp_mismatch) {
 		// check that this is still multisig
 		uint8_t h[32];
-		if (tinput->script_type != InputScriptType_SPENDMULTISIG
+		if (!tinput->has_multisig
 			|| cryptoMultisigFingerprint(&(tinput->multisig), h) == 0
 			|| memcmp(multisig_fp, h, 32) != 0) {
 			// Transaction has changed during signing
@@ -424,7 +424,7 @@ bool compile_input_script_sig(TxInputType *tinput)
 	return tinput->script_sig.size > 0;
 }
 
-void signing_init(uint32_t _inputs_count, uint32_t _outputs_count, const CoinType *_coin, const HDNode *_root, uint32_t _version, uint32_t _lock_time)
+void signing_init(uint32_t _inputs_count, uint32_t _outputs_count, const CoinInfo *_coin, const HDNode *_root, uint32_t _version, uint32_t _lock_time)
 {
 	inputs_count = _inputs_count;
 	outputs_count = _outputs_count;
@@ -469,8 +469,7 @@ void signing_init(uint32_t _inputs_count, uint32_t _outputs_count, const CoinTyp
 static bool signing_check_input(TxInputType *txinput) {
 	/* compute multisig fingerprint */
 	/* (if all input share the same fingerprint, outputs having the same fingerprint will be considered as change outputs) */
-	if (txinput->has_multisig && !multisig_fp_mismatch
-		&& txinput->script_type == InputScriptType_SPENDMULTISIG) {
+	if (txinput->has_multisig && !multisig_fp_mismatch) {
 		uint8_t h[32];
 		if (cryptoMultisigFingerprint(&txinput->multisig, h) == 0) {
 			fsm_sendFailure(FailureType_Failure_ProcessError, _("Error computing multisig fingerprint"));
@@ -705,12 +704,6 @@ static bool signing_sign_segwit_input(TxInputType *txinput) {
 
 	if (txinput->script_type == InputScriptType_SPENDWITNESS
 		|| txinput->script_type == InputScriptType_SPENDP2SHWITNESS) {
-		// disable native segwit for now
-		if (txinput->script_type == InputScriptType_SPENDWITNESS) {
-			fsm_sendFailure(FailureType_Failure_DataError, _("Native segwit is disabled"));
-			signing_abort();
-			return false;
-		}
 		if (!compile_input_script_sig(txinput)) {
 			fsm_sendFailure(FailureType_Failure_ProcessError, _("Failed to compile input"));
 			signing_abort();
@@ -827,14 +820,8 @@ void signing_txack(TransactionType *tx)
 				}
 			} else if  (tx->inputs[0].script_type == InputScriptType_SPENDWITNESS
 						|| tx->inputs[0].script_type == InputScriptType_SPENDP2SHWITNESS) {
-				if (!coin->has_segwit || !coin->segwit) {
+				if (!coin->has_segwit) {
 					fsm_sendFailure(FailureType_Failure_DataError, _("Segwit not enabled on this coin"));
-					signing_abort();
-					return;
-				}
-				// disable native segwit for now
-				if (tx->inputs[0].script_type == InputScriptType_SPENDWITNESS) {
-					fsm_sendFailure(FailureType_Failure_DataError, _("Native segwit is disabled"));
 					signing_abort();
 					return;
 				}
