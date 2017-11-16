@@ -18,6 +18,7 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -844,4 +845,26 @@ void layoutCosiCommitSign(const uint32_t *address_n, size_t address_n_count, con
 	}
 	layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Confirm"), desc,
 		str[0], str[1], str[2], str[3], NULL, NULL);
+}
+
+void layoutStellarGetPublicKey(uint32_t index)
+{
+    char strAccount[32];
+    char strIndex[12];
+
+    if (index == 0) {
+        strlcpy(strAccount, _("primary account?"), sizeof(strAccount));
+    }
+    else {
+        sprintf(strIndex, "%lu", index+1);
+        strlcpy(strAccount, _("account #"), sizeof(strAccount));
+        strlcat(strAccount, strIndex, sizeof(strAccount));
+    }
+
+    layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Confirm"), _("Share public account ID?"),
+        _("Share public account"),
+        _("ID (G...) for"),
+        strAccount,
+        NULL, NULL, NULL
+        );
 }
