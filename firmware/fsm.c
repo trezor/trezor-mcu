@@ -1615,6 +1615,48 @@ void fsm_msgCosiSign(CosiSign *msg)
 	layoutHome();
 }
 
+void fsm_msgStellarGetPublicKey(StellarGetPublicKey *msg)
+{
+    RESP_INIT(StellarPublicKey);
+    resp->index = msg->index;
+
+    CHECK_INITIALIZED
+
+    layoutStellarGetPublicKey(msg->index);
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+        layoutHome();
+        return;
+    }
+
+    CHECK_PIN
+
+    // Derivation path for Stellar is m/44'/148'/index'
+    uint32_t address_n[3];
+    address_n[0] = 0x80000000 | 44;
+    address_n[1] = 0x80000000 | 148;
+    address_n[2] = 0x80000000 | msg->index;
+
+    HDNode *node = fsm_getDerivedNode("ed25519", address_n, 3);
+    if (!node) {
+        fsm_sendFailure(FailureType_Failure_ProcessError, _("Failed to derive path"));
+        layoutHome();
+        return;
+    }
+
+    // Calculate and store ED25519 public key from the private key. Note that this is different
+    // from the public key stored in the HDNode
+    ed25519_public_key stellarPubkeyBytes;
+    ed25519_publickey(node->private_key, stellarPubkeyBytes);
+    memcpy(resp->public_key.bytes, stellarPubkeyBytes, 32);
+    resp->public_key.size = 32;
+
+    // Write response back to the client
+    msg_write(MessageType_MessageType_StellarPublicKey, resp);
+
+    layoutHome();
+}
+
 #if DEBUG_LINK
 
 void fsm_msgDebugLinkGetState(DebugLinkGetState *msg)

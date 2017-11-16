@@ -80,6 +80,9 @@ void fsm_msgNEMDecryptMessage(NEMDecryptMessage *msg);
 void fsm_msgCosiCommit(CosiCommit *msg);
 void fsm_msgCosiSign(CosiSign *msg);
 
+// Stellar
+void fsm_msgStellarGetPublicKey(StellarGetPublicKey *msg);
+
 // debug message functions
 #if DEBUG_LINK
 //void fsm_msgDebugLinkDecision(DebugLinkDecision *msg);
