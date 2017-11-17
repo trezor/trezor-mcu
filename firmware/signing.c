@@ -610,6 +610,14 @@ static bool signing_check_fee(void) {
 			return false;
 		}
 	}
+	if (lock_time != 0) {
+		layoutLockTime(lock_time);
+		if (!protectButton(ButtonRequestType_ButtonRequest_ConfirmOutput, false)) {
+			fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+			signing_abort();
+			return false;
+		}
+	}
 	// last confirmation
 	layoutConfirmTx(coin, to_spend - change_spend, fee);
 	if (!protectButton(ButtonRequestType_ButtonRequest_SignTx, false)) {

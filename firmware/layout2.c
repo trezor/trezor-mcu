@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 
 #include "layout2.h"
 #include "storage.h"
@@ -35,6 +36,9 @@
 #include "gettext.h"
 
 #define BITCOIN_DIVISIBILITY (8)
+
+/* Below this value it is interpreted as block number, otherwise as UNIX timestamp. */
+#define LOCKTIME_THRESHOLD 500000000
 
 // split longer string into 4 rows, rowlen chars each
 static const char **split_message(const uint8_t *msg, uint32_t len, uint32_t rowlen)
@@ -219,6 +223,63 @@ void layoutFeeOverThreshold(const CoinInfo *coin, uint64_t fee)
 		_("Send anyway?"),
 		NULL
 	);
+}
+
+static void format_time_number(char *dst, unsigned int n, size_t size) {
+	char s[3];
+
+	s[0] = '0' + ((n / 10) % 10);
+	s[1] = '0' + (n % 10);
+	s[2] = '\0';
+
+	strlcat(dst, s, size);
+}
+
+void layoutLockTime(uint32_t lock_time)
+{
+	static const char *months[] = {
+		" Jan ", " Feb ", " Mar ",
+		" Apr ", " May ", " Jun ",
+		" Jul ", " Aug ", " Sep ",
+		" Oct ", " Nov ", " Dec ",
+	};
+
+	char str_out[32];
+
+	if (lock_time < LOCKTIME_THRESHOLD) {
+		bn_format_uint64(lock_time, _("block #"), NULL, 0, 0, false, str_out, sizeof(str_out));
+	} else {
+		// "01 Jan 1970 00:00 UTC"
+
+		time_t t = lock_time;
+		struct tm time;
+		gmtime_r(&t, &time);
+
+		str_out[0] = '\0';
+
+		format_time_number(str_out, time.tm_mday, sizeof(str_out));
+		strlcat(str_out, _(months[time.tm_mon]), sizeof(str_out));
+
+		char year[4 + 1 + 1];
+		bn_format_uint64(1900 + time.tm_year, NULL, " ", 0, 0, false, year, sizeof(year));
+		strlcat(str_out, year, sizeof(str_out));
+
+		format_time_number(str_out, time.tm_hour, sizeof(str_out));
+		strlcat(str_out, ":", sizeof(str_out));
+		format_time_number(str_out, time.tm_min,  sizeof(str_out));
+		strlcat(str_out, " UTC", sizeof(str_out));
+	}
+
+	layoutDialogSwipe(&bmp_icon_question,
+		_("Cancel"),
+		_("Confirm"),
+		_("Lock time"),
+		_("Lock transaction until"),
+		str_out,
+		NULL,
+		NULL,
+		NULL,
+		NULL);
 }
 
 void layoutSignMessage(const uint8_t *msg, uint32_t len)
