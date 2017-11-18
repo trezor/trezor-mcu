@@ -255,6 +255,16 @@ bool protectPassphrase(void)
 		if (msg_tiny_id == MessageType_MessageType_PassphraseAck) {
 			msg_tiny_id = 0xFFFF;
 			PassphraseAck *ppa = (PassphraseAck *)msg_tiny;
+
+			size_t length = strlen(ppa->passphrase);
+			if (length > 0) {
+				layoutPassphrase(ppa->passphrase, length);
+				if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, true)) {
+					result = false;
+					break;
+				}
+			}
+
 			session_cachePassphrase(ppa->passphrase);
 			result = true;
 			break;

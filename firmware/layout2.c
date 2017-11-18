@@ -124,6 +124,14 @@ void layoutHome(void)
 	system_millis_lock_start = timer_ms();
 }
 
+void layoutPassphrase(const char *passphrase, size_t length)
+{
+	const char **str = split_message((uint8_t *) passphrase, length, 16);
+	layoutDialogSwipe(&bmp_icon_question, NULL, _("Continue"),
+		_("Use passphrase?"),
+		str[0], str[1], str[2], str[3], NULL, NULL);
+}
+
 void layoutConfirmOutput(const CoinInfo *coin, const TxOutputType *out)
 {
 	char str_out[32];
