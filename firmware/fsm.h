@@ -82,6 +82,8 @@ void fsm_msgCosiSign(CosiSign *msg);
 
 // Stellar
 void fsm_msgStellarGetPublicKey(StellarGetPublicKey *msg);
+void fsm_msgStellarSignTx(StellarSignTx *msg);
+void fsm_msgStellarTxOpAck(StellarTxOpAck *msg);
 
 // debug message functions
 #if DEBUG_LINK

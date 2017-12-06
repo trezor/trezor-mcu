@@ -55,6 +55,7 @@
 #include "nem2.h"
 #include "rfc6979.h"
 #include "gettext.h"
+#include "stellar.h"
 
 // message methods
 
@@ -1622,39 +1623,68 @@ void fsm_msgStellarGetPublicKey(StellarGetPublicKey *msg)
 
     CHECK_INITIALIZED
 
-    layoutStellarGetPublicKey(msg->index);
-    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
-        layoutHome();
-        return;
-    }
-
     CHECK_PIN
 
-    // Derivation path for Stellar is m/44'/148'/index'
-    uint32_t address_n[3];
-    address_n[0] = 0x80000000 | 44;
-    address_n[1] = 0x80000000 | 148;
-    address_n[2] = 0x80000000 | msg->index;
+    // Will exit if the user does not confirm
+    stellar_layoutStellarGetPublicKey(msg->index);
 
-    HDNode *node = fsm_getDerivedNode("ed25519", address_n, 3);
-    if (!node) {
-        fsm_sendFailure(FailureType_Failure_ProcessError, _("Failed to derive path"));
-        layoutHome();
-        return;
-    }
-
-    // Calculate and store ED25519 public key from the private key. Note that this is different
-    // from the public key stored in the HDNode
-    ed25519_public_key stellarPubkeyBytes;
-    ed25519_publickey(node->private_key, stellarPubkeyBytes);
-    memcpy(resp->public_key.bytes, stellarPubkeyBytes, 32);
+    // Read public key and write it to the response
     resp->public_key.size = 32;
+    stellar_getPubkeyAtIndex(msg->index, resp->public_key.bytes, sizeof(resp->public_key.bytes));
 
-    // Write response back to the client
+
     msg_write(MessageType_MessageType_StellarPublicKey, resp);
 
     layoutHome();
+}
+
+void fsm_msgStellarSignTx(StellarSignTx *msg)
+{
+    CHECK_INITIALIZED
+    CHECK_PIN
+
+    stellar_signingInit(msg);
+
+    // Confirm transaction basics
+    stellar_layoutTransactionSummary();
+
+    // Respond with a request for the first operation
+    RESP_INIT(StellarTxOpRequest);
+    resp->offset = stellar_getXdrOffset();
+
+    msg_write(MessageType_MessageType_StellarTxOpRequest, resp);
+}
+
+void fsm_msgStellarTxOpAck(StellarTxOpAck *msg)
+{
+    // This will display additional dialogs to the user
+    stellar_addOperation(msg);
+
+    // Last operation was confirmed, send a StellarSignedTx
+    if (stellar_allOperationsConfirmed()) {
+        StellarTransaction *activeTx = stellar_getActiveTx();
+        RESP_INIT(StellarSignedTx);
+
+        // Add the public key for verification that the right account was used for signing
+        memcpy(resp->public_key.bytes, &(activeTx->account_id), 32);
+        resp->public_key.size = 32;
+
+        // Add the signature (note that this does not include the 4-byte hint)
+        uint8_t signature[64];
+        stellar_getSignatureForActiveTx(signature);
+        memcpy(resp->signature.bytes, signature, sizeof(signature));
+        resp->signature.size = sizeof(signature);
+
+        msg_write(MessageType_MessageType_StellarSignedTx, resp);
+        layoutHome();
+    }
+    // Request the next operation to sign
+    else {
+        RESP_INIT(StellarTxOpRequest);
+        resp->offset = stellar_getXdrOffset();
+
+        msg_write(MessageType_MessageType_StellarTxOpRequest, resp);
+    }
 }
 
 #if DEBUG_LINK
