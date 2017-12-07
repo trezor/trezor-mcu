@@ -525,9 +525,7 @@ void stellar_getPubkeyAtIndex(uint32_t index, uint8_t *out, size_t outlen)
 
     HDNode *node = stellar_deriveNode(index);
 
-    ed25519_public_key stellarPubkeyBytes;
-    ed25519_publickey(node->private_key, stellarPubkeyBytes);
-    memcpy(out, stellarPubkeyBytes, outlen);
+    memcpy(out, node->public_key + 1, outlen);
 }
 
 /*
@@ -554,8 +552,7 @@ HDNode *stellar_deriveNode(uint32_t index)
         return 0;
     }
 
-    // Populate public key
-    ed25519_publickey(node.private_key, node.public_key + 1);
+    hdnode_fill_public_key(&node);
 
     return &node;
 }
