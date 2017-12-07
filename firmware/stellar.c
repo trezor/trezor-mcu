@@ -421,9 +421,7 @@ void stellar_getSignatureForActiveTx(uint8_t *out_signature)
  */
 void stellar_format_stroops(uint64_t number, char *out, size_t outlen)
 {
-    bignum256 bn_number;
-    bn_read_uint64(number, &bn_number);
-    bn_format(&bn_number, NULL, NULL, 7, 0, false, out, outlen);
+    bn_format_uint64(number, NULL, NULL, 7, 0, false, out, outlen);
 }
 
 /*
