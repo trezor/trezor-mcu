@@ -1480,6 +1480,20 @@ void fsm_msgIotaGetAddressCounter(IotaGetAddressCounter *msg)
 
 	resp->address_counter = storage_GetIotaAddressCounter();
 	resp->has_address_counter = true;
+
+	char str[20] = {0};
+	bn_format_uint64(resp->address_counter, "", "", 0, 0, 0, str, 20);
+	layoutDialogSwipe(&bmp_icon_info, NULL, _("Continue"),
+		NULL,
+		_("IOTA address"),
+		_("counter:"),
+		str, NULL, NULL, NULL);
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, true)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+		layoutHome();
+		return;
+	}
+
 	msg_write(MessageType_MessageType_IotaAddressCounter, resp);
 	layoutHome();
 }
