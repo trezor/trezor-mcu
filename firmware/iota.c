@@ -25,7 +25,6 @@
 #include <string.h>
 
 static CONFIDENTIAL struct iota_data_struct iota_data = {0};
-static iota_unsigned_transaction_type iota_unsigned_transaction = {0};
 
 void iota_address_generation_progress_callback(uint32_t progress)
 {
@@ -144,9 +143,9 @@ void iota_address_from_seed_with_index(uint32_t index, bool display, char public
 	}
 }
 
-bool iota_sign_transaction(uint64_t transaction_timestamp, char bundle_hash[], char first_signature[], char second_signature[])
+bool iota_sign_transaction(iota_transaction_details_type *tx, char bundle_hash[], char first_signature[], char second_signature[])
 {
-	if (!iota_unsigned_transaction.ready_for_signing) {
+	if (!tx->ready_for_signing) {
 		return false;
 	}
 
@@ -155,13 +154,13 @@ bool iota_sign_transaction(uint64_t transaction_timestamp, char bundle_hash[], c
 	tryte_t normalized_bundle_hash[81];
 	{
 		tryte_t bundle_hash_trytes[81];
-		calculate_standard_bundle_hash(iota_unsigned_transaction.input_address,
-									   iota_unsigned_transaction.receiving_address,
-									   iota_unsigned_transaction.remainder_address,
-									   iota_unsigned_transaction.balance,
-									   iota_unsigned_transaction.transfer_amount,
-									   iota_unsigned_transaction.tag,
-									   transaction_timestamp,
+		calculate_standard_bundle_hash(tx->input_address,
+									   tx->receiving_address,
+									   tx->remainder_address,
+									   tx->balance,
+									   tx->transfer_amount,
+									   tx->tag,
+									   tx->timestamp,
 									   bundle_hash_trytes);
 		trytes_to_chars(bundle_hash_trytes, bundle_hash, 81);
 		normalize_hash(bundle_hash_trytes, normalized_bundle_hash);
@@ -177,7 +176,7 @@ bool iota_sign_transaction(uint64_t transaction_timestamp, char bundle_hash[], c
 	}
 
 	trit_t private_key_trits[243*27*2];
-	generate_private_key(seed_trits, iota_unsigned_transaction.input_address_index, private_key_trits);
+	generate_private_key(seed_trits, tx->input_address_index, private_key_trits);
 
 	// Sign inputs
 	if(1){
@@ -197,14 +196,4 @@ bool iota_sign_transaction(uint64_t transaction_timestamp, char bundle_hash[], c
 	}
 
 	return true;
-}
-
-iota_unsigned_transaction_type* iota_unsigned_transaction_get()
-{
-	return &iota_unsigned_transaction;
-}
-
-void iota_unsigned_transaction_erase()
-{
-	memset(&iota_unsigned_transaction, 0, sizeof(iota_unsigned_transaction_type));
 }

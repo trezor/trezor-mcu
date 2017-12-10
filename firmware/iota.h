@@ -44,17 +44,16 @@ typedef struct {
 	char input_address[81];
 	uint32_t remainder_address_index;
 	char remainder_address[81];
-	uint64_t request_timestamp;
+	uint64_t timestamp;
 	uint64_t transfer_amount;
 	uint64_t balance;
 	char tag[27];
-} iota_unsigned_transaction_type;
+} iota_transaction_details_type;
 
 bool iota_initialize(HDNode *node);
 const char *iota_get_seed(void);
 void iota_address_from_seed_with_index(uint32_t index, bool display, char public_address[]);
 void iota_unsigned_transaction_erase(void);
-iota_unsigned_transaction_type* iota_unsigned_transaction_get(void);
-bool iota_sign_transaction(uint64_t transaction_timestamp, char bundle_hash[], char first_signature[], char second_signature[]);
+bool iota_sign_transaction(iota_transaction_details_type* transaction_details, char bundle_hash[], char first_signature[], char second_signature[]);
 
 #endif

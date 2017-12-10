@@ -72,12 +72,10 @@ void fsm_msgNEMSignTx(NEMSignTx *msg);
 void fsm_msgCosiCommit(CosiCommit *msg);
 void fsm_msgCosiSign(CosiSign *msg);
 
-void fsm_msgIotaShowSeed(IotaShowSeed *msg);
 void fsm_msgIotaGetAddressCounter(IotaGetAddressCounter *msg);
 void fsm_msgIotaSetAddressCounter(IotaSetAddressCounter *msg);
 void fsm_msgIotaGetAddress(IotaGetAddress *msg);
 void fsm_msgIotaTxRequest(IotaTxRequest *msg);
-void fsm_msgIotaTxDetails(IotaTxDetails *msg);
 
 // debug message functions
 #if DEBUG_LINK
