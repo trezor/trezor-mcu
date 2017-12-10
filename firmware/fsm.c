@@ -1533,6 +1533,7 @@ void fsm_msgIotaGetAddress(IotaGetAddress *msg)
 	// Take address counter from message if available, otherwise from storage
 	uint32_t address_index = (msg->has_address_index ? msg->address_index : storage_GetIotaAddressCounter());
 	iota_address_from_seed_with_index(address_index, false, resp->address);
+	resp->has_address = true;
 	resp->address_index = address_index;
 	resp->has_address_index = true;
 
