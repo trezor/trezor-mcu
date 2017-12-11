@@ -53,7 +53,6 @@ typedef struct {
 bool iota_initialize(HDNode *node);
 const char *iota_get_seed(void);
 void iota_address_from_seed_with_index(uint32_t index, bool display, char public_address[]);
-void iota_unsigned_transaction_erase(void);
 bool iota_sign_transaction(iota_transaction_details_type* transaction_details, char bundle_hash[], char first_signature[], char second_signature[]);
 
-#endif
+#endif // __IOTA_H__

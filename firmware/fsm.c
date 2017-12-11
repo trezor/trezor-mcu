@@ -1605,8 +1605,18 @@ void fsm_msgIotaTxRequest(IotaTxRequest *msg)
 		return;
 	}
 
+	memset(str_one, 0, sizeof(str_one));
+	memcpy(str_one, tx.tag, 27);
+	// Remove trailing 9's
+	for (int i = 27-1; i > 0; i--) {
+		if (str_one[i] == '9') {
+			str_one[i] = '\0';
+		} else {
+			break;
+		}
+	}
 	bn_format_uint64(tx.timestamp, "", "", 0, 0, false, str_two, 30);
-	layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Sign"), _("Sign transaction"), _("Tag:"), _("TREZOR"), _("Request timestamp:"), str_two, NULL, NULL);
+	layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Sign"), _("Sign transaction"), _("Tag:"), str_one, _("Request timestamp:"), str_two, NULL, NULL);
 	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
 		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
 		layoutHome();

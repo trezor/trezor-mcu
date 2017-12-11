@@ -31,7 +31,6 @@ void iota_address_generation_progress_callback(uint32_t progress)
 	layoutProgress(_("Generating address."), progress);
 }
 
-
 void iota_signing_transaction_progress_one_callback(uint32_t progress)
 {
 	layoutProgress(_("Signing transaction."), progress/2);
@@ -179,7 +178,7 @@ bool iota_sign_transaction(iota_transaction_details_type *tx, char bundle_hash[]
 	generate_private_key(seed_trits, tx->input_address_index, private_key_trits);
 
 	// Sign inputs
-	if(1){
+	{
 		trit_t first_signature_trits[3*27*81];
 		tryte_t first_signature_trytes[27*81];
 		generate_signature_fragment(&normalized_bundle_hash[0], &private_key_trits[0], first_signature_trits, iota_signing_transaction_progress_one_callback);
@@ -187,7 +186,8 @@ bool iota_sign_transaction(iota_transaction_details_type *tx, char bundle_hash[]
 		trytes_to_chars(first_signature_trytes, first_signature, 27*81);
 	}
 
-	if(1){
+	// Second signature
+	{
 		trit_t second_signature_trits[3*27*81];
 		tryte_t second_signature_trytes[27*81];
 		generate_signature_fragment(&normalized_bundle_hash[27], &private_key_trits[6561], second_signature_trits, iota_signing_transaction_progress_two_callback);
