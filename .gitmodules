@@ -13,3 +13,6 @@
 [submodule "vendor/nanopb"]
 	path = vendor/nanopb
 	url = https://github.com/nanopb/nanopb.git
+[submodule "vendor/iota"]
+	path = vendor/iota
+	url = https://github.com/iota-trezor/iota.git

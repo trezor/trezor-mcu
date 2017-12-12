@@ -76,6 +76,9 @@ uint32_t *storage_getPinFailsPtr(void);
 uint32_t storage_nextU2FCounter(void);
 void storage_setU2FCounter(uint32_t u2fcounter);
 
+uint32_t storage_GetIotaAddressCounter(void);
+void storage_setIotaAddressCounter(uint32_t counter);
+
 bool storage_isInitialized(void);
 
 bool storage_isImported(void);

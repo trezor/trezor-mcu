@@ -118,6 +118,7 @@ void layoutHome(void)
 		oledBox(0, 0, 127, 8, false);
 		oledDrawStringCenter(0, "NEEDS BACKUP!");
 	}
+
 	oledRefresh();
 
 	// Reset lock screen timeout
@@ -497,6 +498,19 @@ void layoutAddress(const char *address, const char *desc, bool qrcode, bool igno
 	oledDrawString(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 3, OLED_HEIGHT - 8, btnYes);
 	oledInvert(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 4, OLED_HEIGHT - 9, OLED_WIDTH - 1, OLED_HEIGHT - 1);
 
+	oledRefresh();
+}
+
+void layoutIotaAddress(const char *address, const char* descr)
+{
+	oledSwipeLeft();
+	oledDrawString(0, 0 * 9, descr);
+	for (int i = 0; i < 81; i++) {
+		int row = i / 14;
+		int col = i % 14;
+		int offset = (8 - fontCharWidth(address[i])) / 2;
+		oledDrawChar(col * 9 + offset, row * 9 + 10, address[i], 1);
+	}
 	oledRefresh();
 }
 

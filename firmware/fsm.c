@@ -53,6 +53,7 @@
 #include "ethereum.h"
 #include "nem.h"
 #include "nem2.h"
+#include "iota.h"
 #include "rfc6979.h"
 #include "gettext.h"
 
@@ -95,6 +96,12 @@ static uint8_t msg_resp[MSG_OUT_SIZE] __attribute__ ((aligned));
 		layoutHome(); \
 		return; \
 	}
+
+#define IOTA_INITIALIZE \
+	uint32_t key_path = IOTA_KEY_PATH | 0x80000000; \
+	HDNode *node = fsm_getDerivedNode(ED25519_NAME, &key_path, 1); \
+	if (!node) return; \
+	if(!iota_initialize(node)) return;
 
 void fsm_sendSuccess(const char *text)
 {
@@ -1503,6 +1510,183 @@ void fsm_msgCosiSign(CosiSign *msg)
 	ed25519_cosi_sign(msg->data.bytes, msg->data.size, node->private_key, nonce, msg->global_commitment.bytes, msg->global_pubkey.bytes, resp->signature.bytes);
 
 	msg_write(MessageType_MessageType_CosiSignature, resp);
+	layoutHome();
+}
+
+void fsm_msgIotaGetAddressCounter(IotaGetAddressCounter *msg)
+{
+	RESP_INIT(IotaAddressCounter)
+
+	CHECK_INITIALIZED
+
+	CHECK_PIN
+
+	// Don't need private keys / seeds for this
+
+	(void) msg;
+
+	resp->address_counter = storage_GetIotaAddressCounter();
+	resp->has_address_counter = true;
+
+	char str[20] = {0};
+	bn_format_uint64(resp->address_counter, "", "", 0, 0, 0, str, 20);
+	layoutDialogSwipe(&bmp_icon_info, NULL, _("Continue"),
+		NULL,
+		_("IOTA address"),
+		_("counter:"),
+		str, NULL, NULL, NULL);
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, true)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+		layoutHome();
+		return;
+	}
+
+	msg_write(MessageType_MessageType_IotaAddressCounter, resp);
+	layoutHome();
+}
+
+void fsm_msgIotaSetAddressCounter(IotaSetAddressCounter *msg)
+{
+	CHECK_INITIALIZED
+
+	CHECK_PIN
+
+	// Don't need private keys / seeds for this
+
+	char str[20] = {0};
+	bn_format_uint64(msg->address_counter, "", "", 0, 0, 0, str, 20);
+	layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Confirm"), NULL, _("Do you really want to"), _("set the IOTA address"), _("counter to:"), str, NULL, NULL);
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+		layoutHome();
+		return;
+	}
+
+	storage_setIotaAddressCounter(msg->address_counter);
+	fsm_sendSuccess("Address counter set");
+	layoutHome();
+}
+
+void fsm_msgIotaGetAddress(IotaGetAddress *msg)
+{
+	RESP_INIT(IotaAddress);
+
+	CHECK_INITIALIZED
+
+	CHECK_PIN
+
+	IOTA_INITIALIZE
+
+	// Take address counter from message if available, otherwise from storage
+	uint32_t address_index = (msg->has_address_index ? msg->address_index : storage_GetIotaAddressCounter());
+	iota_address_from_seed_with_index(address_index, false, resp->address);
+	resp->has_address = true;
+	resp->address_index = address_index;
+	resp->has_address_index = true;
+
+	msg_write(MessageType_MessageType_IotaAddress, resp);
+	layoutHome();
+}
+
+void fsm_msgIotaTxRequest(IotaTxRequest *msg)
+{
+	RESP_INIT(IotaSignedTx);
+
+	CHECK_INITIALIZED
+
+	CHECK_PIN
+
+	IOTA_INITIALIZE
+
+	// Object with transaction parameters
+	iota_transaction_details_type tx;
+	memset(&tx, 0, sizeof(tx));
+
+	if (msg->has_tag) {
+		memcpy(tx.tag, msg->tag, 27);
+	} else {
+		char default_tag[27] = "TREZOR999999999999999999999";
+		memcpy(tx.tag, default_tag, 27);
+	}
+
+	tx.input_address_index = storage_GetIotaAddressCounter();
+	iota_address_from_seed_with_index(tx.input_address_index, false, tx.input_address);
+
+	tx.remainder_address_index = tx.input_address_index + 1;
+	iota_address_from_seed_with_index(tx.remainder_address_index, false, tx.remainder_address);
+
+	memcpy(tx.receiving_address, msg->receiving_address, 81);
+	tx.balance = msg->balance;
+	tx.transfer_amount = msg->transfer_amount;
+	tx.timestamp = msg->timestamp;
+
+	// Ask the user to confirm the following:
+	// * Receiving address
+	// * Balance
+	// * Transfer amount
+	// * Tag
+	// * Timestamp
+
+	layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Next"), NULL, _("Use the right button"), _("on the next page"), _("to confirm the"), _("receiving address."), NULL, NULL);
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+		layoutHome();
+		return;
+	}
+
+	layoutIotaAddress(tx.receiving_address, "Receiving address:");
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+		layoutHome();
+		return;
+	}
+
+	char str_one[30] = {0};
+	char str_two[30] = {0};
+	bn_format_uint64(tx.balance, "", "i", 0, 0, false, str_one, 30);
+	bn_format_uint64(tx.transfer_amount, "", "i", 0, 0, false, str_two, 30);
+	layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Confirm"), NULL, _("Balance:"), str_one, _("Transfer amount:"), str_two, NULL, NULL);
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+		layoutHome();
+		return;
+	}
+
+	memset(str_one, 0, sizeof(str_one));
+	memcpy(str_one, tx.tag, 27);
+	// Remove trailing 9's
+	for (int i = 27-1; i > 0; i--) {
+		if (str_one[i] == '9') {
+			str_one[i] = '\0';
+		} else {
+			break;
+		}
+	}
+	bn_format_uint64(tx.timestamp, "", "", 0, 0, false, str_two, 30);
+	layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Sign"), _("Sign transaction"), _("Tag:"), str_one, _("Request timestamp:"), str_two, NULL, NULL);
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+		layoutHome();
+		return;
+	}
+
+	// Transaction is good, remember details and wait to receive timestamp
+	tx.ready_for_signing = true;
+
+	if (!iota_sign_transaction(&tx, resp->bundle_hash, resp->first_signature, resp->second_signature)) {
+		fsm_sendFailure(FailureType_Failure_ProcessError, NULL);
+		layoutHome();
+		return;
+	}
+	resp->has_bundle_hash = true;
+	resp->has_first_signature = true;
+	resp->has_second_signature = true;
+
+	msg_write(MessageType_MessageType_IotaSignedTx, resp);
+
+	// A signed transaction just left the trezor. Update the address index.
+	storage_setIotaAddressCounter(tx.remainder_address_index);
+
 	layoutHome();
 }
 

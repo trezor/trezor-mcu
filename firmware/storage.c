@@ -162,7 +162,7 @@ bool storage_from_flash(void)
 		old_storage_size = 1496;
 	} else
 	if (version == 8) {
-		old_storage_size = 1504;
+		old_storage_size = 1504 + 8; // Not sure: I added a uint32 and a bool
 	}
 
 	// erase newly added fields
@@ -770,4 +770,19 @@ void storage_wipe(void)
 	storage_check_flash_errors();
 
 	storage_clearPinArea();
+}
+
+uint32_t storage_GetIotaAddressCounter()
+{
+	if (!storage.has_iota_address_counter) {
+		storage_setIotaAddressCounter(0);
+	}
+	return storage.iota_address_counter;
+}
+
+void storage_setIotaAddressCounter(uint32_t counter)
+{
+	storage.iota_address_counter = counter;
+	storage.has_iota_address_counter = true;
+	storage_commit();
 }
