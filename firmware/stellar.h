@@ -62,12 +62,13 @@ typedef struct {
 void stellar_signingInit(StellarSignTx *tx);
 void stellar_signingAbort(void);
 void stellar_addOperation(StellarTxOpAck *msg);
-void stellar_confirmPaymentOp(uint8_t *bytestream, uint32_t *offset);
+void stellar_confirmCreateAccountOp(StellarTxOpAck *msg);
+void stellar_confirmPaymentOp(StellarTxOpAck *msg);
 
 // Layout
 void stellar_layoutStellarGetPublicKey(uint32_t index);
 void stellar_layoutTransactionDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5);
-void stellar_layoutTransactionSummary(void);
+void stellar_layoutTransactionSummary(StellarSignTx *msg);
 
 // Helpers
 HDNode *stellar_deriveNode(uint32_t index);
@@ -76,11 +77,12 @@ size_t stellar_publicAddressAsStr(uint8_t *bytes, char *out, size_t outlen);
 const char **stellar_lineBreakAddress(uint8_t *addrbytes);
 void stellar_getPubkeyAtIndex(uint32_t index, uint8_t *out, size_t outlen);
 
-uint32_t stellar_xdr_read_uint32(uint8_t *bytestream, uint32_t *offset);
-uint64_t stellar_xdr_read_uint64(uint8_t *bytestream, uint32_t *offset);
-uint8_t stellar_xdr_read_bool(uint8_t *bytestream, uint32_t *offset);
-void stellar_xdr_read_address(uint8_t *out_addr_bytes, uint8_t *bytestream, uint32_t *offset);
-void stellar_xdr_read_string(uint8_t *out_str, uint8_t *bytestream, uint32_t *offset);
+void stellar_hashupdate_uint32(uint32_t value);
+void stellar_hashupdate_uint64(uint64_t value);
+void stellar_hashupdate_bool(bool value);
+void stellar_hashupdate_string(uint8_t *data, size_t len);
+void stellar_hashupdate_address(uint8_t *address_bytes);
+void stellar_hashupdate_bytes(uint8_t *data, size_t len);
 
 StellarTransaction *stellar_getActiveTx(void);
 uint32_t stellar_getXdrOffset(void);

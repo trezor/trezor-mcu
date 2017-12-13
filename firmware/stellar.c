@@ -48,87 +48,8 @@ static StellarTransaction stellar_activeTx;
  */
 void stellar_signingInit(StellarSignTx *msg)
 {
-    const uint8_t tx_type_bytes[4] = { 0x00, 0x00, 0x00, 0x02 };
-    stellar_signing = true;
     memset(&stellar_activeTx, 0, sizeof(StellarTransaction));
-
-    // Public key comes from deriving the specified account path (this should match what's in the XDR)
-    uint8_t bytes_pubkey[32];
-    stellar_getPubkeyAtIndex(msg->index, bytes_pubkey, sizeof(bytes_pubkey));
-    memcpy(&(stellar_activeTx.account_id), bytes_pubkey, sizeof(stellar_activeTx.account_id));
-    memcpy(&(stellar_activeTx.account_index), &(msg->index), sizeof(stellar_activeTx.account_index));
-
-    // Skip account ID type since it's always 0
-    stellar_activeTx.xdr_offset += 4;
-
-    // Skip public key bytes since we derive this above
-    stellar_activeTx.xdr_offset += 32;
-
-    // Fee (4 byte unsigned int)
-    memcpy(&(stellar_activeTx.fee), msg->header_xdr.bytes + stellar_activeTx.xdr_offset, 4);
-#if BYTE_ORDER == LITTLE_ENDIAN
-    REVERSE32(stellar_activeTx.fee, stellar_activeTx.fee);
-#endif
-    stellar_activeTx.xdr_offset += 4;
-
-    // Sequence number (8 byte unsigned int)
-    memcpy(&(stellar_activeTx.sequence_number), msg->header_xdr.bytes + stellar_activeTx.xdr_offset, 8);
-#if BYTE_ORDER == LITTLE_ENDIAN
-    REVERSE64(stellar_activeTx.sequence_number, stellar_activeTx.sequence_number);
-#endif
-    stellar_activeTx.xdr_offset += 8;
-
-    // Time bounds are an optional union which is encoded as:
-    //  4 bytes - boolean (whether there is data)
-    //  8 bytes - if data, then this is the first timestamp
-    //  8 bytes - if data, then this is the second timestamp
-    uint8_t has_timebounds = stellar_xdr_read_bool(msg->header_xdr.bytes, &(stellar_activeTx.xdr_offset));
-    if (has_timebounds) {
-        memcpy(&(stellar_activeTx.timebound_min), msg->header_xdr.bytes + stellar_activeTx.xdr_offset, 8);
-#if BYTE_ORDER == LITTLE_ENDIAN
-        REVERSE64(stellar_activeTx.timebound_min, stellar_activeTx.timebound_min);
-#endif
-        stellar_activeTx.xdr_offset += 8;
-
-        memcpy(&(stellar_activeTx.timebound_max), msg->header_xdr.bytes + stellar_activeTx.xdr_offset, 8);
-#if BYTE_ORDER == LITTLE_ENDIAN
-        REVERSE64(stellar_activeTx.timebound_max, stellar_activeTx.timebound_max);
-#endif
-        stellar_activeTx.xdr_offset += 8;
-    }
-
-    // Memo type (4 bytes)
-    stellar_activeTx.memo_type = stellar_xdr_read_uint32(msg->header_xdr.bytes, &(stellar_activeTx.xdr_offset));
-
-    // Memo (based on type)
-    switch (stellar_activeTx.memo_type) {
-        // None, nothing else to do
-        case 0:
-            break;
-        // Text: 4 bytes (size) + up to 28 bytes
-        case 1:
-            stellar_xdr_read_string(stellar_activeTx.memo, msg->header_xdr.bytes, &(stellar_activeTx.xdr_offset));
-            break;
-        // ID (8 bytes, uint64)
-        case 2:
-            memcpy(&(stellar_activeTx.memo), msg->header_xdr.bytes + stellar_activeTx.xdr_offset, 8);
-            stellar_activeTx.xdr_offset += 8;
-            break;
-        // Hash and return are the same data structure (32 byte tx hash)
-        case 3:
-        case 4:
-            memcpy(&(stellar_activeTx.memo), msg->header_xdr.bytes + stellar_activeTx.xdr_offset, 32);
-            stellar_activeTx.xdr_offset += 32;
-            break;
-        default:
-            break;
-    }
-
-    // Number of operations (4 bytes) (this is encoded as part of the operations array but consider it part of the header)
-    stellar_activeTx.num_operations = stellar_xdr_read_uint32(msg->header_xdr.bytes, &(stellar_activeTx.xdr_offset));
-
-    // Header parsing finished, start calculating hash for the initial data
-
+    stellar_signing = true;
     // Initialize signing context
     sha256_Init(&(stellar_activeTx.sha256_ctx));
 
@@ -136,6 +57,79 @@ void stellar_signingInit(StellarSignTx *msg)
     // max length defined in messages.options
     uint8_t network_hash[32];
     sha256_Raw((uint8_t *)msg->network_passphrase, strnlen(msg->network_passphrase, 1024), network_hash);
+
+    uint8_t tx_type_bytes[4] = { 0x00, 0x00, 0x00, 0x02 };
+
+    // Copy some data into the active tx
+    stellar_activeTx.num_operations = msg->num_operations;
+
+    // Start building what will be signed:
+    // sha256 of:
+    //  sha256(network passphrase)
+    //  4-byte unsigned big-endian int type constant (2 for tx)
+    //  remaining bytes are operations added in subsequent messages
+    stellar_hashupdate_bytes(network_hash, sizeof(network_hash));
+    stellar_hashupdate_bytes(tx_type_bytes, sizeof(tx_type_bytes));
+
+    // Public key comes from deriving the specified account path (we ignore the one sent by the client)
+    uint8_t bytes_pubkey[32];
+    stellar_getPubkeyAtIndex(msg->index, bytes_pubkey, sizeof(bytes_pubkey));
+    memcpy(&(stellar_activeTx.account_id), bytes_pubkey, sizeof(stellar_activeTx.account_id));
+    memcpy(&(stellar_activeTx.account_index), &(msg->index), sizeof(stellar_activeTx.account_index));
+
+    // Hash: public key
+    stellar_hashupdate_address(bytes_pubkey);
+
+    // Hash: fee
+    stellar_hashupdate_uint32(msg->fee);
+
+    // Hash: sequence number
+    stellar_hashupdate_uint64(msg->sequence_number);
+
+    // Timebounds are only present if timebounds_start or timebounds_end is non-zero
+    uint8_t has_timebounds = (msg->timebounds_start > 0 || msg->timebounds_end > 0);
+    if (has_timebounds) {
+        // Hash: the "has timebounds?" boolean
+        stellar_hashupdate_bool(true);
+
+        // Timebounds are sent as uint32s since that's all we can display, but they must be hashed as
+        // 64-bit values
+        stellar_hashupdate_uint32(0);
+        stellar_hashupdate_uint32(msg->timebounds_start);
+
+        stellar_hashupdate_uint32(0);
+        stellar_hashupdate_uint32(msg->timebounds_end);
+    }
+    // No timebounds, hash a false boolean
+    else {
+        stellar_hashupdate_bool(false);
+    }
+
+    // Hash: memo
+    stellar_hashupdate_uint32(msg->memo_type);
+    switch (msg->memo_type) {
+        // None, nothing else to do
+        case 0:
+            break;
+        // Text: 4 bytes (size) + up to 28 bytes
+        case 1:
+            stellar_hashupdate_string((unsigned char*)&(msg->memo_text), strnlen(msg->memo_text, 28));
+            break;
+        // ID (8 bytes, uint64)
+        case 2:
+            stellar_hashupdate_uint64(msg->memo_id);
+            break;
+        // Hash and return are the same data structure (32 byte tx hash)
+        case 3:
+        case 4:
+            stellar_hashupdate_bytes(msg->memo_hash.bytes, msg->memo_hash.size);
+            break;
+        default:
+            break;
+    }
+
+    // Hash: number of operations
+    stellar_hashupdate_uint32(msg->num_operations);
 
     // Determine what type of network this transaction is for
     if (strncmp("Public Global Stellar Network ; September 2015", msg->network_passphrase, 1024) == 0) {
@@ -147,19 +141,6 @@ void stellar_signingInit(StellarSignTx *msg)
     else {
         stellar_activeTx.network_type = 3;
     }
-
-    // Start building what will be signed:
-    // sha256 of:
-    //  sha256(network passphrase)
-    //  4-byte unsigned big-endian int type constant (2 for tx)
-    //  remaining bytes are operations added in subsequent messages
-    sha256_Update(&(stellar_activeTx.sha256_ctx), network_hash, sizeof(network_hash));
-
-    sha256_Update(&(stellar_activeTx.sha256_ctx), tx_type_bytes, sizeof(tx_type_bytes));
-
-    // Add the bytes of XDR that we've processed so far
-    // stellar_activeTx.xdr_offset tracks how large the header is
-    sha256_Update(&(stellar_activeTx.sha256_ctx), msg->header_xdr.bytes, stellar_activeTx.xdr_offset);
 }
 
 /*
@@ -167,22 +148,16 @@ void stellar_signingInit(StellarSignTx *msg)
  */
 void stellar_addOperation(StellarTxOpAck *msg)
 {
-    uint32_t offset = 0;
-    uint32_t op_type;
-
     if (!stellar_signing) {
         fsm_sendFailure(FailureType_Failure_UnexpectedMessage, _("Not in Stellar signing mode"));
         layoutHome();
         return;
     }
 
-    // Source account is optional (XDR booleans are 4 bytes)
+    // Source account is optional
     // Prompt the user for additional verification if one is present
-    uint8_t has_source_account = stellar_xdr_read_bool(msg->xdr.bytes + offset, &offset);
-    if (has_source_account) {
-        uint8_t op_src_account[32];
-        stellar_xdr_read_address(op_src_account, msg->xdr.bytes + offset, &offset);
-        const char **str_addr_rows = stellar_lineBreakAddress(op_src_account);
+    if (msg->source_account.size > 0) {
+        const char **str_addr_rows = stellar_lineBreakAddress(msg->source_account.bytes);
 
         stellar_layoutTransactionDialog(
             _("Op src account OK?"),
@@ -195,70 +170,116 @@ void stellar_addOperation(StellarTxOpAck *msg)
             stellar_signingAbort();
             return;
         }
+
+        // Hash: source account
+        stellar_hashupdate_address(msg->source_account.bytes);
+    }
+    else {
+        stellar_hashupdate_bool(false);
     }
 
-    // Operation type (4 byte unsigned int)
-    op_type = stellar_xdr_read_uint32(msg->xdr.bytes, &offset);
+    // Hash: operation type
+    stellar_hashupdate_uint32(msg->type);
 
-    // PAYMENT
-    if (op_type == 1) {
-        stellar_confirmPaymentOp(msg->xdr.bytes, &offset);
+    // Create Account
+    if (msg->type == 0) {
+        stellar_confirmCreateAccountOp(msg);
     }
-
-    // Update the hash to be signed with data in this operation
-    sha256_Update(&(stellar_activeTx.sha256_ctx), msg->xdr.bytes, offset);
+    // Payment
+    if (msg->type == 1) {
+        stellar_confirmPaymentOp(msg);
+    }
 
     // If the last operation was confirmed, update the hash with 4 null bytes.
     // These are for the currently reserved union at the end of the transaction envelope
     if (stellar_allOperationsConfirmed()) {
-        uint8_t empty_bytes[4] = { 0x00, 0x00, 0x00, 0x00 };
-        sha256_Update(&(stellar_activeTx.sha256_ctx), empty_bytes, sizeof(empty_bytes));
+        stellar_hashupdate_uint32(0);
     }
 }
 
-void stellar_confirmPaymentOp(uint8_t *bytestream, uint32_t *offset)
+void stellar_confirmCreateAccountOp(StellarTxOpAck *msg)
 {
-    uint8_t pubaddr_bytes[32];
-    stellar_xdr_read_address(pubaddr_bytes, bytestream, offset);
-    const char **str_addr_rows = stellar_lineBreakAddress(pubaddr_bytes);
+    const char **str_addr_rows = stellar_lineBreakAddress(msg->destination_account.bytes);
+
+    // Hash: address
+    stellar_hashupdate_address(msg->destination_account.bytes);
+    // Hash: starting amount
+    stellar_hashupdate_uint64(msg->amount);
+
+    // Amount being funded
+    char str_amount_line[32];
+    char str_amount[32];
+    stellar_format_stroops(msg->amount, str_amount, sizeof(str_amount));
+
+    strlcpy(str_amount_line, _("With "), sizeof(str_amount_line));
+    strlcat(str_amount_line, str_amount, sizeof(str_amount_line));
+    strlcat(str_amount_line, _(" XLM"), sizeof(str_amount_line));
+
+    stellar_layoutTransactionDialog(
+        _("Create account: "),
+        str_addr_rows[0],
+        str_addr_rows[1],
+        str_addr_rows[2],
+        str_amount_line
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        stellar_signingAbort();
+        return;
+    }
+
+    // At this point, the operation is confirmed
+    stellar_activeTx.confirmed_operations++;
+}
+
+void stellar_confirmPaymentOp(StellarTxOpAck *msg)
+{
+    const char **str_addr_rows = stellar_lineBreakAddress(msg->destination_account.bytes);
 
     // To: G...
     char str_to[32];
     strlcpy(str_to, _("To: "), sizeof(str_to));
     strlcat(str_to, str_addr_rows[0], sizeof(str_to));
 
+    // Hash: destination
+    stellar_hashupdate_address(msg->destination_account.bytes);
+
     // Asset
     char str_asset_row[32];
-    char str_asset_name[12 + 1];
+    char str_asset_code[12 + 1];
     // Full asset issuer string
     char str_asset_issuer[56+1];
     // truncated asset issuer, G1234
     char str_asset_issuer_trunc[5 + 1];
-    uint8_t issuer_bytes[32];
 
-    uint32_t asset_type = stellar_xdr_read_uint32(bytestream, offset);
     // Native asset
-    if (asset_type == 0) {
+    if (msg->asset.type == 0) {
         strlcpy(str_asset_row, _("XLM (native asset)"), sizeof(str_asset_row));
+
+        // Hash: asset type
+        stellar_hashupdate_uint32(msg->asset.type);
     }
     // 4-character custom
-    if (asset_type == 1) {
-        memcpy(str_asset_name, bytestream + *offset, 4);
-        *offset += 4;
+    if (msg->asset.type == 1) {
+        memcpy(str_asset_code, msg->asset.code, 4);
+        strlcpy(str_asset_row, str_asset_code, sizeof(str_asset_row));
 
-        strlcpy(str_asset_row, str_asset_name, sizeof(str_asset_row));
+        // Hash: asset code
+        stellar_hashupdate_bytes((uint8_t *)(msg->asset.code), 4);
     }
-    if (asset_type == 2) {
-        memcpy(str_asset_name, bytestream + *offset, 12);
-        *offset += 12;
+    if (msg->asset.type == 2) {
+        memcpy(str_asset_code, msg->asset.code, 12);
+        strlcpy(str_asset_row, str_asset_code, sizeof(str_asset_row));
 
-        strlcpy(str_asset_row, str_asset_name, sizeof(str_asset_row));
+        // Hash: asset code
+        stellar_hashupdate_bytes((uint8_t *)(msg->asset.code), 12);
     }
     // Issuer is read the same way for both types of custom assets
-    if (asset_type == 1 || asset_type == 2) {
-        stellar_xdr_read_address(issuer_bytes, bytestream, offset);
-        stellar_publicAddressAsStr(issuer_bytes, str_asset_issuer, sizeof(str_asset_issuer));
+    if (msg->asset.type == 1 || msg->asset.type == 2) {
+        stellar_publicAddressAsStr(msg->asset.issuer.bytes, str_asset_issuer, sizeof(str_asset_issuer));
         memcpy(str_asset_issuer_trunc, str_asset_issuer, 5);
+
+        // Hash: asset issuer
+        stellar_hashupdate_bytes(msg->asset.issuer.bytes, msg->asset.issuer.size);
 
         strlcat(str_asset_row, _(" ("), sizeof(str_asset_row));
         strlcat(str_asset_row, str_asset_issuer_trunc, sizeof(str_asset_row));
@@ -267,7 +288,11 @@ void stellar_confirmPaymentOp(uint8_t *bytestream, uint32_t *offset)
 
     char str_pay_amount[32];
     char str_amount[32];
-    stellar_format_stroops(stellar_xdr_read_uint64(bytestream, offset), str_amount, sizeof(str_amount));
+    stellar_format_stroops(msg->amount, str_amount, sizeof(str_amount));
+
+    // Hash: amount
+    // todo: amount can be signed?
+    stellar_hashupdate_uint64(msg->amount);
 
     strlcpy(str_pay_amount, _("Pay "), sizeof(str_pay_amount));
     strlcat(str_pay_amount, str_amount, sizeof(str_pay_amount));
@@ -293,93 +318,6 @@ void stellar_signingAbort()
     stellar_signing = false;
     fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
     layoutHome();
-}
-
-/*
- * returns the uint32_t at offset and increments offset by 4
- */
-uint32_t stellar_xdr_read_uint32(uint8_t *bytestream, uint32_t *offset)
-{
-    uint32_t ret;
-    memcpy(&ret, bytestream + *offset, 4);
-#if BYTE_ORDER == LITTLE_ENDIAN
-    REVERSE32(ret, ret);
-#endif
-
-    *offset += 4;
-
-    return ret;
-}
-
-/*
- * returns the uint64_t at offset and increments offset by 8
- */
-uint64_t stellar_xdr_read_uint64(uint8_t *bytestream, uint32_t *offset)
-{
-    uint64_t ret;
-    memcpy(&ret, bytestream + *offset, 8);
-#if BYTE_ORDER == LITTLE_ENDIAN
-    REVERSE64(ret, ret);
-#endif
-
-    *offset += 8;
-
-    return ret;
-}
-
-/*
- * returns a uint8_t representing a boolean value at offset and increments offset by 4
- */
-uint8_t stellar_xdr_read_bool(uint8_t *bytestream, uint32_t *offset)
-{
-    uint8_t ret;
-    uint32_t tmp_uint32;
-    memcpy(&tmp_uint32, bytestream + *offset, 4);
-#if BYTE_ORDER == LITTLE_ENDIAN
-    REVERSE32(tmp_uint32, tmp_uint32);
-#endif
-    *offset += 4;
-
-    // Booleans are 4 bytes in XDR, but this returns true/false
-    ret = (tmp_uint32) ? 1 : 0;
-
-    return ret;
-}
-
-/*
- * Returns the 32 bytes that make up an address
- * Note that an address is actually 36 bytes where the first 4 indicate the key
- * type (which is always ED25519)
- */
-void stellar_xdr_read_address(uint8_t *out_addr_bytes, uint8_t *bytestream, uint32_t *offset)
-{
-    // Read key type (always 0, so ignored)
-    uint32_t key_type = stellar_xdr_read_uint32(bytestream, offset);
-    if (key_type != 0) {
-        fsm_sendFailure(FailureType_Failure_UnexpectedMessage, _("Unsupported address type"));
-        layoutHome();
-        return;
-    }
-
-    // Read next 32 bytes
-    memcpy(out_addr_bytes, bytestream + *offset, 32);
-    *offset += 32;
-}
-
-/*
- * Copies the string in bytestream to out_str
- * XDR strings are:
- *  length (4 bytes)
- *  string (length bytes)
- */
-void stellar_xdr_read_string(uint8_t *out_str, uint8_t *bytestream, uint32_t *offset)
-{
-    // First 4 bytes are string length
-    uint32_t strlen = stellar_xdr_read_uint32(bytestream, offset);
-
-    // Read next strlen bytes
-    memcpy(out_str, bytestream + *offset, strlen);
-    *offset += strlen;
 }
 
 uint32_t stellar_getXdrOffset()
@@ -439,9 +377,7 @@ void stellar_format_uint32(uint64_t number, char *out, size_t outlen)
  */
 void stellar_format_uint64(uint64_t number, char *out, size_t outlen)
 {
-    bignum256 bn_number;
-    bn_read_uint64(number, &bn_number);
-    bn_format(&bn_number, NULL, NULL, 0, 0, false, out, outlen);
+    bn_format_uint64(number, NULL, NULL, 0, 0, false, out, outlen);
 }
 
 /*
@@ -557,10 +493,81 @@ HDNode *stellar_deriveNode(uint32_t index)
     return &node;
 }
 
+void stellar_hashupdate_uint32(uint32_t value)
+{
+    // Ensure uint32 is big endian
+#if BYTE_ORDER == LITTLE_ENDIAN
+    REVERSE32(value, value);
+#endif
+
+    // Byte values must be hashed as big endian
+    uint8_t data[4];
+    data[3] = (value >> 24) & 0xFF;
+    data[2] = (value >> 16) & 0xFF;
+    data[1] = (value >> 8)  & 0xFF;
+    data[0] = value         & 0xFF;
+
+    stellar_hashupdate_bytes(data, sizeof(data));
+}
+
+void stellar_hashupdate_uint64(uint64_t value)
+{
+    // Ensure uint64 is big endian
+#if BYTE_ORDER == LITTLE_ENDIAN
+    REVERSE64(value, value);
+#endif
+
+    // Byte values must be hashed as big endian
+    uint8_t data[8];
+    data[7] = (value >> 56) & 0xFF;
+    data[6] = (value >> 48) & 0xFF;
+    data[5] = (value >> 40) & 0xFF;
+    data[4] = (value >> 32) & 0xFF;
+    data[3] = (value >> 24) & 0xFF;
+    data[2] = (value >> 16) & 0xFF;
+    data[1] = (value >> 8)  & 0xFF;
+    data[0] = value         & 0xFF;
+
+    stellar_hashupdate_bytes(data, sizeof(data));
+}
+
+void stellar_hashupdate_bool(bool value)
+{
+    if (value) {
+        stellar_hashupdate_uint32(1);
+    }
+    else {
+        stellar_hashupdate_uint32(0);
+    }
+}
+
+void stellar_hashupdate_string(uint8_t *data, size_t len)
+{
+    // Hash the length of the string
+    stellar_hashupdate_uint32((uint32_t)len);
+
+    // Hash the raw bytes of the string
+    stellar_hashupdate_bytes(data, len);
+}
+
+void stellar_hashupdate_address(uint8_t *address_bytes)
+{
+    // First 4 bytes of an address are the type. There's only one type (0)
+    stellar_hashupdate_uint32(0);
+
+    // Remaining part of the address is 32 bytes
+    stellar_hashupdate_bytes(address_bytes, 32);
+}
+
+void stellar_hashupdate_bytes(uint8_t *data, size_t len)
+{
+    sha256_Update(&(stellar_activeTx.sha256_ctx), data, len);
+}
+
 /*
  * Reads stellar_activeTx and displays a summary of the overall transaction
  */
-void stellar_layoutTransactionSummary()
+void stellar_layoutTransactionSummary(StellarSignTx *msg)
 {
     char str_lines[5][32];
     memset(str_lines, 0, sizeof(str_lines));
@@ -572,21 +579,18 @@ void stellar_layoutTransactionSummary()
     uint8_t needs_memo_hash_confirm = 0;
 
     // Format the fee
-    bignum256 bn_fee;
-    bn_read_uint32(stellar_activeTx.fee, &bn_fee);
-    bn_format(&bn_fee, NULL, _(" XLM"), 7, 0, false, str_fee, sizeof(str_fee));
+    stellar_format_stroops(msg->fee, str_fee, sizeof(str_fee));
 
     strlcpy(str_lines[0], _("Fee: "), sizeof(str_lines[0]));
     strlcat(str_lines[0], str_fee, sizeof(str_lines[0]));
+    strlcat(str_lines[0], _(" XLM"), sizeof(str_lines[0]));
 
     // add in numOperations
-    bignum256 bn_num_ops;
-    bn_read_uint32(stellar_activeTx.num_operations, &bn_num_ops);
-    bn_format(&bn_num_ops, NULL, NULL, 0, 0, false, str_num_ops, sizeof(str_num_ops));
+    stellar_format_uint32(msg->num_operations, str_num_ops, sizeof(str_num_ops));
 
     strlcat(str_lines[0], _(" ("), sizeof(str_lines[0]));
     strlcat(str_lines[0], str_num_ops, sizeof(str_lines[0]));
-    if (stellar_activeTx.num_operations == 1) {
+    if (msg->num_operations == 1) {
         strlcat(str_lines[0], _(" op)"), sizeof(str_lines[0]));
     } else {
         strlcat(str_lines[0], _(" ops)"), sizeof(str_lines[0]));
@@ -615,21 +619,18 @@ void stellar_layoutTransactionSummary()
         strlcpy(str_lines[0], _("[No Memo]"), sizeof(str_lines[0]));
     }
     // Memo: text
-    if (stellar_activeTx.memo_type == 1) {
+    if (msg->memo_type == 1) {
         strlcpy(str_lines[0], _("Memo (TEXT)"), sizeof(str_lines[0]));
 
         // Split 28-character string into two lines of 19 / 9
-        strlcpy(str_lines[1], (const char*)stellar_activeTx.memo, 19 + 1);
-        strlcpy(str_lines[2], (const char*)(stellar_activeTx.memo + 19), 9 + 1);
+        // todo: word wrap method?
+        strlcpy(str_lines[1], (const char*)msg->memo_text, 19 + 1);
+        strlcpy(str_lines[2], (const char*)(msg->memo_text + 19), 9 + 1);
     }
     // Memo: ID
     if (stellar_activeTx.memo_type == 2) {
         strlcpy(str_lines[0], _("Memo (ID)"), sizeof(str_lines[0]));
-
-        // Memo is a uint64
-        uint32_t id_ptr = 0;
-        uint64_t id_memo = stellar_xdr_read_uint64(stellar_activeTx.memo, &id_ptr);
-        stellar_format_uint64(id_memo, str_lines[1], sizeof(str_lines[1]));
+        stellar_format_uint64(msg->memo_id, str_lines[1], sizeof(str_lines[1]));
     }
     // Memo: hash
     if (stellar_activeTx.memo_type == 3) {
@@ -643,10 +644,10 @@ void stellar_layoutTransactionSummary()
     }
 
     if (needs_memo_hash_confirm) {
-        data2hex(stellar_activeTx.memo +  0, 8, str_lines[1]);
-        data2hex(stellar_activeTx.memo +  8, 8, str_lines[2]);
-        data2hex(stellar_activeTx.memo + 16, 8, str_lines[3]);
-        data2hex(stellar_activeTx.memo + 24, 8, str_lines[4]);
+        data2hex(msg->memo_hash.bytes +  0, 8, str_lines[1]);
+        data2hex(msg->memo_hash.bytes +  8, 8, str_lines[2]);
+        data2hex(msg->memo_hash.bytes + 16, 8, str_lines[3]);
+        data2hex(msg->memo_hash.bytes + 24, 8, str_lines[4]);
     }
 
     stellar_layoutTransactionDialog(
@@ -661,82 +662,42 @@ void stellar_layoutTransactionSummary()
         return;
     }
 
-    // Additional confirmation for some memo types
-    /*
-    if (needs_memo_hash_confirm) {
-        char hash_str[4][17];
-
-        data2hex(stellar_activeTx.memo +  0, 8, hash_str[0]);
-        data2hex(stellar_activeTx.memo +  8, 8, hash_str[1]);
-        data2hex(stellar_activeTx.memo + 16, 8, hash_str[2]);
-        data2hex(stellar_activeTx.memo + 24, 8, hash_str[3]);
-
-        stellar_layoutTransactionDialog(
-            _("Confirm Memo Hash"),
-            hash_str[0],
-            hash_str[1],
-            hash_str[2],
-            hash_str[3]
-        );
-        if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-            stellar_signingAbort();
-            return;
-        }
-    }
-    */
-
     // Verify timebounds, if present
     memset(str_lines, 0, sizeof(str_lines));
 
     // Timebound: lower
-    if (stellar_activeTx.timebound_min || stellar_activeTx.timebound_max) {
+    if (msg->timebounds_start || msg->timebounds_end) {
         time_t timebound;
         char str_timebound[32];
         const struct tm *tm;
 
-        // stellar timestamp is 8 bytes, time_t is only 32 so check for overflow
-        if (stellar_activeTx.timebound_min > INT32_MAX) {
-            strlcpy(str_lines[1], _("ERR: value too large"), sizeof(str_lines[1]));
-        }
-        else {
-            timebound = (time_t)stellar_activeTx.timebound_min;
-
+        timebound = (time_t)msg->timebounds_start;
+        strlcpy(str_lines[0], _("Valid from:"), sizeof(str_lines[0]));
+        if (timebound) {
             tm = gmtime(&timebound);
             strftime(str_timebound, sizeof(str_timebound), "%F %T (UTC)", tm);
-
-            strlcpy(str_lines[0], _("Valid from:"), sizeof(str_lines[0]));
-            if (stellar_activeTx.timebound_min) {
-                strlcpy(str_lines[1], str_timebound, sizeof(str_lines[1]));
-            }
-            else {
-                strlcpy(str_lines[1], _("[no restriction]"), sizeof(str_lines[1]));
-            }
+            strlcpy(str_lines[1], str_timebound, sizeof(str_lines[1]));
+        }
+        else {
+            strlcpy(str_lines[1], _("[no restriction]"), sizeof(str_lines[1]));
         }
 
         // Reset for timebound_max
         memset(str_timebound, 0, sizeof(str_timebound));
 
-        // stellar timestamp is 8 bytes, time_t is only 32 so check for overflow
-        if (stellar_activeTx.timebound_max > INT32_MAX) {
-            strlcpy(str_lines[3], _("ERR: value too large"), sizeof(str_lines[3]));
-        }
-        else {
-            timebound = (time_t)stellar_activeTx.timebound_max;
-
+        timebound = (time_t)msg->timebounds_end;
+        strlcpy(str_lines[0], _("Valid from:"), sizeof(str_lines[0]));
+        if (timebound) {
             tm = gmtime(&timebound);
             strftime(str_timebound, sizeof(str_timebound), "%F %T (UTC)", tm);
-
-            strlcpy(str_lines[2], _("Valid until:"), sizeof(str_lines[2]));
-            if (stellar_activeTx.timebound_min) {
-                strlcpy(str_lines[3], str_timebound, sizeof(str_lines[3]));
-            }
-            else {
-                strlcpy(str_lines[3], _("[no restriction]"), sizeof(str_lines[3]));
-            }
+            strlcpy(str_lines[1], str_timebound, sizeof(str_lines[1]));
+        }
+        else {
+            strlcpy(str_lines[1], _("[no restriction]"), sizeof(str_lines[1]));
         }
     }
 
-    if (stellar_activeTx.timebound_min || stellar_activeTx.timebound_max) {
+    if (msg->timebounds_start || msg->timebounds_end) {
         stellar_layoutTransactionDialog(
             _("Confirm Time Bounds"),
             str_lines[0],

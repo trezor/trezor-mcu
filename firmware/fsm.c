@@ -1646,11 +1646,10 @@ void fsm_msgStellarSignTx(StellarSignTx *msg)
     stellar_signingInit(msg);
 
     // Confirm transaction basics
-    stellar_layoutTransactionSummary();
+    stellar_layoutTransactionSummary(msg);
 
     // Respond with a request for the first operation
     RESP_INIT(StellarTxOpRequest);
-    resp->offset = stellar_getXdrOffset();
 
     msg_write(MessageType_MessageType_StellarTxOpRequest, resp);
 }
@@ -1668,12 +1667,14 @@ void fsm_msgStellarTxOpAck(StellarTxOpAck *msg)
         // Add the public key for verification that the right account was used for signing
         memcpy(resp->public_key.bytes, &(activeTx->account_id), 32);
         resp->public_key.size = 32;
+        resp->has_public_key = true;
 
         // Add the signature (note that this does not include the 4-byte hint)
         uint8_t signature[64];
         stellar_getSignatureForActiveTx(signature);
         memcpy(resp->signature.bytes, signature, sizeof(signature));
         resp->signature.size = sizeof(signature);
+        resp->has_signature = true;
 
         msg_write(MessageType_MessageType_StellarSignedTx, resp);
         layoutHome();
@@ -1681,7 +1682,6 @@ void fsm_msgStellarTxOpAck(StellarTxOpAck *msg)
     // Request the next operation to sign
     else {
         RESP_INIT(StellarTxOpRequest);
-        resp->offset = stellar_getXdrOffset();
 
         msg_write(MessageType_MessageType_StellarTxOpRequest, resp);
     }
