@@ -42,6 +42,7 @@
 #define ENDPOINT_ADDRESS_OUT        (0x01)
 
 static bool brand_new_firmware;
+static bool old_was_unsigned;
 
 static const struct usb_device_descriptor dev_descr = {
 	.bLength = USB_DT_DEVICE_SIZE,
@@ -437,6 +438,8 @@ static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 				} while (!button.YesUp && !button.NoUp);
 			}
 			if (brand_new_firmware || button.YesUp) {
+				// check whether current firmware is signed
+				old_was_unsigned = !signatures_ok(NULL);
 				// backup metadata
 				backup_metadata(meta_backup);
 				flash_wait_for_last_operation();
@@ -587,8 +590,11 @@ static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 
 		layoutProgress("INSTALLING ... Please wait", 1000);
 		uint8_t flags = *((uint8_t *)FLASH_META_FLAGS);
-		// wipe storage if signatures are not ok or the firmware flag isn't set.
-		if ((flags & 0x01) == 0 || !signatures_ok(NULL)) {
+		// wipe storage if:
+		// 1) old firmware was unsigned
+		// 2) firmware restore flag isn't set
+		// 3) signatures are not ok
+		if (old_was_unsigned || (flags & 0x01) == 0 || !signatures_ok(NULL)) {
 			memset(meta_backup, 0, sizeof(meta_backup));
 		}
 		// copy new firmware header
