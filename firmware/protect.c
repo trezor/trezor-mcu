@@ -29,6 +29,7 @@
 #include "util.h"
 #include "debug.h"
 #include "gettext.h"
+#include "sha2.h"
 
 #define MAX_WRONG_PINS 15
 
@@ -236,6 +237,9 @@ bool protectChangePin(void)
 	return result;
 }
 
+
+static uint8_t passphraseHash[32];
+
 bool protectPassphrase(void)
 {
 	if (!storage_hasPassphraseProtection() || session_isPassphraseCached()) {
@@ -258,10 +262,18 @@ bool protectPassphrase(void)
 
 			size_t length = strlen(ppa->passphrase);
 			if (length > 0) {
-				layoutPassphrase(ppa->passphrase, length);
-				if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, true)) {
-					result = false;
-					break;
+				uint8_t hash[32];
+				sha256_Raw((const uint8_t *)(ppa->passphrase), length, hash);
+
+				bool sameAsLast = memcmp(hash, passphraseHash, 32) == 0;
+
+				if (!sameAsLast) {
+					layoutPassphrase(ppa->passphrase, length);
+					if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, true)) {
+						result = false;
+						break;
+					}
+					memcpy(passphraseHash, hash, 32);
 				}
 			}
 
