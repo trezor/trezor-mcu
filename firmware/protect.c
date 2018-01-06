@@ -35,6 +35,8 @@
 
 bool protectAbortedByInitialize = false;
 
+static uint8_t CONFIDENTIAL passphraseHash[SHA256_DIGEST_LENGTH];
+
 bool protectButton(ButtonRequestType type, bool confirm_only)
 {
 	ButtonRequest resp;
@@ -237,9 +239,6 @@ bool protectChangePin(void)
 	return result;
 }
 
-
-static uint8_t passphraseHash[32];
-
 bool protectPassphrase(void)
 {
 	if (!storage_hasPassphraseProtection() || session_isPassphraseCached()) {
@@ -262,10 +261,10 @@ bool protectPassphrase(void)
 
 			size_t length = strlen(ppa->passphrase);
 			if (length > 0) {
-				uint8_t hash[32];
+				uint8_t hash[SHA256_DIGEST_LENGTH];
 				sha256_Raw((const uint8_t *)(ppa->passphrase), length, hash);
 
-				bool sameAsLast = memcmp(hash, passphraseHash, 32) == 0;
+				bool sameAsLast = memcmp(hash, passphraseHash, SHA256_DIGEST_LENGTH) == 0;
 
 				if (!sameAsLast) {
 					layoutPassphrase(ppa->passphrase, length);
