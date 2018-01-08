@@ -83,7 +83,9 @@ void fsm_msgCosiSign(CosiSign *msg);
 // Stellar
 void fsm_msgStellarGetPublicKey(StellarGetPublicKey *msg);
 void fsm_msgStellarSignTx(StellarSignTx *msg);
-void fsm_msgStellarTxOpAck(StellarTxOpAck *msg);
+void fsm_msgStellarPaymentOp(StellarPaymentOp *msg);
+void fsm_msgStellarCreateAccountOp(StellarCreateAccountOp *msg);
+void fsm_msgStellarPathPaymentOp(StellarPathPaymentOp *msg);
 
 // debug message functions
 #if DEBUG_LINK

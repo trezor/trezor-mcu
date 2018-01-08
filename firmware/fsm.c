@@ -1654,28 +1654,54 @@ void fsm_msgStellarSignTx(StellarSignTx *msg)
     msg_write(MessageType_MessageType_StellarTxOpRequest, resp);
 }
 
-void fsm_msgStellarTxOpAck(StellarTxOpAck *msg)
+void fsm_msgStellarCreateAccountOp(StellarCreateAccountOp *msg)
+{
+    stellar_confirmCreateAccountOp(msg);
+
+    if (stellar_allOperationsConfirmed()) {
+        RESP_INIT(StellarSignedTx);
+
+        stellar_fillSignedTx(resp);
+        msg_write(MessageType_MessageType_StellarSignedTx, resp);
+        layoutHome();
+    }
+    // Request the next operation to sign
+    else {
+        RESP_INIT(StellarTxOpRequest);
+
+        msg_write(MessageType_MessageType_StellarTxOpRequest, resp);
+    }
+}
+
+void fsm_msgStellarPaymentOp(StellarPaymentOp *msg)
 {
     // This will display additional dialogs to the user
-    stellar_addOperation(msg);
+    stellar_confirmPaymentOp(msg);
 
     // Last operation was confirmed, send a StellarSignedTx
     if (stellar_allOperationsConfirmed()) {
-        StellarTransaction *activeTx = stellar_getActiveTx();
         RESP_INIT(StellarSignedTx);
 
-        // Add the public key for verification that the right account was used for signing
-        memcpy(resp->public_key.bytes, &(activeTx->account_id), 32);
-        resp->public_key.size = 32;
-        resp->has_public_key = true;
+        stellar_fillSignedTx(resp);
+        msg_write(MessageType_MessageType_StellarSignedTx, resp);
+        layoutHome();
+    }
+    // Request the next operation to sign
+    else {
+        RESP_INIT(StellarTxOpRequest);
 
-        // Add the signature (note that this does not include the 4-byte hint)
-        uint8_t signature[64];
-        stellar_getSignatureForActiveTx(signature);
-        memcpy(resp->signature.bytes, signature, sizeof(signature));
-        resp->signature.size = sizeof(signature);
-        resp->has_signature = true;
+        msg_write(MessageType_MessageType_StellarTxOpRequest, resp);
+    }
+}
 
+void fsm_msgStellarPathPaymentOp(StellarPathPaymentOp *msg)
+{
+    stellar_confirmPathPaymentOp(msg);
+
+    if (stellar_allOperationsConfirmed()) {
+        RESP_INIT(StellarSignedTx);
+
+        stellar_fillSignedTx(resp);
         msg_write(MessageType_MessageType_StellarSignedTx, resp);
         layoutHome();
     }

@@ -186,8 +186,36 @@ StellarSignTx.memo_id               max_size:8
 StellarSignTx.memo_text             max_size:28
 StellarSignTx.memo_hash             max_size:32
 
-StellarTxOpAck.source_account       max_size:32
-StellarTxOpAck.destination_account  max_size:32
+StellarPaymentOp.source_account       max_size:32
+StellarPaymentOp.destination_account  max_size:32
+
+StellarCreateAccountOp.source_account max_size:32
+StellarCreateAccountOp.new_account    max_size:32
+
+StellarPathPaymentOp.source_account      max_size:32
+StellarPathPaymentOp.destination_account max_size:32
+StellarPathPaymentOp.paths               max_count:5
+
+StellarManageOfferOp.source_account max_size:32
+
+StellarCreatePassiveOfferOp.source_account max_size:32
+
+StellarSetOptionsOp.source_account                max_size:32
+StellarSetOptionsOp.inflation_destination_account max_size:32
+StellarSetOptionsOp.home_domain                   max_size:32
+StellarSetOptionsOp.signer_key                    max_size:32
+
+StellarChangeTrustOp.source_account max_size:32
+
+StellarAllowTrustOp.source_account  max_size:32
+StellarAllowTrustOp.trusted_account max_size:32
+
+StellarAccountMergeOp.source_account      max_size:32
+StellarAccountMergeOp.destination_account max_size:32
+
+StellarManageDataOp.source_account      max_size:32
+StellarManageDataOp.key                 max_size:64
+StellarManageDataOp.value               max_size:64
 
 StellarSignedTx.public_key          max_size:32
 StellarSignedTx.signature           max_size:64 # ed25519 signatures are 64 bytes, this does not include the hint

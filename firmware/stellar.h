@@ -61,9 +61,9 @@ typedef struct {
 // Signing process
 void stellar_signingInit(StellarSignTx *tx);
 void stellar_signingAbort(void);
-void stellar_addOperation(StellarTxOpAck *msg);
-void stellar_confirmCreateAccountOp(StellarTxOpAck *msg);
-void stellar_confirmPaymentOp(StellarTxOpAck *msg);
+void stellar_confirmCreateAccountOp(StellarCreateAccountOp *msg);
+void stellar_confirmPaymentOp(StellarPaymentOp *msg);
+void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg);
 
 // Layout
 void stellar_layoutStellarGetPublicKey(uint32_t index);
@@ -82,15 +82,18 @@ void stellar_hashupdate_uint64(uint64_t value);
 void stellar_hashupdate_bool(bool value);
 void stellar_hashupdate_string(uint8_t *data, size_t len);
 void stellar_hashupdate_address(uint8_t *address_bytes);
+void stellar_hashupdate_asset(StellarAssetType *asset);
 void stellar_hashupdate_bytes(uint8_t *data, size_t len);
 
 StellarTransaction *stellar_getActiveTx(void);
+void stellar_fillSignedTx(StellarSignedTx *resp);
 uint32_t stellar_getXdrOffset(void);
 uint8_t stellar_allOperationsConfirmed(void);
 void stellar_getSignatureForActiveTx(uint8_t *out_signature);
 
 void stellar_format_uint64(uint64_t number, char *out, size_t outlen);
 void stellar_format_stroops(uint64_t number, char *out, size_t outlen);
+void stellar_format_asset(StellarAssetType *asset, char *str_formatted, size_t len);
 
 uint16_t stellar_crc16(uint8_t *bytes, uint32_t length);
 

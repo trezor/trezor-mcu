@@ -143,73 +143,43 @@ void stellar_signingInit(StellarSignTx *msg)
     }
 }
 
-/*
- * Adds an operation to the current transaction by parsing the StellarTxOpAck message
- */
-void stellar_addOperation(StellarTxOpAck *msg)
+void stellar_confirmSourceAccount(bool has_source_account, uint8_t *bytes)
 {
-    if (!stellar_signing) {
-        fsm_sendFailure(FailureType_Failure_UnexpectedMessage, _("Not in Stellar signing mode"));
-        layoutHome();
+    if (!has_source_account) {
+        stellar_hashupdate_bool(false);
         return;
     }
 
-    // Source account is optional
-    // Prompt the user for additional verification if one is present
-    if (msg->source_account.size > 0) {
-        const char **str_addr_rows = stellar_lineBreakAddress(msg->source_account.bytes);
+    const char **str_addr_rows = stellar_lineBreakAddress(bytes);
 
-        stellar_layoutTransactionDialog(
-            _("Op src account OK?"),
-            NULL,
-            str_addr_rows[0],
-            str_addr_rows[1],
-            str_addr_rows[2]
-        );
-        if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-            stellar_signingAbort();
-            return;
-        }
-
-        // Hash: source account
-        stellar_hashupdate_address(msg->source_account.bytes);
-    }
-    else {
-        stellar_hashupdate_bool(false);
+    stellar_layoutTransactionDialog(
+        _("Op src account OK?"),
+        NULL,
+        str_addr_rows[0],
+        str_addr_rows[1],
+        str_addr_rows[2]
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        stellar_signingAbort();
+        return;
     }
 
-    // Hash: operation type
-    stellar_hashupdate_uint32(msg->type);
-
-    // Create Account
-    if (msg->type == 0) {
-        stellar_confirmCreateAccountOp(msg);
-    }
-    // Payment
-    if (msg->type == 1) {
-        stellar_confirmPaymentOp(msg);
-    }
-
-    // If the last operation was confirmed, update the hash with 4 null bytes.
-    // These are for the currently reserved union at the end of the transaction envelope
-    if (stellar_allOperationsConfirmed()) {
-        stellar_hashupdate_uint32(0);
-    }
+    // Hash: source account
+    stellar_hashupdate_address(bytes);
 }
 
-void stellar_confirmCreateAccountOp(StellarTxOpAck *msg)
+void stellar_confirmCreateAccountOp(StellarCreateAccountOp *msg)
 {
-    const char **str_addr_rows = stellar_lineBreakAddress(msg->destination_account.bytes);
+    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    // Hash: operation type
+    stellar_hashupdate_uint32(0);
 
-    // Hash: address
-    stellar_hashupdate_address(msg->destination_account.bytes);
-    // Hash: starting amount
-    stellar_hashupdate_uint64(msg->amount);
+    const char **str_addr_rows = stellar_lineBreakAddress(msg->new_account.bytes);
 
     // Amount being funded
     char str_amount_line[32];
     char str_amount[32];
-    stellar_format_stroops(msg->amount, str_amount, sizeof(str_amount));
+    stellar_format_stroops(msg->starting_balance, str_amount, sizeof(str_amount));
 
     strlcpy(str_amount_line, _("With "), sizeof(str_amount_line));
     strlcat(str_amount_line, str_amount, sizeof(str_amount_line));
@@ -227,12 +197,20 @@ void stellar_confirmCreateAccountOp(StellarTxOpAck *msg)
         return;
     }
 
-    // At this point, the operation is confirmed
+    // Hash: address
+    stellar_hashupdate_address(msg->new_account.bytes);
+    // Hash: starting amount
+    stellar_hashupdate_uint64(msg->starting_balance);
+
     stellar_activeTx.confirmed_operations++;
 }
 
-void stellar_confirmPaymentOp(StellarTxOpAck *msg)
+void stellar_confirmPaymentOp(StellarPaymentOp *msg)
 {
+    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    // Hash: operation type
+    stellar_hashupdate_uint32(1);
+
     const char **str_addr_rows = stellar_lineBreakAddress(msg->destination_account.bytes);
 
     // To: G...
@@ -240,59 +218,13 @@ void stellar_confirmPaymentOp(StellarTxOpAck *msg)
     strlcpy(str_to, _("To: "), sizeof(str_to));
     strlcat(str_to, str_addr_rows[0], sizeof(str_to));
 
-    // Hash: destination
-    stellar_hashupdate_address(msg->destination_account.bytes);
-
-    // Asset
     char str_asset_row[32];
-    char str_asset_code[12 + 1];
-    // Full asset issuer string
-    char str_asset_issuer[56+1];
-    // truncated asset issuer, G1234
-    char str_asset_issuer_trunc[5 + 1];
-
-    // Native asset
-    if (msg->asset.type == 0) {
-        strlcpy(str_asset_row, _("XLM (native asset)"), sizeof(str_asset_row));
-
-        // Hash: asset type
-        stellar_hashupdate_uint32(msg->asset.type);
-    }
-    // 4-character custom
-    if (msg->asset.type == 1) {
-        memcpy(str_asset_code, msg->asset.code, 4);
-        strlcpy(str_asset_row, str_asset_code, sizeof(str_asset_row));
-
-        // Hash: asset code
-        stellar_hashupdate_bytes((uint8_t *)(msg->asset.code), 4);
-    }
-    if (msg->asset.type == 2) {
-        memcpy(str_asset_code, msg->asset.code, 12);
-        strlcpy(str_asset_row, str_asset_code, sizeof(str_asset_row));
-
-        // Hash: asset code
-        stellar_hashupdate_bytes((uint8_t *)(msg->asset.code), 12);
-    }
-    // Issuer is read the same way for both types of custom assets
-    if (msg->asset.type == 1 || msg->asset.type == 2) {
-        stellar_publicAddressAsStr(msg->asset.issuer.bytes, str_asset_issuer, sizeof(str_asset_issuer));
-        memcpy(str_asset_issuer_trunc, str_asset_issuer, 5);
-
-        // Hash: asset issuer
-        stellar_hashupdate_bytes(msg->asset.issuer.bytes, msg->asset.issuer.size);
-
-        strlcat(str_asset_row, _(" ("), sizeof(str_asset_row));
-        strlcat(str_asset_row, str_asset_issuer_trunc, sizeof(str_asset_row));
-        strlcat(str_asset_row, _(")"), sizeof(str_asset_row));
-    }
+    memset(str_asset_row, 0, sizeof(str_asset_row));
+    stellar_format_asset(&(msg->asset), str_asset_row, sizeof(str_asset_row));
 
     char str_pay_amount[32];
     char str_amount[32];
     stellar_format_stroops(msg->amount, str_amount, sizeof(str_amount));
-
-    // Hash: amount
-    // todo: amount can be signed?
-    stellar_hashupdate_uint64(msg->amount);
 
     strlcpy(str_pay_amount, _("Pay "), sizeof(str_pay_amount));
     strlcat(str_pay_amount, str_amount, sizeof(str_pay_amount));
@@ -309,6 +241,100 @@ void stellar_confirmPaymentOp(StellarTxOpAck *msg)
         return;
     }
 
+    // Hash destination
+    stellar_hashupdate_address(msg->destination_account.bytes);
+    // asset
+    stellar_hashupdate_asset(&(msg->asset));
+    // amount (even though amount is signed it doesn't matter for hashing)
+    stellar_hashupdate_uint64(msg->amount);
+
+    // At this point, the operation is confirmed
+    stellar_activeTx.confirmed_operations++;
+}
+
+void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg)
+{
+    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    // Hash: operation type
+    stellar_hashupdate_uint32(2);
+
+    const char **str_dest_rows = stellar_lineBreakAddress(msg->destination_account.bytes);
+
+    // To: G...
+    char str_to[32];
+    strlcpy(str_to, _("To: "), sizeof(str_to));
+    strlcat(str_to, str_dest_rows[0], sizeof(str_to));
+
+    char str_send_asset[32];
+    char str_dest_asset[32];
+    stellar_format_asset(&(msg->send_asset), str_send_asset, sizeof(str_send_asset));
+    stellar_format_asset(&(msg->destination_asset), str_dest_asset, sizeof(str_dest_asset));
+
+    char str_pay_amount[32];
+    char str_amount[32];
+    stellar_format_stroops(msg->destination_amount, str_amount, sizeof(str_amount));
+
+    strlcpy(str_pay_amount, _("Path Pay "), sizeof(str_pay_amount));
+    strlcat(str_pay_amount, str_amount, sizeof(str_pay_amount));
+
+    // Confirm what the receiver will get
+    /*
+    Path Pay 100
+    JPY (G1234ABCDEF)
+    To: G....
+    ....
+    ....
+    */
+    stellar_layoutTransactionDialog(
+        str_pay_amount,
+        str_dest_asset,
+        str_to,
+        str_dest_rows[1],
+        str_dest_rows[2]
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        stellar_signingAbort();
+        return;
+    }
+
+    // Confirm what the sender is using to pay
+    char str_source_amount[32];
+    char str_source_number[32];
+    stellar_format_stroops(msg->send_max, str_source_number, sizeof(str_source_number));
+
+    strlcpy(str_source_amount, _("Pay Using "), sizeof(str_source_amount));
+    strlcat(str_source_amount, str_source_number, sizeof(str_source_amount));
+
+    stellar_layoutTransactionDialog(
+        str_source_amount,
+        str_send_asset,
+        NULL,
+        _("This is the amount debited"),
+        _("from your account.")
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        stellar_signingAbort();
+        return;
+    }
+    // Note: no confirmation for intermediate steps since they don't impact the user
+
+    // Hash send asset
+    stellar_hashupdate_asset(&(msg->send_asset));
+    // send max (signed vs. unsigned doesn't matter wrt hashing)
+    stellar_hashupdate_uint64(msg->send_max);
+    // destination account
+    stellar_hashupdate_address(msg->destination_account.bytes);
+    // destination asset
+    stellar_hashupdate_asset(&(msg->destination_asset));
+    // destination amount
+    stellar_hashupdate_uint64(msg->destination_amount);
+
+    // paths are stored as an array so hash the number of elements as a uint32
+    stellar_hashupdate_uint32(msg->paths_count);
+    for (uint8_t i=0; i < msg->paths_count; i++) {
+        stellar_hashupdate_asset(&(msg->paths[i]));
+    }
+
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
 }
@@ -318,6 +344,30 @@ void stellar_signingAbort()
     stellar_signing = false;
     fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
     layoutHome();
+}
+
+/**
+ * Populates the fields of resp with the signature of the active transaction
+ */
+void stellar_fillSignedTx(StellarSignedTx *resp)
+{
+    StellarTransaction *activeTx = stellar_getActiveTx();
+
+    // Finalize the transaction by hashing 4 null bytes representing a (currently unused) empty union
+    stellar_hashupdate_uint32(0);
+
+    // Add the public key for verification that the right account was used for signing
+    memcpy(resp->public_key.bytes, &(activeTx->account_id), 32);
+    resp->public_key.size = 32;
+    resp->has_public_key = true;
+
+    // Add the signature (note that this does not include the 4-byte hint since it can be calculated from the public key)
+    uint8_t signature[64];
+    // Note: this calls sha256_Final on the hash context
+    stellar_getSignatureForActiveTx(signature);
+    memcpy(resp->signature.bytes, signature, sizeof(signature));
+    resp->signature.size = sizeof(signature);
+    resp->has_signature = true;
 }
 
 uint32_t stellar_getXdrOffset()
@@ -401,6 +451,56 @@ const char **stellar_lineBreakAddress(uint8_t *addrbytes)
 
     static const char *ret[3] = { rows[0], rows[1], rows[2] };
     return ret;
+}
+
+/*
+ * Returns the asset formatted to fit in a single row
+ *
+ * Examples:
+ *  XLM (Native Asset)
+ *  MOBI (G1234)
+ *  ALPHA12EXAMP (G0987)
+ */
+void stellar_format_asset(StellarAssetType *asset, char *str_formatted, size_t len)
+{
+    char str_asset_code[12 + 1];
+    // Full asset issuer string
+    char str_asset_issuer[56+1];
+    // truncated asset issuer, final length depends on length of asset code
+    char str_asset_issuer_trunc[13 + 1];
+
+    memset(str_asset_code, 0, sizeof(str_asset_code));
+    memset(str_asset_issuer_trunc, 0, sizeof(str_asset_issuer_trunc));
+
+    // Get string representation of address
+    stellar_publicAddressAsStr(asset->issuer.bytes, str_asset_issuer, sizeof(str_asset_issuer));
+
+    // Native asset
+    if (asset->type == 0) {
+        strlcpy(str_formatted, _("XLM (native asset)"), len);
+    }
+    // 4-character custom
+    if (asset->type == 1) {
+        memcpy(str_asset_code, asset->code, 4);
+        strlcpy(str_formatted, str_asset_code, len);
+
+        // Truncate issuer to 13 chars
+        memcpy(str_asset_issuer_trunc, str_asset_issuer, 13);
+    }
+    // 12-character custom
+    if (asset->type == 2) {
+        memcpy(str_asset_code, asset->code, 12);
+        strlcpy(str_formatted, str_asset_code, len);
+
+        // Truncate issuer to 5 characters
+        memcpy(str_asset_issuer_trunc, str_asset_issuer, 5);
+    }
+    // Issuer is read the same way for both types of custom assets
+    if (asset->type == 1 || asset->type == 2) {
+        strlcat(str_formatted, _(" ("), len);
+        strlcat(str_formatted, str_asset_issuer_trunc, len);
+        strlcat(str_formatted, _(")"), len);
+    }
 }
 
 size_t stellar_publicAddressAsStr(uint8_t *bytes, char *out, size_t outlen)
@@ -557,6 +657,36 @@ void stellar_hashupdate_address(uint8_t *address_bytes)
 
     // Remaining part of the address is 32 bytes
     stellar_hashupdate_bytes(address_bytes, 32);
+}
+
+/*
+ * Note about string handling below: this field is an XDR "opaque" field and not a typical string,
+ * so if "TEST" is the asset code then the hashed value needs to be 4 bytes and not include the null
+ * at the end of the string
+ */
+void stellar_hashupdate_asset(StellarAssetType *asset)
+{
+    stellar_hashupdate_uint32(asset->type);
+
+    // 4-character asset code
+    if (asset->type == 1) {
+        char code4[4+1];
+        memset(code4, 0, sizeof(code4));
+        strlcpy(code4, asset->code, sizeof(code4));
+
+        stellar_hashupdate_bytes((uint8_t *)code4, 4);
+        stellar_hashupdate_address(asset->issuer.bytes);
+    }
+
+    // 12-character asset code
+    if (asset->type == 2) {
+        char code12[12+1];
+        memset(code12, 0, sizeof(code12));
+        strlcpy(code12, asset->code, sizeof(code12));
+
+        stellar_hashupdate_bytes((uint8_t *)code12, 12);
+        stellar_hashupdate_address(asset->issuer.bytes);
+    }
 }
 
 void stellar_hashupdate_bytes(uint8_t *data, size_t len)
@@ -757,24 +887,24 @@ void stellar_layoutTransactionDialog(const char *line1, const char *line2, const
     // Dialog contents begin
     if (line1) {
         oledDrawString(offset_x, offset_y, line1);
-        offset_y += line_height;
     }
+    offset_y += line_height;
     if (line2) {
         oledDrawString(offset_x, offset_y, line2);
-        offset_y += line_height;
     }
+    offset_y += line_height;
     if (line3) {
         oledDrawString(offset_x, offset_y, line3);
-        offset_y += line_height;
     }
+    offset_y += line_height;
     if (line4) {
         oledDrawString(offset_x, offset_y, line4);
-        offset_y += line_height;
     }
+    offset_y += line_height;
     if (line5) {
         oledDrawString(offset_x, offset_y, line5);
-        offset_y += line_height;
     }
+    offset_y += line_height;
 
     // Cancel button
     oledDrawString(1, OLED_HEIGHT - 8, "\x15");
