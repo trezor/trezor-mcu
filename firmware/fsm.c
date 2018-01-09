@@ -1713,6 +1713,25 @@ void fsm_msgStellarPathPaymentOp(StellarPathPaymentOp *msg)
     }
 }
 
+void fsm_msgStellarManageOfferOp(StellarManageOfferOp *msg)
+{
+    stellar_confirmManageOfferOp(msg);
+
+    if (stellar_allOperationsConfirmed()) {
+        RESP_INIT(StellarSignedTx);
+
+        stellar_fillSignedTx(resp);
+        msg_write(MessageType_MessageType_StellarSignedTx, resp);
+        layoutHome();
+    }
+    // Request the next operation to sign
+    else {
+        RESP_INIT(StellarTxOpRequest);
+
+        msg_write(MessageType_MessageType_StellarTxOpRequest, resp);
+    }
+}
+
 #if DEBUG_LINK
 
 void fsm_msgDebugLinkGetState(DebugLinkGetState *msg)

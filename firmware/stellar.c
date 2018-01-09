@@ -339,6 +339,89 @@ void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg)
     stellar_activeTx.confirmed_operations++;
 }
 
+void stellar_confirmManageOfferOp(StellarManageOfferOp *msg)
+{
+    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    // Hash: operation type
+    stellar_hashupdate_uint32(3);
+
+    // New Offer / Delete #123 / Update #123
+    char str_offer[32];
+    if (msg->offer_id == 0) {
+        strlcpy(str_offer, _("New Offer"), sizeof(str_offer));
+    }
+    else {
+        char str_offer_id[20];
+        stellar_format_uint64(msg->offer_id, str_offer_id, sizeof(str_offer_id));
+
+        if (msg->amount == 0) {
+            strlcpy(str_offer, _("Delete #"), sizeof(str_offer));
+        }
+        else {
+            strlcpy(str_offer, _("Update #"), sizeof(str_offer));
+        }
+
+        strlcat(str_offer, str_offer_id, sizeof(str_offer));
+    }
+
+    char str_selling[32];
+    char str_sell_amount[32];
+    char str_selling_asset[32];
+
+    stellar_format_asset(&(msg->selling_asset), str_selling_asset, sizeof(str_selling_asset));
+    stellar_format_stroops(msg->amount, str_sell_amount, sizeof(str_sell_amount));
+
+    /*
+     Sell 200
+     XLM (Native Asset)
+    */
+    strlcpy(str_selling, _("Sell "), sizeof(str_selling));
+    strlcat(str_selling, str_sell_amount, sizeof(str_selling));
+
+    char str_buying[32];
+    char str_buying_asset[32];
+    char str_price[17];
+
+    stellar_format_asset(&(msg->buying_asset), str_buying_asset, sizeof(str_buying_asset));
+    stellar_format_price(msg->price_n, msg->price_d, str_price, sizeof(str_price));
+
+    /*
+     For 0.675952 Per
+     USD (G12345678)
+     */
+    strlcpy(str_buying, _("For "), sizeof(str_buying));
+    strlcat(str_buying, str_price, sizeof(str_buying));
+    strlcat(str_buying, _(" Per"), sizeof(str_buying));
+
+    stellar_layoutTransactionDialog(
+        str_offer,
+        str_selling,
+        str_selling_asset,
+        str_buying,
+        str_buying_asset
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        stellar_signingAbort();
+        return;
+    }
+
+    // Hash selling asset
+    stellar_hashupdate_asset(&(msg->selling_asset));
+    // buying asset
+    stellar_hashupdate_asset(&(msg->buying_asset));
+    // amount to sell (signed vs. unsigned doesn't matter wrt hashing)
+    stellar_hashupdate_uint64(msg->amount);
+    // numerator
+    stellar_hashupdate_uint32(msg->price_n);
+    // denominator
+    stellar_hashupdate_uint32(msg->price_d);
+    // offer ID
+    stellar_hashupdate_uint64(msg->offer_id);
+
+    // At this point, the operation is confirmed
+    stellar_activeTx.confirmed_operations++;
+}
+
 void stellar_signingAbort()
 {
     stellar_signing = false;
@@ -410,6 +493,45 @@ void stellar_getSignatureForActiveTx(uint8_t *out_signature)
 void stellar_format_stroops(uint64_t number, char *out, size_t outlen)
 {
     bn_format_uint64(number, NULL, NULL, 7, 0, false, out, outlen);
+}
+
+/*
+ * Formats a price represented as a uint32 numerator and uint32 denominator
+ *
+ * Note that there may be a loss of precision between the real price value and what
+ * is shown to the user
+ *
+ * Smallest possible price is 1 / 4294967296 which is:
+ *  0.00000000023283064365386962890625
+ *
+ * largest possible price is:
+ *  4294967296
+ */
+void stellar_format_price(uint32_t numerator, uint32_t denominator, char *out, size_t outlen)
+{
+    memset(out, 0, outlen);
+
+    // early exist for invalid denominator
+    if (denominator == 0) {
+        strlcpy(out, _("[Invalid Price]"), outlen);
+        return;
+    }
+
+    int scale = 0;
+    double dbl_value = (double)numerator / (double)denominator;
+
+    // Multiply by 10 until the value is larger than the largest possible offer size
+    // Largest possible offer size is UINT32_MAX (4294967296)
+    while (dbl_value < UINT32_MAX) {
+        dbl_value *= (double)10;
+        scale++;
+    }
+
+    // Cast back to an integer
+    uint64_t scaled_value = (uint64_t) dbl_value;
+
+    // Format with bn_format_uint64
+    bn_format_uint64(scaled_value, NULL, NULL, scale, 0, false, out, outlen);
 }
 
 /*

@@ -64,6 +64,7 @@ void stellar_signingAbort(void);
 void stellar_confirmCreateAccountOp(StellarCreateAccountOp *msg);
 void stellar_confirmPaymentOp(StellarPaymentOp *msg);
 void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg);
+void stellar_confirmManageOfferOp(StellarManageOfferOp *msg);
 
 // Layout
 void stellar_layoutStellarGetPublicKey(uint32_t index);
@@ -94,6 +95,7 @@ void stellar_getSignatureForActiveTx(uint8_t *out_signature);
 void stellar_format_uint64(uint64_t number, char *out, size_t outlen);
 void stellar_format_stroops(uint64_t number, char *out, size_t outlen);
 void stellar_format_asset(StellarAssetType *asset, char *str_formatted, size_t len);
+void stellar_format_price(uint32_t numerator, uint32_t denominator, char *out, size_t outlen);
 
 uint16_t stellar_crc16(uint8_t *bytes, uint32_t length);
 
