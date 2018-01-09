@@ -87,6 +87,7 @@ void fsm_msgStellarPaymentOp(StellarPaymentOp *msg);
 void fsm_msgStellarCreateAccountOp(StellarCreateAccountOp *msg);
 void fsm_msgStellarPathPaymentOp(StellarPathPaymentOp *msg);
 void fsm_msgStellarManageOfferOp(StellarManageOfferOp *msg);
+void fsm_msgStellarCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg);
 
 // debug message functions
 #if DEBUG_LINK

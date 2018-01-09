@@ -65,6 +65,7 @@ void stellar_confirmCreateAccountOp(StellarCreateAccountOp *msg);
 void stellar_confirmPaymentOp(StellarPaymentOp *msg);
 void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg);
 void stellar_confirmManageOfferOp(StellarManageOfferOp *msg);
+void stellar_confirmCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg);
 
 // Layout
 void stellar_layoutStellarGetPublicKey(uint32_t index);
