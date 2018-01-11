@@ -856,6 +856,68 @@ void stellar_confirmChangeTrustOp(StellarChangeTrustOp *msg)
     stellar_activeTx.confirmed_operations++;
 }
 
+void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg)
+{
+    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    // Hash: operation type
+    stellar_hashupdate_uint32(7);
+
+    // Add Trust: USD
+    char str_title[32];
+    if (msg->is_authorized) {
+        strlcpy(str_title, _("Allow Trust of"), sizeof(str_title));
+    }
+    else {
+        strlcpy(str_title, _("REVOKE Trust of"), sizeof(str_title));
+    }
+
+    // Asset code
+    char str_asset_row[32];
+    strlcpy(str_asset_row, msg->asset_code, sizeof(str_asset_row));
+
+    const char **str_trustor_rows = stellar_lineBreakAddress(msg->trusted_account.bytes);
+
+    // By: G...
+    char str_by[32];
+    strlcpy(str_by, _("By: "), sizeof(str_by));
+    strlcat(str_by, str_trustor_rows[0], sizeof(str_by));
+
+    stellar_layoutTransactionDialog(
+        str_title,
+        str_asset_row,
+        str_by,
+        str_trustor_rows[1],
+        str_trustor_rows[2]
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        stellar_signingAbort();
+        return;
+    }
+
+    // Hash: trustor account (the account being allowed to access the asset)
+    stellar_hashupdate_address(msg->trusted_account.bytes);
+    // asset type
+    stellar_hashupdate_uint32(msg->asset_type);
+    // asset code
+    if (msg->asset_type == 1) {
+        char code4[4+1];
+        memset(code4, 0, sizeof(code4));
+        strlcpy(code4, msg->asset_code, sizeof(code4));
+        stellar_hashupdate_bytes((uint8_t *)code4, 4);
+    }
+    if (msg->asset_type == 2) {
+        char code12[12+1];
+        memset(code12, 0, sizeof(code12));
+        strlcpy(code12, msg->asset_code, sizeof(code12));
+        stellar_hashupdate_bytes((uint8_t *)code12, 12);
+    }
+    // is authorized
+    stellar_hashupdate_bool(msg->is_authorized);
+
+    // At this point, the operation is confirmed
+    stellar_activeTx.confirmed_operations++;
+}
+
 void stellar_signingAbort()
 {
     stellar_signing = false;
@@ -1025,6 +1087,7 @@ void stellar_format_asset(StellarAssetType *asset, char *str_formatted, size_t l
     // truncated asset issuer, final length depends on length of asset code
     char str_asset_issuer_trunc[13 + 1];
 
+    memset(str_formatted, 0, len);
     memset(str_asset_code, 0, sizeof(str_asset_code));
     memset(str_asset_issuer_trunc, 0, sizeof(str_asset_issuer_trunc));
 

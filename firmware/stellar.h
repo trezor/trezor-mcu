@@ -68,6 +68,7 @@ void stellar_confirmManageOfferOp(StellarManageOfferOp *msg);
 void stellar_confirmCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg);
 void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg);
 void stellar_confirmChangeTrustOp(StellarChangeTrustOp *msg);
+void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg);
 
 // Layout
 void stellar_layoutStellarGetPublicKey(uint32_t index);

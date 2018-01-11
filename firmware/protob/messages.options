@@ -208,6 +208,7 @@ StellarChangeTrustOp.source_account max_size:32
 
 StellarAllowTrustOp.source_account  max_size:32
 StellarAllowTrustOp.trusted_account max_size:32
+StellarAllowTrustOp.asset_code max_size:13
 
 StellarAccountMergeOp.source_account      max_size:32
 StellarAccountMergeOp.destination_account max_size:32
