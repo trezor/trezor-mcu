@@ -93,6 +93,7 @@ uint32_t stellar_getXdrOffset(void);
 uint8_t stellar_allOperationsConfirmed(void);
 void stellar_getSignatureForActiveTx(uint8_t *out_signature);
 
+void stellar_format_uint32(uint32_t number, char *out, size_t outlen);
 void stellar_format_uint64(uint64_t number, char *out, size_t outlen);
 void stellar_format_stroops(uint64_t number, char *out, size_t outlen);
 void stellar_format_asset(StellarAssetType *asset, char *str_formatted, size_t len);

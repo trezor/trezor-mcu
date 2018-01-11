@@ -608,7 +608,7 @@ void stellar_format_price(uint32_t numerator, uint32_t denominator, char *out, s
 /*
  * Returns a uint32 formatted as a string
  */
-void stellar_format_uint32(uint64_t number, char *out, size_t outlen)
+void stellar_format_uint32(uint32_t number, char *out, size_t outlen)
 {
     bignum256 bn_number;
     bn_read_uint32(number, &bn_number);
@@ -841,6 +841,16 @@ void stellar_hashupdate_string(uint8_t *data, size_t len)
 
     // Hash the raw bytes of the string
     stellar_hashupdate_bytes(data, len);
+
+    // If len isn't a multiple of 4, add padding bytes
+    int remainder = len % 4;
+    uint8_t null_byte[1] = { 0x00 };
+    if (remainder) {
+        while (remainder < 4) {
+            stellar_hashupdate_bytes(null_byte, 1);
+            remainder++;
+        }
+    }
 }
 
 void stellar_hashupdate_address(uint8_t *address_bytes)
@@ -939,7 +949,10 @@ void stellar_layoutTransactionSummary(StellarSignTx *msg)
 
     // Memo: none
     if (stellar_activeTx.memo_type == 0) {
-        strlcpy(str_lines[0], _("[No Memo]"), sizeof(str_lines[0]));
+        strlcpy(str_lines[0], _("[No Memo Set]"), sizeof(str_lines[0]));
+        strlcpy(str_lines[1], _("Important:"), sizeof(str_lines[0]));
+        strlcpy(str_lines[2], _("Many exchanges require"), sizeof(str_lines[0]));
+        strlcpy(str_lines[3], _("a memo when depositing."), sizeof(str_lines[0]));
     }
     // Memo: text
     if (msg->memo_type == 1) {
@@ -1048,6 +1061,7 @@ void stellar_layoutTransactionDialog(const char *line1, const char *line2, const
 
     char str_account_index[12];
     char str_pubaddr_truncated[6]; // G???? + null
+    memset(str_pubaddr_truncated, 0, sizeof(str_pubaddr_truncated));
 
     layoutLast = layoutDialogSwipe;
     layoutSwipe();
