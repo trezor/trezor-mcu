@@ -803,6 +803,59 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
     stellar_activeTx.confirmed_operations++;
 }
 
+void stellar_confirmChangeTrustOp(StellarChangeTrustOp *msg)
+{
+    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    // Hash: operation type
+    stellar_hashupdate_uint32(6);
+
+    // Add Trust: USD
+    char str_title[32];
+    if (msg->limit == 0) {
+        strlcpy(str_title, _("DELETE Trust: "), sizeof(str_title));
+    }
+    else {
+        strlcpy(str_title, _("Add Trust: "), sizeof(str_title));
+    }
+    strlcat(str_title, msg->asset.code, sizeof(str_title));
+
+    // Amount: MAX (or a number)
+    char str_amount_row[32];
+    strlcpy(str_amount_row, _("Amount: "), sizeof(str_amount_row));
+
+    if (msg->limit == 9223372036854775807) {
+        strlcat(str_amount_row, _("[Maximum]"), sizeof(str_amount_row));
+    }
+    else {
+        char str_amount[32];
+        stellar_format_stroops(msg->limit, str_amount, sizeof(str_amount));
+        strlcat(str_amount_row, str_amount, sizeof(str_amount_row));
+    }
+
+    // Display full issuer address
+    const char **str_addr_rows = stellar_lineBreakAddress(msg->asset.issuer.bytes);
+
+    stellar_layoutTransactionDialog(
+        str_title,
+        str_amount_row,
+        str_addr_rows[0],
+        str_addr_rows[1],
+        str_addr_rows[2]
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        stellar_signingAbort();
+        return;
+    }
+
+    // Hash: asset
+    stellar_hashupdate_asset(&(msg->asset));
+    // limit
+    stellar_hashupdate_uint64(msg->limit);
+
+    // At this point, the operation is confirmed
+    stellar_activeTx.confirmed_operations++;
+}
+
 void stellar_signingAbort()
 {
     stellar_signing = false;

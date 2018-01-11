@@ -89,6 +89,7 @@ void fsm_msgStellarPathPaymentOp(StellarPathPaymentOp *msg);
 void fsm_msgStellarManageOfferOp(StellarManageOfferOp *msg);
 void fsm_msgStellarCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg);
 void fsm_msgStellarSetOptionsOp(StellarSetOptionsOp *msg);
+void fsm_msgStellarChangeTrustOp(StellarChangeTrustOp *msg);
 
 // debug message functions
 #if DEBUG_LINK
