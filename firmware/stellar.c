@@ -493,6 +493,316 @@ void stellar_confirmCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg)
     stellar_activeTx.confirmed_operations++;
 }
 
+void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
+{
+    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    // Hash: operation type
+    stellar_hashupdate_uint32(5);
+
+    // Something like Set Inflation Destination
+    char str_title[32];
+    char rows[4][32];
+    int row_idx = 0;
+    memset(rows, 0, sizeof(rows));
+
+    // Inflation destination
+    stellar_hashupdate_bool(msg->has_inflation_destination_account);
+    if (msg->has_inflation_destination_account) {
+        strlcpy(str_title, _("Set Inflation Destination"), sizeof(str_title));
+        const char **str_addr_rows = stellar_lineBreakAddress(msg->inflation_destination_account.bytes);
+
+        stellar_layoutTransactionDialog(
+            str_title,
+            NULL,
+            str_addr_rows[0],
+            str_addr_rows[1],
+            str_addr_rows[2]
+        );
+        if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+            stellar_signingAbort();
+            return;
+        }
+
+        // address
+        stellar_hashupdate_address(msg->inflation_destination_account.bytes);
+    }
+
+    // Clear flags
+    stellar_hashupdate_bool(msg->has_clear_flags);
+    if (msg->has_clear_flags) {
+        strlcpy(str_title, _("Clear Flag(s)"), sizeof(str_title));
+
+        // Auth required
+        if (msg->clear_flags & 0x01) {
+            strlcpy(rows[row_idx], _("AUTH_REQUIRED"), sizeof(rows[row_idx]));
+            row_idx++;
+        }
+        // Auth revocable
+        if (msg->clear_flags & 0x02) {
+            strlcpy(rows[row_idx], _("AUTH_REVOCABLE"), sizeof(rows[row_idx]));
+            row_idx++;
+        }
+
+        stellar_layoutTransactionDialog(
+            str_title,
+            rows[0],
+            rows[1],
+            rows[2],
+            rows[3]
+        );
+        if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+            stellar_signingAbort();
+            return;
+        }
+        memset(rows, 0, sizeof(rows));
+        row_idx = 0;
+
+        // Hash flags
+        stellar_hashupdate_uint32(msg->clear_flags);
+    }
+
+    // Set flags
+    stellar_hashupdate_bool(msg->has_set_flags);
+    if (msg->has_set_flags) {
+        strlcpy(str_title, _("Set Flag(s)"), sizeof(str_title));
+
+        // Auth required
+        if (msg->set_flags & 0x01) {
+            strlcpy(rows[row_idx], _("AUTH_REQUIRED"), sizeof(rows[row_idx]));
+            row_idx++;
+        }
+        // Auth revocable
+        if (msg->set_flags & 0x02) {
+            strlcpy(rows[row_idx], _("AUTH_REVOCABLE"), sizeof(rows[row_idx]));
+            row_idx++;
+        }
+
+        stellar_layoutTransactionDialog(
+            str_title,
+            rows[0],
+            rows[1],
+            rows[2],
+            rows[3]
+        );
+        if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+            stellar_signingAbort();
+            return;
+        }
+        memset(rows, 0, sizeof(rows));
+        row_idx = 0;
+
+        // Hash flags
+        stellar_hashupdate_uint32(msg->set_flags);
+    }
+
+    // Account thresholds
+    bool show_thresholds_confirm = false;
+    row_idx = 0;
+    stellar_hashupdate_bool(msg->has_master_weight);
+    if (msg->has_master_weight) {
+        char str_master_weight[10+1];
+        show_thresholds_confirm = true;
+        stellar_format_uint32(msg->master_weight, str_master_weight, sizeof(str_master_weight));
+        strlcpy(rows[row_idx], _("Master Weight: "), sizeof(rows[row_idx]));
+        strlcat(rows[row_idx], str_master_weight, sizeof(rows[row_idx]));
+        row_idx++;
+
+        // Hash master weight
+        stellar_hashupdate_uint32(msg->master_weight);
+    }
+
+    stellar_hashupdate_bool(msg->has_low_threshold);
+    if (msg->has_low_threshold) {
+        char str_low_threshold[10+1];
+        show_thresholds_confirm = true;
+        stellar_format_uint32(msg->low_threshold, str_low_threshold, sizeof(str_low_threshold));
+        strlcpy(rows[row_idx], _("Low: "), sizeof(rows[row_idx]));
+        strlcat(rows[row_idx], str_low_threshold, sizeof(rows[row_idx]));
+        row_idx++;
+
+        // Hash low threshold
+        stellar_hashupdate_uint32(msg->low_threshold);
+    }
+    stellar_hashupdate_bool(msg->has_medium_threshold);
+    if (msg->has_medium_threshold) {
+        char str_med_threshold[10+1];
+        show_thresholds_confirm = true;
+        stellar_format_uint32(msg->medium_threshold, str_med_threshold, sizeof(str_med_threshold));
+        strlcpy(rows[row_idx], _("Medium: "), sizeof(rows[row_idx]));
+        strlcat(rows[row_idx], str_med_threshold, sizeof(rows[row_idx]));
+        row_idx++;
+
+        // Hash medium threshold
+        stellar_hashupdate_uint32(msg->medium_threshold);
+    }
+    stellar_hashupdate_bool(msg->has_high_threshold);
+    if (msg->has_high_threshold) {
+        char str_high_threshold[10+1];
+        show_thresholds_confirm = true;
+        stellar_format_uint32(msg->high_threshold, str_high_threshold, sizeof(str_high_threshold));
+        strlcpy(rows[row_idx], _("High: "), sizeof(rows[row_idx]));
+        strlcat(rows[row_idx], str_high_threshold, sizeof(rows[row_idx]));
+        row_idx++;
+
+        // Hash high threshold
+        stellar_hashupdate_uint32(msg->high_threshold);
+    }
+
+    if (show_thresholds_confirm) {
+        strlcpy(str_title, _("Account Thresholds"), sizeof(str_title));
+        stellar_layoutTransactionDialog(
+            str_title,
+            rows[0],
+            rows[1],
+            rows[2],
+            rows[3]
+        );
+        if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+            stellar_signingAbort();
+            return;
+        }
+        memset(rows, 0, sizeof(rows));
+        row_idx = 0;
+    }
+
+    // Home domain
+    stellar_hashupdate_bool(msg->has_home_domain);
+    if (msg->has_home_domain) {
+        strlcpy(str_title, _("Home Domain"), sizeof(str_title));
+
+        // Split home domain if longer than 22 characters
+        int home_domain_len = strnlen(msg->home_domain, 32);
+        if (home_domain_len > 22) {
+            strlcpy(rows[0], msg->home_domain, 22);
+            strlcpy(rows[1], msg->home_domain + 21, sizeof(rows[1]));
+        }
+        else {
+            strlcpy(rows[0], msg->home_domain, sizeof(rows[0]));
+        }
+
+        stellar_layoutTransactionDialog(
+            str_title,
+            rows[0],
+            rows[1],
+            NULL,
+            NULL
+        );
+        if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+            stellar_signingAbort();
+            return;
+        }
+        memset(rows, 0, sizeof(rows));
+        row_idx = 0;
+
+        stellar_hashupdate_string((unsigned char*)&(msg->home_domain), strnlen(msg->home_domain, 32));
+    }
+
+    // Signer
+    stellar_hashupdate_bool(msg->has_signer_type);
+    if (msg->has_signer_type) {
+        if (msg->signer_weight > 0) {
+            strlcpy(str_title, _("Add Signer: "), sizeof(str_title));
+        }
+        else {
+            strlcpy(str_title, _("REMOVE Signer: "), sizeof(str_title));
+        }
+
+        // Format weight as a string
+        char str_weight[16];
+        stellar_format_uint32(msg->signer_weight, str_weight, sizeof(str_weight));
+        char str_weight_row[32];
+        strlcpy(str_weight_row, _("Weight: "), sizeof(str_weight_row));
+        strlcat(str_weight_row, str_weight, sizeof(str_weight_row));
+
+        // 0 = account, 1 = pre-auth, 2 = hash(x)
+        char str_signer_type[16];
+        bool needs_hash_confirm = false;
+        if (msg->signer_type == 0) {
+            strlcpy(str_signer_type, _("account"), sizeof(str_signer_type));
+            strlcat(str_title, str_signer_type, sizeof(str_title));
+
+            const char **str_addr_rows = stellar_lineBreakAddress(msg->signer_key.bytes);
+            stellar_layoutTransactionDialog(
+                str_title,
+                str_weight_row,
+                str_addr_rows[0],
+                str_addr_rows[1],
+                str_addr_rows[2]
+            );
+            if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+                stellar_signingAbort();
+                return;
+            }
+        }
+        if (msg->signer_type == 1) {
+            needs_hash_confirm = true;
+            strlcpy(str_signer_type, _("pre-auth hash"), sizeof(str_signer_type));
+            strlcat(str_title, str_signer_type, sizeof(str_title));
+
+            stellar_layoutTransactionDialog(
+                str_title,
+                str_weight_row,
+                NULL,
+                _("(confirm hash on next"),
+                _("screen)")
+            );
+            if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+                stellar_signingAbort();
+                return;
+            }
+        }
+        if (msg->signer_type == 2) {
+            needs_hash_confirm = true;
+            strlcpy(str_signer_type, _("hash(x)"), sizeof(str_signer_type));
+            strlcat(str_title, str_signer_type, sizeof(str_title));
+
+            stellar_layoutTransactionDialog(
+                str_title,
+                str_weight_row,
+                NULL,
+                _("(confirm hash on next"),
+                _("screen)")
+            );
+            if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+                stellar_signingAbort();
+                return;
+            }
+        }
+
+        // Extra confirmation step for hash signers
+        if (needs_hash_confirm) {
+            data2hex(msg->signer_key.bytes +  0, 8, rows[row_idx++]);
+            data2hex(msg->signer_key.bytes +  8, 8, rows[row_idx++]);
+            data2hex(msg->signer_key.bytes + 16, 8, rows[row_idx++]);
+            data2hex(msg->signer_key.bytes + 24, 8, rows[row_idx++]);
+
+            stellar_layoutTransactionDialog(
+                _("Confirm Hash"),
+                rows[0],
+                rows[1],
+                rows[2],
+                rows[3]
+            );
+            if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+                stellar_signingAbort();
+                return;
+            }
+            memset(rows, 0, sizeof(rows));
+            row_idx = 0;
+        }
+
+        // Hash: signer type
+        stellar_hashupdate_uint32(msg->signer_type);
+        // key
+        stellar_hashupdate_bytes(msg->signer_key.bytes, msg->signer_key.size);
+        // weight
+        stellar_hashupdate_uint32(msg->signer_weight);
+    }
+
+    // At this point, the operation is confirmed
+    stellar_activeTx.confirmed_operations++;
+}
+
 void stellar_signingAbort()
 {
     stellar_signing = false;
