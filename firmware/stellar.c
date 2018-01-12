@@ -918,6 +918,33 @@ void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg)
     stellar_activeTx.confirmed_operations++;
 }
 
+void stellar_confirmAccountMergeOp(StellarAccountMergeOp *msg)
+{
+    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    // Hash: operation type
+    stellar_hashupdate_uint32(8);
+
+    const char **str_destination_rows = stellar_lineBreakAddress(msg->destination_account.bytes);
+
+    stellar_layoutTransactionDialog(
+        _("Merge Account"),
+        _("All XLM will be sent to:"),
+        str_destination_rows[0],
+        str_destination_rows[1],
+        str_destination_rows[2]
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        stellar_signingAbort();
+        return;
+    }
+
+    // Hash: destination account
+    stellar_hashupdate_address(msg->destination_account.bytes);
+
+    // At this point, the operation is confirmed
+    stellar_activeTx.confirmed_operations++;
+}
+
 void stellar_signingAbort()
 {
     stellar_signing = false;

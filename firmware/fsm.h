@@ -91,6 +91,7 @@ void fsm_msgStellarCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg);
 void fsm_msgStellarSetOptionsOp(StellarSetOptionsOp *msg);
 void fsm_msgStellarChangeTrustOp(StellarChangeTrustOp *msg);
 void fsm_msgStellarAllowTrustOp(StellarAllowTrustOp *msg);
+void fsm_msgStellarAccountMergeOp(StellarAccountMergeOp *msg);
 
 // debug message functions
 #if DEBUG_LINK
