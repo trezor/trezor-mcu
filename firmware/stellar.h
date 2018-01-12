@@ -70,6 +70,7 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg);
 void stellar_confirmChangeTrustOp(StellarChangeTrustOp *msg);
 void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg);
 void stellar_confirmAccountMergeOp(StellarAccountMergeOp *msg);
+void stellar_confirmManageDataOp(StellarManageDataOp *msg);
 
 // Layout
 void stellar_layoutStellarGetPublicKey(uint32_t index);

@@ -39,6 +39,7 @@
 #include "fsm.h"
 #include "protect.h"
 #include "util.h"
+#include "layout2.h"
 
 static bool stellar_signing = false;
 static StellarTransaction stellar_activeTx;
@@ -940,6 +941,73 @@ void stellar_confirmAccountMergeOp(StellarAccountMergeOp *msg)
 
     // Hash: destination account
     stellar_hashupdate_address(msg->destination_account.bytes);
+
+    // At this point, the operation is confirmed
+    stellar_activeTx.confirmed_operations++;
+}
+
+void stellar_confirmManageDataOp(StellarManageDataOp *msg)
+{
+    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    // Hash: operation type
+    stellar_hashupdate_uint32(10);
+
+    char str_title[32];
+    if (msg->has_value) {
+        strlcpy(str_title, _("Set data value key:"), sizeof(str_title));
+    }
+    else {
+        strlcpy(str_title, _("CLEAR data value key:"), sizeof(str_title));
+    }
+
+    // Confirm key
+    const char **str_key_lines = split_message((const uint8_t*)(msg->key), strnlen(msg->key, 64), 16);
+
+    stellar_layoutTransactionDialog(
+        str_title,
+        str_key_lines[0],
+        str_key_lines[1],
+        str_key_lines[2],
+        str_key_lines[3]
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        stellar_signingAbort();
+        return;
+    }
+
+    // Confirm value by displaying sha256 hash since this can contain non-printable characters
+    if (msg->has_value) {
+        strlcpy(str_title, _("Confirm sha256 of value:"), sizeof(str_title));
+
+        char str_hash_digest[SHA256_DIGEST_STRING_LENGTH];
+        sha256_Data(msg->value.bytes, msg->value.size, str_hash_digest);
+        const char **str_hash_lines = split_message((const uint8_t*)str_hash_digest, sizeof(str_hash_digest), 16);
+
+        stellar_layoutTransactionDialog(
+            str_title,
+            str_hash_lines[0],
+            str_hash_lines[1],
+            str_hash_lines[2],
+            str_hash_lines[3]
+        );
+        if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+            stellar_signingAbort();
+            return;
+        }
+    }
+
+    // Hash: key
+    stellar_hashupdate_string((unsigned char*)&(msg->key), strnlen(msg->key, 64));
+    // value
+    if (msg->has_value) {
+        stellar_hashupdate_bool(true);
+        // Variable opaque field is length + raw bytes
+        stellar_hashupdate_uint32(msg->value.size);
+        stellar_hashupdate_bytes(msg->value.bytes, msg->value.size);
+    }
+    else {
+        stellar_hashupdate_bool(false);
+    }
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
