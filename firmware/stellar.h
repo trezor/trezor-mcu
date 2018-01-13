@@ -32,27 +32,10 @@ typedef struct {
     // 1 - public network, 2 - official testnet, 3 - other private network
     uint8_t network_type;
 
-    // number of stroops for the fee
-    uint32_t fee;
-
-    // Sequence number
-    uint64_t sequence_number;
-
-    // Minimum and maximum timebounds
-    uint64_t timebound_min;
-    uint64_t timebound_max;
-
-    // 0 = none, 1 = text, 2 = ID, 3 = hash, 4 = return
-    uint32_t memo_type;
-    uint8_t memo[32];
-
     // Total number of operations expected
     uint8_t num_operations;
     // Number that have been confirmed by the user
     uint8_t confirmed_operations;
-
-    // current offset within the XDR stream
-    uint32_t xdr_offset;
 
     // sha256 context that will eventually be signed
     SHA256_CTX sha256_ctx;
@@ -94,7 +77,6 @@ void stellar_hashupdate_bytes(uint8_t *data, size_t len);
 
 StellarTransaction *stellar_getActiveTx(void);
 void stellar_fillSignedTx(StellarSignedTx *resp);
-uint32_t stellar_getXdrOffset(void);
 uint8_t stellar_allOperationsConfirmed(void);
 void stellar_getSignatureForActiveTx(uint8_t *out_signature);
 

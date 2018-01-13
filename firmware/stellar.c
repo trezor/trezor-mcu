@@ -1044,11 +1044,6 @@ void stellar_fillSignedTx(StellarSignedTx *resp)
     resp->has_signature = true;
 }
 
-uint32_t stellar_getXdrOffset()
-{
-    return stellar_activeTx.xdr_offset;
-}
-
 uint8_t stellar_allOperationsConfirmed()
 {
     return stellar_activeTx.confirmed_operations == stellar_activeTx.num_operations;
@@ -1419,7 +1414,7 @@ void stellar_hashupdate_bytes(uint8_t *data, size_t len)
 }
 
 /*
- * Reads stellar_activeTx and displays a summary of the overall transaction
+ * Displays a summary of the overall transaction
  */
 void stellar_layoutTransactionSummary(StellarSignTx *msg)
 {
@@ -1469,7 +1464,7 @@ void stellar_layoutTransactionSummary(StellarSignTx *msg)
     memset(str_lines, 0, sizeof(str_lines));
 
     // Memo: none
-    if (stellar_activeTx.memo_type == 0) {
+    if (msg->memo_type == 0) {
         strlcpy(str_lines[0], _("[No Memo Set]"), sizeof(str_lines[0]));
         strlcpy(str_lines[1], _("Important:"), sizeof(str_lines[0]));
         strlcpy(str_lines[2], _("Many exchanges require"), sizeof(str_lines[0]));
@@ -1485,17 +1480,17 @@ void stellar_layoutTransactionSummary(StellarSignTx *msg)
         strlcpy(str_lines[2], (const char*)(msg->memo_text + 19), 9 + 1);
     }
     // Memo: ID
-    if (stellar_activeTx.memo_type == 2) {
+    if (msg->memo_type == 2) {
         strlcpy(str_lines[0], _("Memo (ID)"), sizeof(str_lines[0]));
         stellar_format_uint64(msg->memo_id, str_lines[1], sizeof(str_lines[1]));
     }
     // Memo: hash
-    if (stellar_activeTx.memo_type == 3) {
+    if (msg->memo_type == 3) {
         needs_memo_hash_confirm = 1;
         strlcpy(str_lines[0], _("Memo (HASH)"), sizeof(str_lines[0]));
     }
     // Memo: return
-    if (stellar_activeTx.memo_type == 4) {
+    if (msg->memo_type == 4) {
         needs_memo_hash_confirm = 1;
         strlcpy(str_lines[0], _("Memo (RETURN)"), sizeof(str_lines[0]));
     }
