@@ -1620,6 +1620,7 @@ void fsm_msgStellarGetPublicKey(StellarGetPublicKey *msg)
 {
     RESP_INIT(StellarPublicKey);
     resp->index = msg->index;
+    resp->has_index = true;
 
     CHECK_INITIALIZED
 
@@ -1629,11 +1630,48 @@ void fsm_msgStellarGetPublicKey(StellarGetPublicKey *msg)
     stellar_layoutStellarGetPublicKey(msg->index);
 
     // Read public key and write it to the response
+    resp->has_public_key = true;
     resp->public_key.size = 32;
     stellar_getPubkeyAtIndex(msg->index, resp->public_key.bytes, sizeof(resp->public_key.bytes));
 
 
     msg_write(MessageType_MessageType_StellarPublicKey, resp);
+
+    layoutHome();
+}
+
+void fsm_msgStellarSignString(StellarSignString *msg)
+{
+    CHECK_INITIALIZED
+    CHECK_PIN
+
+    RESP_INIT(StellarSignedData);
+
+    // Will exit if the user does not confirm
+    stellar_confirmSignString(msg, resp);
+
+    msg_write(MessageType_MessageType_StellarSignedData, resp);
+
+    layoutHome();
+}
+
+void fsm_msgStellarVerifyMessage(StellarVerifyMessage *msg)
+{
+    RESP_INIT(StellarMessageVerification);
+
+    resp->is_verified = stellar_verifySignature(
+        msg->signature.bytes,
+        msg->message.bytes,
+        msg->message.size,
+        msg->public_key.bytes
+    );
+    resp->has_is_verified = true;
+
+    memcpy(resp->public_key.bytes, msg->public_key.bytes, sizeof(resp->public_key.bytes));
+    resp->has_public_key = true;
+    resp->public_key.size = sizeof(resp->public_key.bytes);
+
+    msg_write(MessageType_MessageType_StellarMessageVerification, resp);
 
     layoutHome();
 }

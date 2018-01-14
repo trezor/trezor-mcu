@@ -27,7 +27,7 @@
 typedef struct {
     // 0-based index of the account being used
     uint32_t account_index;
-    uint8_t account_id[32];
+    uint8_t signing_pubkey[32];
 
     // 1 - public network, 2 - official testnet, 3 - other private network
     uint8_t network_type;
@@ -55,10 +55,16 @@ void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg);
 void stellar_confirmAccountMergeOp(StellarAccountMergeOp *msg);
 void stellar_confirmManageDataOp(StellarManageDataOp *msg);
 
+void stellar_confirmSignString(StellarSignString *msg, StellarSignedData *resp);
+
+void stellar_signString(const unsigned char *str_to_sign, uint32_t account_index, uint8_t *out_signature);
+bool stellar_verifySignature(const uint8_t *signature, const uint8_t *message, size_t message_len, uint8_t *public_key);
+
 // Layout
 void stellar_layoutStellarGetPublicKey(uint32_t index);
 void stellar_layoutTransactionDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5);
 void stellar_layoutTransactionSummary(StellarSignTx *msg);
+void stellar_layoutSigningDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5, uint32_t account_index, const char *warning, bool is_final_step);
 
 // Helpers
 HDNode *stellar_deriveNode(uint32_t index);

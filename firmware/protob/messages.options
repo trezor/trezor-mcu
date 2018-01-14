@@ -180,6 +180,17 @@ CosiSignature.signature			max_size:32
 # Stellar
 StellarPublicKey.public_key         max_size:32
 
+StellarSignString.message   max_size:1024
+
+StellarSignedData.public_key max_size:32
+StellarSignedData.signature  max_size:64
+
+StellarVerifyMessage.public_key max_size:32
+StellarVerifyMessage.message    max_size:1024
+StellarVerifyMessage.signature  max_size:64
+
+StellarMessageVerification.public_key   max_size: 32
+
 StellarSignTx.network_passphrase    max_size:1024
 StellarSignTx.source_account        max_size:32
 StellarSignTx.memo_text             max_size:29

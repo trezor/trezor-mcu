@@ -44,6 +44,68 @@
 static bool stellar_signing = false;
 static StellarTransaction stellar_activeTx;
 
+void stellar_confirmSignString(StellarSignString *msg, StellarSignedData *resp)
+{
+    // Max protobuf length is 1024, so string is 1023 + null
+    int message_len = strnlen(msg->message, 1023);
+
+    // Verify that message only includes printable ascii characters
+    bool is_valid = true;
+    for (int i=0; i < message_len; i++) {
+        if (msg->message[i] < 32) {
+            is_valid = false;
+            break;
+        }
+        if (msg->message[i] >126) {
+            is_valid = false;
+            break;
+        }
+    }
+    if (!is_valid) {
+        stellar_layoutSigningDialog(
+            _("Cannot sign message"),
+            NULL,
+            _("Message contains"),
+            _("non-printable ascii"),
+            _("characters."),
+            msg->index,
+            NULL,
+            false
+        );
+        protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false);
+        layoutHome();
+        return;
+    }
+
+    // Message can be signed, display as much of it as possible to the user
+    const char **str_message_lines = split_message((const uint8_t*)(msg->message), message_len, 24);
+
+    stellar_layoutSigningDialog(
+        _("Sign message?"),
+        str_message_lines[0],
+        str_message_lines[1],
+        str_message_lines[2],
+        str_message_lines[3],
+        msg->index,
+        NULL,
+        true
+    );
+    if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+        return;
+    }
+
+    // Populate response message
+    stellar_signString((const unsigned char*)(msg->message), msg->index, resp->signature.bytes);
+    resp->has_signature = true;
+    resp->signature.size = 64;
+    resp->has_index = true;
+    resp->index = msg->index;
+
+    stellar_getPubkeyAtIndex(resp->index, resp->public_key.bytes, sizeof(resp->public_key.bytes));
+    resp->has_public_key = true;
+    resp->public_key.size = 32;
+}
+
 /*
  * Starts the signing process and parses the transaction header
  */
@@ -75,7 +137,7 @@ void stellar_signingInit(StellarSignTx *msg)
     // Public key comes from deriving the specified account path (we ignore the one sent by the client)
     uint8_t bytes_pubkey[32];
     stellar_getPubkeyAtIndex(msg->index, bytes_pubkey, sizeof(bytes_pubkey));
-    memcpy(&(stellar_activeTx.account_id), bytes_pubkey, sizeof(stellar_activeTx.account_id));
+    memcpy(&(stellar_activeTx.signing_pubkey), bytes_pubkey, sizeof(stellar_activeTx.signing_pubkey));
     memcpy(&(stellar_activeTx.account_index), &(msg->index), sizeof(stellar_activeTx.account_index));
 
     // Hash: public key
@@ -1031,7 +1093,7 @@ void stellar_fillSignedTx(StellarSignedTx *resp)
     stellar_hashupdate_uint32(0);
 
     // Add the public key for verification that the right account was used for signing
-    memcpy(resp->public_key.bytes, &(activeTx->account_id), 32);
+    memcpy(resp->public_key.bytes, &(activeTx->signing_pubkey), 32);
     resp->public_key.size = 32;
     resp->has_public_key = true;
 
@@ -1070,6 +1132,23 @@ void stellar_getSignatureForActiveTx(uint8_t *out_signature)
     ed25519_sign(to_sign, sizeof(to_sign), node->private_key, node->public_key + 1, signature);
 
     memcpy(out_signature, signature, sizeof(signature));
+}
+
+void stellar_signString(const uint8_t *str_to_sign, uint32_t account_index, uint8_t *out_signature)
+{
+    HDNode *node = stellar_deriveNode(account_index);
+
+    uint8_t signature[64];
+    // Maximum field size in protobuf message is 1024, so strlen of 1023 + null
+    ed25519_sign(str_to_sign, strnlen((const char *)str_to_sign, 1023), node->private_key, node->public_key + 1, signature);
+
+    memcpy(out_signature, signature, sizeof(signature));
+}
+
+bool stellar_verifySignature(const uint8_t *signature, const uint8_t *message, size_t message_len, uint8_t *public_key)
+{
+    // returns 0 if signature is valid
+    return ed25519_sign_open(message, message_len, public_key, signature) == 0;
 }
 
 /*
@@ -1446,7 +1525,7 @@ void stellar_layoutTransactionSummary(StellarSignTx *msg)
     }
 
     // Display full address being used to sign transaction
-    const char **str_addr_rows = stellar_lineBreakAddress(stellar_activeTx.account_id);
+    const char **str_addr_rows = stellar_lineBreakAddress(stellar_activeTx.signing_pubkey);
 
     stellar_layoutTransactionDialog(
         str_lines[0],
@@ -1565,15 +1644,21 @@ void stellar_layoutTransactionSummary(StellarSignTx *msg)
 }
 
 /*
- * Main dialog helper method. Allows displaying 5 lines.
- * A title showing the account being used to sign is always displayed.
+ * Most basic dialog used for signing
+ *  - Header indicating which key is being used for signing
+ *  - 5 rows for content
+ *  - Cancel / Next buttons
+ *  - Warning message can appear between cancel/next buttons
  */
-void stellar_layoutTransactionDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5)
+void stellar_layoutSigningDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5, uint32_t account_index, const char *warning, bool is_final_step)
 {
     // Start with some initial padding and use these to track position as rendering moves down the screen
     int offset_x = 1;
     int offset_y = 1;
     int line_height = 9;
+
+    uint8_t public_key[32];
+    stellar_getPubkeyAtIndex(account_index, public_key, sizeof(public_key));
 
     char str_account_index[12];
     char str_pubaddr_truncated[6]; // G???? + null
@@ -1586,11 +1671,11 @@ void stellar_layoutTransactionDialog(const char *line1, const char *line2, const
     // Load up public address
     char str_pubaddr[56+1];
     memset(str_pubaddr, 0, sizeof(str_pubaddr));
-    stellar_publicAddressAsStr(stellar_activeTx.account_id, str_pubaddr, sizeof(str_pubaddr));
+    stellar_publicAddressAsStr(public_key, str_pubaddr, sizeof(str_pubaddr));
     memcpy(str_pubaddr_truncated, str_pubaddr, 5);
 
     // Format account index
-    stellar_format_uint32(stellar_activeTx.account_index + 1, str_account_index, sizeof(str_account_index));
+    stellar_format_uint32(account_index + 1, str_account_index, sizeof(str_account_index));
 
     // Header
     // Ends up as: Signing with #1 (GABCD)
@@ -1635,22 +1720,54 @@ void stellar_layoutTransactionDialog(const char *line1, const char *line2, const
     oledInvert(0, OLED_HEIGHT - 9, fontCharWidth('\x15') + oledStringWidth("Cancel") + 2, OLED_HEIGHT - 1);
 
     // Warnings (drawn centered between the buttons
+    if (warning) {
+        oledDrawStringCenter(OLED_HEIGHT - 8, warning);
+    }
+
+    // Next / sign button
+    char str_next_label[8];
+    if (is_final_step) {
+        strlcpy(str_next_label, _("SIGN"), sizeof(str_next_label));
+    }
+    else {
+        strlcpy(str_next_label, _("Next"), sizeof(str_next_label));
+    }
+
+    oledDrawString(OLED_WIDTH - fontCharWidth('\x06') - 1, OLED_HEIGHT - 8, "\x06");
+    oledDrawString(OLED_WIDTH - oledStringWidth(str_next_label) - fontCharWidth('\x06') - 3, OLED_HEIGHT - 8, str_next_label);
+    oledInvert(OLED_WIDTH - oledStringWidth(str_next_label) - fontCharWidth('\x06') - 4, OLED_HEIGHT - 9, OLED_WIDTH - 1, OLED_HEIGHT - 1);
+
+    oledRefresh();
+}
+
+/*
+ * Main dialog helper method. Allows displaying 5 lines.
+ * A title showing the account being used to sign is always displayed.
+ */
+void stellar_layoutTransactionDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5)
+{
+    char str_warning[16];
+    memset(str_warning, 0, sizeof(str_warning));
+
     if (stellar_activeTx.network_type == 2) {
         // Warning: testnet
-        oledDrawStringCenter(OLED_HEIGHT - 8, "WRN:TN");
+        strlcpy(str_warning, _("WRN:TN"), sizeof(str_warning));
     }
     if (stellar_activeTx.network_type == 3) {
         // Warning: private network
-        oledDrawStringCenter(OLED_HEIGHT - 8, "WRN:PN");
+        strlcpy(str_warning, _("WRN:PN"), sizeof(str_warning));
     }
 
-
-    // Next / confirm button
-    oledDrawString(OLED_WIDTH - fontCharWidth('\x06') - 1, OLED_HEIGHT - 8, "\x06");
-    oledDrawString(OLED_WIDTH - oledStringWidth("Next") - fontCharWidth('\x06') - 3, OLED_HEIGHT - 8, "Next");
-    oledInvert(OLED_WIDTH - oledStringWidth("Next") - fontCharWidth('\x06') - 4, OLED_HEIGHT - 9, OLED_WIDTH - 1, OLED_HEIGHT - 1);
-
-    oledRefresh();
+    stellar_layoutSigningDialog(
+        line1,
+        line2,
+        line3,
+        line4,
+        line5,
+        stellar_activeTx.account_index,
+        str_warning,
+        false
+    );
 }
 
 void stellar_layoutStellarGetPublicKey(uint32_t index)

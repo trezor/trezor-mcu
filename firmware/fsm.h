@@ -93,6 +93,8 @@ void fsm_msgStellarChangeTrustOp(StellarChangeTrustOp *msg);
 void fsm_msgStellarAllowTrustOp(StellarAllowTrustOp *msg);
 void fsm_msgStellarAccountMergeOp(StellarAccountMergeOp *msg);
 void fsm_msgStellarManageDataOp(StellarManageDataOp *msg);
+void fsm_msgStellarSignString(StellarSignString *msg);
+void fsm_msgStellarVerifyMessage(StellarVerifyMessage *msg);
 
 // debug message functions
 #if DEBUG_LINK
