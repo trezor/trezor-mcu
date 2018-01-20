@@ -34,7 +34,22 @@
 #include "nem2.h"
 #include "gettext.h"
 
-#define BITCOIN_DIVISIBILITY (8)
+static size_t format_amount(const CoinInfo *coin, uint64_t amount, char *str_out, size_t size) {
+	const char *suffix;
+	int decimals;
+
+	// TODO: Implement Storage field
+	if (0) {
+		suffix = " ";
+		decimals = 8;
+	} else {
+		suffix = " m";
+		decimals = 5;
+	}
+
+	bn_format_uint64(amount, NULL, suffix, decimals, 0, false, str_out, size);
+	return strlcat(str_out, coin->coin_shortcut, size);
+}
 
 // split longer string into 4 rows, rowlen chars each
 static const char **split_message(const uint8_t *msg, uint32_t len, uint32_t rowlen)
@@ -127,7 +142,7 @@ void layoutHome(void)
 void layoutConfirmOutput(const CoinInfo *coin, const TxOutputType *out)
 {
 	char str_out[32 + 3];
-	bn_format_uint64(out->amount, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_out, sizeof(str_out) - 3);
+	format_amount(coin, out->amount, str_out, sizeof(str_out) - 3);
 	strlcat(str_out, " to", sizeof(str_out));
 	static char lines[2][28];
 	const char *addr = out->address;
@@ -190,8 +205,8 @@ void layoutConfirmOpReturn(const uint8_t *data, uint32_t size)
 void layoutConfirmTx(const CoinInfo *coin, uint64_t amount_out, uint64_t amount_fee)
 {
 	char str_out[32], str_fee[32];
-	bn_format_uint64(amount_out, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_out, sizeof(str_out));
-	bn_format_uint64(amount_fee, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_fee, sizeof(str_fee));
+	format_amount(coin, amount_out, str_out, sizeof(str_out));
+	format_amount(coin, amount_fee, str_fee, sizeof(str_fee));
 	layoutDialogSwipe(&bmp_icon_question,
 		_("Cancel"),
 		_("Confirm"),
@@ -208,7 +223,7 @@ void layoutConfirmTx(const CoinInfo *coin, uint64_t amount_out, uint64_t amount_
 void layoutFeeOverThreshold(const CoinInfo *coin, uint64_t fee)
 {
 	char str_fee[32];
-	bn_format_uint64(fee, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_fee, sizeof(str_fee));
+	format_amount(coin, fee, str_fee, sizeof(str_fee));
 	layoutDialogSwipe(&bmp_icon_question,
 		_("Cancel"),
 		_("Confirm"),
@@ -369,19 +384,19 @@ static const char *address_n_str(const uint32_t *address_n, size_t address_n_cou
 			const char *abbr = 0;
 			if (native_segwit) {
 				if (coin && coin->has_segwit && coin->bech32_prefix) {
-					abbr = coin->coin_shortcut + 1;
+					abbr = coin->coin_shortcut;
 				}
 			} else
 			if (p2sh_segwit) {
 				if (coin && coin->has_segwit && coin->has_address_type_p2sh) {
-					abbr = coin->coin_shortcut + 1;
+					abbr = coin->coin_shortcut;
 				}
 			} else {
 				if (coin) {
 					if (coin->has_segwit && coin->has_address_type_p2sh) {
 						legacy = true;
 					}
-					abbr = coin->coin_shortcut + 1;
+					abbr = coin->coin_shortcut;
 				} else {
 					abbr = slip44_extras(address_n[1]);
 				}
