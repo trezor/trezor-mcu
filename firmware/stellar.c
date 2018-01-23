@@ -44,7 +44,7 @@
 static bool stellar_signing = false;
 static StellarTransaction stellar_activeTx;
 
-void stellar_confirmSignString(StellarSignString *msg, StellarSignedData *resp)
+void stellar_confirmSignString(StellarSignMessage *msg, StellarMessageSignature *resp)
 {
     // Max protobuf length is 1024, so string is 1023 + null
     int message_len = strnlen(msg->message, 1023);
@@ -68,7 +68,8 @@ void stellar_confirmSignString(StellarSignString *msg, StellarSignedData *resp)
             _("Message contains"),
             _("non-printable ascii"),
             _("characters."),
-            msg->index,
+            msg->address_n,
+            msg->address_n_count,
             NULL,
             false
         );
@@ -86,7 +87,8 @@ void stellar_confirmSignString(StellarSignString *msg, StellarSignedData *resp)
         str_message_lines[1],
         str_message_lines[2],
         str_message_lines[3],
-        msg->index,
+        msg->address_n,
+        msg->address_n_count,
         NULL,
         true
     );
@@ -95,13 +97,11 @@ void stellar_confirmSignString(StellarSignString *msg, StellarSignedData *resp)
     }
 
     // Populate response message
-    stellar_signString((const unsigned char*)(msg->message), msg->index, resp->signature.bytes);
+    stellar_signString((const unsigned char*)(msg->message), msg->address_n, msg->address_n_count, resp->signature.bytes);
     resp->has_signature = true;
     resp->signature.size = 64;
-    resp->has_index = true;
-    resp->index = msg->index;
 
-    stellar_getPubkeyAtIndex(resp->index, resp->public_key.bytes, sizeof(resp->public_key.bytes));
+    stellar_getPubkeyAtAddress(msg->address_n, msg->address_n_count, resp->public_key.bytes, sizeof(resp->public_key.bytes));
     resp->has_public_key = true;
     resp->public_key.size = 32;
 }
@@ -136,9 +136,12 @@ void stellar_signingInit(StellarSignTx *msg)
 
     // Public key comes from deriving the specified account path (we ignore the one sent by the client)
     uint8_t bytes_pubkey[32];
-    stellar_getPubkeyAtIndex(msg->index, bytes_pubkey, sizeof(bytes_pubkey));
+    stellar_getPubkeyAtAddress(msg->address_n, msg->address_n_count, bytes_pubkey, sizeof(bytes_pubkey));
     memcpy(&(stellar_activeTx.signing_pubkey), bytes_pubkey, sizeof(stellar_activeTx.signing_pubkey));
-    memcpy(&(stellar_activeTx.account_index), &(msg->index), sizeof(stellar_activeTx.account_index));
+
+    stellar_activeTx.address_n_count = msg->address_n_count;
+    // todo: fix sizeof check
+    memcpy(&(stellar_activeTx.address_n), &(msg->address_n), sizeof(stellar_activeTx.address_n));
 
     // Hash: public key
     stellar_hashupdate_address(bytes_pubkey);
@@ -1121,7 +1124,7 @@ StellarTransaction *stellar_getActiveTx()
  */
 void stellar_getSignatureForActiveTx(uint8_t *out_signature)
 {
-    HDNode *node = stellar_deriveNode(stellar_activeTx.account_index);
+    HDNode *node = stellar_deriveNode(stellar_activeTx.address_n, stellar_activeTx.address_n_count);
 
     // Signature is the ed25519 detached signature of the sha256 of all the bytes
     // that have been read so far
@@ -1134,9 +1137,9 @@ void stellar_getSignatureForActiveTx(uint8_t *out_signature)
     memcpy(out_signature, signature, sizeof(signature));
 }
 
-void stellar_signString(const uint8_t *str_to_sign, uint32_t account_index, uint8_t *out_signature)
+void stellar_signString(const uint8_t *str_to_sign, uint32_t *address_n, size_t address_n_count, uint8_t *out_signature)
 {
-    HDNode *node = stellar_deriveNode(account_index);
+    HDNode *node = stellar_deriveNode(address_n, address_n_count);
 
     uint8_t signature[64];
     // Maximum field size in protobuf message is 1024, so strlen of 1023 + null
@@ -1145,10 +1148,15 @@ void stellar_signString(const uint8_t *str_to_sign, uint32_t account_index, uint
     memcpy(out_signature, signature, sizeof(signature));
 }
 
-bool stellar_verifySignature(const uint8_t *signature, const uint8_t *message, size_t message_len, uint8_t *public_key)
+bool stellar_verifySignature(StellarVerifyMessage *msg)
 {
     // returns 0 if signature is valid
-    return ed25519_sign_open(message, message_len, public_key, signature) == 0;
+    return ed25519_sign_open(
+        msg->message.bytes,
+        msg->message.size,
+        msg->public_key.bytes,
+        msg->signature.bytes
+        ) == 0;
 }
 
 /*
@@ -1343,36 +1351,37 @@ uint16_t stellar_crc16(uint8_t *bytes, uint32_t length)
 /*
  * Writes 32-byte public key to out
  */
-void stellar_getPubkeyAtIndex(uint32_t index, uint8_t *out, size_t outlen)
+void stellar_getPubkeyAtAddress(uint32_t *address_n, size_t address_n_count, uint8_t *out, size_t outlen)
 {
     if (outlen < 32) return;
 
-    HDNode *node = stellar_deriveNode(index);
+    HDNode *node = stellar_deriveNode(address_n, address_n_count);
+
+    if (node == 0) {
+        stellar_signingAbort();
+        return;
+    }
 
     memcpy(out, node->public_key + 1, outlen);
 }
 
 /*
  * Derives the HDNode at the given index
- * The prefix for this is m/44'/148'/index'
+ * Standard Stellar prefix is m/44'/148'/ and the default account is m/44'/148'/0'
+ *
+ * All paths must be hardened
  */
-HDNode *stellar_deriveNode(uint32_t index)
+HDNode *stellar_deriveNode(uint32_t *address_n, size_t address_n_count)
 {
     static CONFIDENTIAL HDNode node;
     const char *curve = "ed25519";
-
-    // Derivation path for Stellar is m/44'/148'/index'
-    uint32_t address_n[3];
-    address_n[0] = 0x80000000 | 44;
-    address_n[1] = 0x80000000 | 148;
-    address_n[2] = 0x80000000 | index;
 
     // Device not initialized, passphrase request cancelled, or unsupported curve
     if (!storage_getRootNode(&node, curve, true)) {
         return 0;
     }
     // Failed to derive private key
-    if (hdnode_private_ckd_cached(&node, address_n, 3, NULL) == 0) {
+    if (hdnode_private_ckd_cached(&node, address_n, address_n_count, NULL) == 0) {
         return 0;
     }
 
@@ -1650,7 +1659,7 @@ void stellar_layoutTransactionSummary(StellarSignTx *msg)
  *  - Cancel / Next buttons
  *  - Warning message can appear between cancel/next buttons
  */
-void stellar_layoutSigningDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5, uint32_t account_index, const char *warning, bool is_final_step)
+void stellar_layoutSigningDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5, uint32_t *address_n, size_t address_n_count, const char *warning, bool is_final_step)
 {
     // Start with some initial padding and use these to track position as rendering moves down the screen
     int offset_x = 1;
@@ -1658,10 +1667,9 @@ void stellar_layoutSigningDialog(const char *line1, const char *line2, const cha
     int line_height = 9;
 
     uint8_t public_key[32];
-    stellar_getPubkeyAtIndex(account_index, public_key, sizeof(public_key));
+    stellar_getPubkeyAtAddress(address_n, address_n_count, public_key, sizeof(public_key));
 
-    char str_account_index[12];
-    char str_pubaddr_truncated[6]; // G???? + null
+    char str_pubaddr_truncated[12]; // G???? + null
     memset(str_pubaddr_truncated, 0, sizeof(str_pubaddr_truncated));
 
     layoutLast = layoutDialogSwipe;
@@ -1672,20 +1680,14 @@ void stellar_layoutSigningDialog(const char *line1, const char *line2, const cha
     char str_pubaddr[56+1];
     memset(str_pubaddr, 0, sizeof(str_pubaddr));
     stellar_publicAddressAsStr(public_key, str_pubaddr, sizeof(str_pubaddr));
-    memcpy(str_pubaddr_truncated, str_pubaddr, 5);
-
-    // Format account index
-    stellar_format_uint32(account_index + 1, str_account_index, sizeof(str_account_index));
+    memcpy(str_pubaddr_truncated, str_pubaddr, sizeof(str_pubaddr_truncated) - 1);
 
     // Header
-    // Ends up as: Signing with #1 (GABCD)
+    // Ends up as: Signing with GABCDEFGHIJKL
     char str_header[32];
     memset(str_header, 0, sizeof(str_header));
-    strlcpy(str_header, _("Signing with #"), sizeof(str_header));
-    strlcat(str_header, str_account_index, sizeof(str_header));
-    strlcat(str_header, _(" ("), sizeof(str_header));
+    strlcpy(str_header, _("Signing with "), sizeof(str_header));
     strlcat(str_header, str_pubaddr_truncated, sizeof(str_header));
-    strlcat(str_header, _(")"), sizeof(str_header));
 
     oledDrawString(offset_x, offset_y, str_header);
     offset_y += line_height;
@@ -1764,34 +1766,25 @@ void stellar_layoutTransactionDialog(const char *line1, const char *line2, const
         line3,
         line4,
         line5,
-        stellar_activeTx.account_index,
+        stellar_activeTx.address_n,
+        stellar_activeTx.address_n_count,
         str_warning,
         false
     );
 }
 
-void stellar_layoutStellarGetPublicKey(uint32_t index)
+void stellar_layoutGetPublicKey(uint32_t *address_n, size_t address_n_count)
 {
-    char str_title[32];
-    char str_index[12];
-
-    stellar_format_uint32(index+1, str_index, sizeof(str_index));
-
-    // Share account #100?
-    strlcpy(str_title, _("Share account #"), sizeof(str_title));
-    strlcat(str_title, str_index, sizeof(str_title));
-    strlcat(str_title, _("?"), sizeof(str_title));
-
     // Derive node and calculate address
     uint8_t pubkey_bytes[32];
-    stellar_getPubkeyAtIndex(index, pubkey_bytes, sizeof(pubkey_bytes));
+    stellar_getPubkeyAtAddress(address_n, address_n_count, pubkey_bytes, sizeof(pubkey_bytes));
     const char **str_addr_rows = stellar_lineBreakAddress(pubkey_bytes);
 
     layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Confirm"), _("Share public account ID?"),
-        str_title,
         str_addr_rows[0],
         str_addr_rows[1],
         str_addr_rows[2],
+        NULL,
         NULL, NULL
         );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {

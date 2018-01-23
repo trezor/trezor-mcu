@@ -1619,60 +1619,47 @@ void fsm_msgCosiSign(CosiSign *msg)
 void fsm_msgStellarGetPublicKey(StellarGetPublicKey *msg)
 {
     RESP_INIT(StellarPublicKey);
-    resp->index = msg->index;
-    resp->has_index = true;
 
     CHECK_INITIALIZED
 
     CHECK_PIN
 
     // Will exit if the user does not confirm
-    stellar_layoutStellarGetPublicKey(msg->index);
+    stellar_layoutGetPublicKey(msg->address_n, msg->address_n_count);
 
     // Read public key and write it to the response
     resp->has_public_key = true;
     resp->public_key.size = 32;
-    stellar_getPubkeyAtIndex(msg->index, resp->public_key.bytes, sizeof(resp->public_key.bytes));
-
+    stellar_getPubkeyAtAddress(msg->address_n, msg->address_n_count, resp->public_key.bytes, sizeof(resp->public_key.bytes));
 
     msg_write(MessageType_MessageType_StellarPublicKey, resp);
 
     layoutHome();
 }
 
-void fsm_msgStellarSignString(StellarSignString *msg)
+void fsm_msgStellarSignMessage(StellarSignMessage *msg)
 {
     CHECK_INITIALIZED
     CHECK_PIN
 
-    RESP_INIT(StellarSignedData);
+    RESP_INIT(StellarMessageSignature);
 
     // Will exit if the user does not confirm
     stellar_confirmSignString(msg, resp);
 
-    msg_write(MessageType_MessageType_StellarSignedData, resp);
+    msg_write(MessageType_MessageType_StellarMessageSignature, resp);
 
     layoutHome();
 }
 
 void fsm_msgStellarVerifyMessage(StellarVerifyMessage *msg)
 {
-    RESP_INIT(StellarMessageVerification);
+    if (!stellar_verifySignature(msg)) {
+        fsm_sendFailure(FailureType_Failure_DataError, _("Invalid signature"));
+        return;
+    }
 
-    resp->is_verified = stellar_verifySignature(
-        msg->signature.bytes,
-        msg->message.bytes,
-        msg->message.size,
-        msg->public_key.bytes
-    );
-    resp->has_is_verified = true;
-
-    memcpy(resp->public_key.bytes, msg->public_key.bytes, sizeof(resp->public_key.bytes));
-    resp->has_public_key = true;
-    resp->public_key.size = sizeof(resp->public_key.bytes);
-
-    msg_write(MessageType_MessageType_StellarMessageVerification, resp);
-
+    fsm_sendSuccess(_("Message verified"));
     layoutHome();
 }
 

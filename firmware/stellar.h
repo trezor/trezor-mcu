@@ -25,8 +25,9 @@
 #include "fsm.h"
 
 typedef struct {
-    // 0-based index of the account being used
-    uint32_t account_index;
+    // BIP32 path to the address being used for signing
+    uint32_t address_n[10];
+    size_t address_n_count;
     uint8_t signing_pubkey[32];
 
     // 1 - public network, 2 - official testnet, 3 - other private network
@@ -55,23 +56,23 @@ void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg);
 void stellar_confirmAccountMergeOp(StellarAccountMergeOp *msg);
 void stellar_confirmManageDataOp(StellarManageDataOp *msg);
 
-void stellar_confirmSignString(StellarSignString *msg, StellarSignedData *resp);
+void stellar_confirmSignString(StellarSignMessage *msg, StellarMessageSignature *resp);
 
-void stellar_signString(const unsigned char *str_to_sign, uint32_t account_index, uint8_t *out_signature);
-bool stellar_verifySignature(const uint8_t *signature, const uint8_t *message, size_t message_len, uint8_t *public_key);
+void stellar_signString(const uint8_t *str_to_sign, uint32_t *address_n, size_t address_n_count, uint8_t *out_signature);
+bool stellar_verifySignature(StellarVerifyMessage *msg);
 
 // Layout
-void stellar_layoutStellarGetPublicKey(uint32_t index);
+void stellar_layoutGetPublicKey(uint32_t *address_n, size_t address_n_count);
 void stellar_layoutTransactionDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5);
 void stellar_layoutTransactionSummary(StellarSignTx *msg);
-void stellar_layoutSigningDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5, uint32_t account_index, const char *warning, bool is_final_step);
+void stellar_layoutSigningDialog(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5, uint32_t *address_n, size_t address_n_count, const char *warning, bool is_final_step);
 
 // Helpers
-HDNode *stellar_deriveNode(uint32_t index);
+HDNode *stellar_deriveNode(uint32_t *address_n, size_t address_n_count);
 
 size_t stellar_publicAddressAsStr(uint8_t *bytes, char *out, size_t outlen);
 const char **stellar_lineBreakAddress(uint8_t *addrbytes);
-void stellar_getPubkeyAtIndex(uint32_t index, uint8_t *out, size_t outlen);
+void stellar_getPubkeyAtAddress(uint32_t *address_n, size_t address_n_count, uint8_t *out, size_t outlen);
 
 void stellar_hashupdate_uint32(uint32_t value);
 void stellar_hashupdate_uint64(uint64_t value);
