@@ -1,22 +1,15 @@
-ifneq ($(EMULATOR),1)
-OBJS += startup.o
-endif
-
 OBJS += buttons.o
 OBJS += layout.o
 OBJS += oled.o
 OBJS += rng.o
-OBJS += serialno.o
-
-ifneq ($(EMULATOR),1)
-OBJS += setup.o
-endif
-
 OBJS += util.o
 OBJS += memory.o
 
 ifneq ($(EMULATOR),1)
+OBJS += startup.o
+OBJS += setup.o
 OBJS += timer.o
+OBJS += serialno.o
 endif
 
 OBJS += gen/bitmaps.o
