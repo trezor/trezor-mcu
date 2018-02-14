@@ -8,9 +8,17 @@ endif
 NAME  = trezor
 
 ifeq ($(EMULATOR),1)
-OBJS += udp.o
+  ifeq ($(TRANSPORT), PIPE)
+    OBJS += usb.o
+  else
+    ifeq ($(TRANSPORT), USBG)
+      OBJS += usb.o
+    else
+      OBJS += udp.o
+    endif
+  endif
 else
-OBJS += usb.o
+  OBJS += usb.o
 endif
 
 OBJS += u2f.o

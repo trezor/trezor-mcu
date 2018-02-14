@@ -2,6 +2,7 @@
  * This file is part of the TREZOR project, https://trezor.io/
  *
  * Copyright (C) 2017 Saleem Rashid <trezor@saleemrashid.com>
+ * Modified Copyright (C) 2018 Yannick Heneault <yheneaul@gmail.com>
  *
  * This library is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -20,10 +21,14 @@
 #include <libopencm3/stm32/flash.h>
 
 #include <string.h>
+#include <unistd.h>
 
 #include "memory.h"
 
-void flash_lock(void) {}
+void flash_lock(void) {
+	sync();
+}
+
 void flash_unlock(void) {}
 
 void flash_clear_status_flags(void) {}

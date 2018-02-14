@@ -2,6 +2,7 @@
  * This file is part of the TREZOR project, https://trezor.io/
  *
  * Copyright (C) 2017 Saleem Rashid <trezor@saleemrashid.com>
+ * Modified Copyright (C) 2018 Yannick Heneault <yheneaul@gmail.com>
  *
  * This library is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +25,10 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#ifdef PIZERO
+#include <bcm2835.h>
+#endif
+
 #include <libopencm3/stm32/flash.h>
 
 #include "memory.h"
@@ -34,11 +39,17 @@
 
 #define EMULATOR_FLASH_FILE "emulator.img"
 
+#ifdef USE_RANDOM
+#define RANDOM_DEV_FILE "/dev/random"
+#else
+#define RANDOM_DEV_FILE "/dev/urandom"
+#endif
+
 void *emulator_flash_base = NULL;
 
 uint32_t __stack_chk_guard;
 
-static int urandom = -1;
+static int random_fd = -1;
 
 static void setup_urandom(void);
 static void setup_flash(void);
@@ -46,20 +57,32 @@ static void setup_flash(void);
 void setup(void) {
 	setup_urandom();
 	setup_flash();
+#ifdef PIZERO
+    bcm2835_init();
+    bcm2835_gpio_fsel(RPI_V2_GPIO_P1_32 , BCM2835_GPIO_FSEL_INPT);
+    bcm2835_gpio_fsel(RPI_V2_GPIO_P1_36, BCM2835_GPIO_FSEL_INPT);
+    bcm2835_gpio_set_pud(RPI_V2_GPIO_P1_32 , BCM2835_GPIO_PUD_UP );
+    bcm2835_gpio_set_pud(RPI_V2_GPIO_P1_36, BCM2835_GPIO_PUD_UP );
+#endif
 }
 
 void emulatorRandom(void *buffer, size_t size) {
-	ssize_t n = read(urandom, buffer, size);
-	if (n < 0 || ((size_t) n) != size) {
-		perror("Failed to read /dev/urandom");
+	ssize_t n;
+	do {
+		//sometime /dev/random can return less byte than requested
+		n = read(random_fd, buffer, size);
+	} while (n >= 0 && ((size_t) n) != size);
+	if (n < 0)
+	{
+		perror("Failed to read " RANDOM_DEV_FILE);
 		exit(1);
 	}
 }
 
 static void setup_urandom(void) {
-	urandom = open("/dev/urandom", O_RDONLY);
-	if (urandom < 0) {
-		perror("Failed to open /dev/urandom");
+	random_fd = open(RANDOM_DEV_FILE, O_RDONLY);
+	if (random_fd < 0) {
+		perror("Failed to open " RANDOM_DEV_FILE);
 		exit(1);
 	}
 }

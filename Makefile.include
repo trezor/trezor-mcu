@@ -77,15 +77,6 @@ LDFLAGS  += -L$(TOP_DIR) \
 ifeq ($(EMULATOR),1)
 CFLAGS   += -DEMULATOR=1
 
-ifeq ($(HEADLESS),1)
-CFLAGS   += -DHEADLESS=1
-else
-CFLAGS   += -DHEADLESS=0
-
-CFLAGS   += $(shell pkg-config --cflags sdl2)
-LDLIBS   += $(shell pkg-config --libs sdl2)
-endif
-
 CFLAGS   += -include $(TOP_DIR)emulator/emulator.h
 CFLAGS   += -include stdio.h
 
@@ -93,6 +84,34 @@ LDFLAGS  += -L$(TOP_DIR)emulator
 
 LDLIBS   += -ltrezor -lemulator
 LIBDEPS  += $(TOP_DIR)/libtrezor.a $(TOP_DIR)emulator/libemulator.a
+
+ifeq ($(HEADLESS),1)
+CFLAGS   += -DHEADLESS=1
+else
+CFLAGS   += -DHEADLESS=0
+CFLAGS   += $(shell pkg-config --cflags sdl)
+LDLIBS   += $(shell pkg-config --libs sdl)
+endif
+
+ifdef PIZERO
+CFLAGS += -DPIZERO=1
+LDFLAGS += -lbcm2835
+endif
+
+ifdef USE_RANDOM
+CFLAGS += -DUSE_RANDOM=1
+endif
+
+ifeq ($(TRANSPORT), PIPE)
+  CFLAGS += -DTRANSPORT_PIPE=1
+else
+ ifeq ($(TRANSPORT), USBG)
+   CFLAGS += -DTRANSPORT_USBG=1
+   CFLAGS   += $(shell pkg-config --cflags libusbgx)
+   LDLIBS   += $(shell pkg-config --libs libusbgx)
+ endif
+endif
+
 else
 ifdef APPVER
 CFLAGS   += -DAPPVER=$(APPVER)
@@ -190,5 +209,6 @@ clean::
 	rm -f *.list
 	rm -f *.log
 	rm -f *.srec
+	rm -f $(NAME)
 
 -include $(OBJS:.o=.d)
