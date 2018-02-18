@@ -29,8 +29,12 @@ void emulatorPoll(void) {}
 
 #include <SDL.h>
 
+#define ENV_OLED_SCALE "TREZOR_OLED_SCALE"
+
 static SDL_Renderer *renderer = NULL;
 static SDL_Texture *texture = NULL;
+
+unsigned long emulatorGetScale(void);
 
 void oledInit(void) {
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -39,7 +43,15 @@ void oledInit(void) {
 	}
 	atexit(SDL_Quit);
 
-	SDL_Window *window = SDL_CreateWindow("TREZOR", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, OLED_WIDTH, OLED_HEIGHT, 0);
+	unsigned long scale = emulatorGetScale();
+
+	SDL_Window *window = SDL_CreateWindow("TREZOR",
+		SDL_WINDOWPOS_UNDEFINED,
+		SDL_WINDOWPOS_UNDEFINED,
+		OLED_WIDTH * scale,
+	        OLED_HEIGHT * scale,
+		0);
+
 	if (window == NULL) {
 		fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
 		exit(1);
@@ -51,10 +63,29 @@ void oledInit(void) {
 		exit(1);
 	}
 
+	/* Use unscaled coordinate system */
+	SDL_RenderSetLogicalSize(renderer, OLED_WIDTH, OLED_HEIGHT);
+
 	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, OLED_WIDTH, OLED_HEIGHT);
 
 	oledClear();
 	oledRefresh();
+}
+
+unsigned long emulatorGetScale(void) {
+	unsigned long scale = 1;
+
+	const char *variable = getenv(ENV_OLED_SCALE);
+	if (variable != NULL && variable[0] != '\0') {
+		char *endptr;
+		scale = strtoul(variable, &endptr, 10);
+		if (*endptr != '\0') {
+			fprintf(stderr, "Failed to convert " ENV_OLED_SCALE "\n");
+			exit(1);
+		}
+	}
+
+	return scale;
 }
 
 void oledRefresh(void) {
