@@ -109,14 +109,14 @@ void layoutHome(void)
 	} else {
 		if (label && strlen(label) > 0) {
 			oledDrawBitmap(44, 4, &bmp_logo48);
-			oledDrawStringCenter(OLED_HEIGHT - 8, label);
+			oledDrawStringCenter(OLED_HEIGHT - 8, label, FONT_STANDARD);
 		} else {
 			oledDrawBitmap(40, 0, &bmp_logo64);
 		}
 	}
 	if (storage_needsBackup()) {
 		oledBox(0, 0, 127, 8, false);
-		oledDrawStringCenter(0, "NEEDS BACKUP!");
+		oledDrawStringCenter(0, "NEEDS BACKUP!", FONT_STANDARD);
 	}
 	oledRefresh();
 
@@ -129,31 +129,31 @@ void layoutConfirmOutput(const CoinInfo *coin, const TxOutputType *out)
 	char str_out[32 + 3];
 	bn_format_uint64(out->amount, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_out, sizeof(str_out) - 3);
 	strlcat(str_out, " to", sizeof(str_out));
-	static char lines[2][28];
 	const char *addr = out->address;
 	int addrlen = strlen(addr);
-	int numlines = addrlen <= 34 ? 2 : 3;
-	int linelen = (addrlen + 3) / numlines + 1;
-	if (linelen > 27) {
-		linelen = 27;
+	int numlines = addrlen <= 42 ? 2 : 3;
+	int linelen = (addrlen - 1) / numlines + 1;
+	if (linelen > 21) {
+		linelen = 21;
 	}
-	if (numlines == 3) {
-		strlcpy(lines[0], addr, linelen + 1);
-		addr += linelen;
+	const char **str = split_message((const uint8_t *)addr, addrlen, linelen);
+	layoutLast = layoutDialogSwipe;
+	layoutSwipe();
+	oledClear();
+	oledDrawBitmap(0, 0, &bmp_icon_question);
+	oledDrawString(20, 0 * 9, _("Confirm sending"), FONT_STANDARD);
+	oledDrawString(20, 1 * 9, str_out, FONT_STANDARD);
+	int left = linelen > 18 ? 0 : 20;
+	oledDrawString(left, 2 * 9, str[0], FONT_FIXED);
+	oledDrawString(left, 3 * 9, str[1], FONT_FIXED);
+	oledDrawString(left, 4 * 9, str[2], FONT_FIXED);
+	oledDrawString(left, 5 * 9, str[3], FONT_FIXED);
+	if (!str[3][0]) {
+		oledHLine(OLED_HEIGHT - 13);
 	}
-	strlcpy(lines[1], addr, linelen + 1);
-	addr += linelen;
-	layoutDialogSwipe(&bmp_icon_question,
-		_("Cancel"),
-		_("Confirm"),
-		NULL,
-		_("Confirm sending"),
-		str_out,
-		lines[0],
-		lines[1],
-		addr,
-		NULL
-	);
+	layoutButtonNo(_("Cancel"));
+	layoutButtonYes(_("Confirm"));
+	oledRefresh();
 }
 
 void layoutConfirmOpReturn(const uint8_t *data, uint32_t size)
@@ -316,13 +316,11 @@ void layoutResetWord(const char *word, int pass, int word_pos, bool last)
 	oledDrawBitmap(0, 0, &bmp_icon_info);
 	left = bmp_icon_info.width + 4;
 
-	oledDrawString(left, 0 * 9, action);
-	oledDrawString(left, 2 * 9, word_pos < 10 ? index_str + 1 : index_str);
-	oledDrawStringDouble(left, 3 * 9, word);
+	oledDrawString(left, 0 * 9, action, FONT_STANDARD);
+	oledDrawString(left, 2 * 9, word_pos < 10 ? index_str + 1 : index_str, FONT_STANDARD);
+	oledDrawString(left, 3 * 9, word, FONT_STANDARD | FONT_DOUBLE);
 	oledHLine(OLED_HEIGHT - 13);
-	oledDrawString(OLED_WIDTH - fontCharWidth('\x06') - 1, OLED_HEIGHT - 8, "\x06");
-	oledDrawString(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 3, OLED_HEIGHT - 8, btnYes);
-	oledInvert(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 4, OLED_HEIGHT - 9, OLED_WIDTH - 1, OLED_HEIGHT - 1);
+	layoutButtonYes(btnYes);
 	oledRefresh();
 }
 
@@ -488,28 +486,22 @@ void layoutAddress(const char *address, const char *desc, bool qrcode, bool igno
 			}
 		}
 	} else {
-		uint32_t rowlen = (addrlen - 1) / (addrlen <= 40 ? 2 : addrlen <= 60 ? 3 : 4) + 1;
+		uint32_t rowlen = (addrlen - 1) / (addrlen <= 42 ? 2 : addrlen <= 63 ? 3 : 4) + 1;
 		const char **str = split_message((const uint8_t *)address, addrlen, rowlen);
 		if (desc) {
-			oledDrawString(0, 0 * 9, desc);
+			oledDrawString(0, 0 * 9, desc, FONT_STANDARD);
 		}
 		for (int i = 0; i < 4; i++) {
-			oledDrawString(0, (i + 1) * 9 + 4, str[i]);
+			oledDrawString(0, (i + 1) * 9 + 4, str[i], FONT_FIXED);
 		}
-		oledDrawString(0, 42, address_n_str(address_n, address_n_count));
+		oledDrawString(0, 42, address_n_str(address_n, address_n_count), FONT_STANDARD);
 	}
 
 	if (!qrcode) {
-		static const char *btnNo = _("QR Code");
-		oledDrawString(2, OLED_HEIGHT - 8, btnNo);
-		oledInvert(0, OLED_HEIGHT - 9, oledStringWidth(btnNo) + 3, OLED_HEIGHT - 1);
+		layoutButtonNo(_("QR Code"));
 	}
 
-	static const char *btnYes = _("Continue");
-	oledDrawString(OLED_WIDTH - fontCharWidth('\x06') - 1, OLED_HEIGHT - 8, "\x06");
-	oledDrawString(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 3, OLED_HEIGHT - 8, btnYes);
-	oledInvert(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 4, OLED_HEIGHT - 9, OLED_WIDTH - 1, OLED_HEIGHT - 1);
-
+	layoutButtonYes(_("Continue"));
 	oledRefresh();
 }
 
