@@ -32,6 +32,12 @@ void layoutDialog(const BITMAP *icon, const char *btnNo, const char *btnYes, con
 	}
 	if (line1) oledDrawString(left, 0 * 9, line1);
 	if (line2) oledDrawString(left, 1 * 9, line2);
+
+	bool packed = strlen(line3) > 21 || strlen(line4) > 21 || strlen(line5) > 21 || strlen(line6) > 21;
+	if (packed) {
+		left = 0;
+	}
+
 	if (line3) oledDrawString(left, 2 * 9, line3);
 	if (line4) oledDrawString(left, 3 * 9, line4);
 	if (desc) {
