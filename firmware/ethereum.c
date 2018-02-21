@@ -440,7 +440,7 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 
 	/* eip-155 chain id */
 	if (msg->has_chain_id) {
-		if (msg->chain_id < 1 || msg->chain_id > MAX_CHAIN_ID) {
+		if (msg->chain_id < 1) {
 			fsm_sendFailure(FailureType_Failure_DataError, _("Chain Id out of bounds"));
 			ethereum_signing_abort();
 			return;
