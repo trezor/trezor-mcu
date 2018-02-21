@@ -36,7 +36,7 @@
 #include "memzero.h"
 
 /* maximum supported chain id.  v must fit in an uint32_t. */
-#define MAX_CHAIN_ID 2147483630
+#define MAX_CHAIN_ID 4294967295
 
 static bool ethereum_signing = false;
 static uint32_t data_total, data_left;
@@ -440,7 +440,7 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 
 	/* eip-155 chain id */
 	if (msg->has_chain_id) {
-		if (msg->chain_id < 1 || msg->chain_id > MAX_CHAIN_ID) {
+		if (msg->chain_id < 1) {
 			fsm_sendFailure(FailureType_Failure_DataError, _("Chain Id out of bounds"));
 			ethereum_signing_abort();
 			return;
