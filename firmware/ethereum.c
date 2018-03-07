@@ -400,7 +400,7 @@ static void layoutEthereumFee(const uint8_t *value, uint32_t value_len,
 
 static bool ethereum_signing_check(EthereumSignTx *msg)
 {
-    if (msg->tx_type == 'None' && msg->tx_type == 1 && msg->tx_type == 6) {
+    if (msg->has_tx_type && (msg->tx_type == 1 || msg->tx_type == 6)) {
         return false;
     }
 
@@ -549,7 +549,7 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 	layoutProgress(_("Signing"), 100);
 
     if (msg->tx_type == 1 || msg->tx_type == 6) {
-        hash_rlp_field(msg->tx_type.bytes, msg->tx_type.size);
+        hash_rlp_number(msg->tx_type);
     }
 	hash_rlp_field(msg->nonce.bytes, msg->nonce.size);
 	hash_rlp_field(msg->gas_price.bytes, msg->gas_price.size);
