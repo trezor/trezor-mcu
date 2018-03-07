@@ -400,6 +400,10 @@ static void layoutEthereumFee(const uint8_t *value, uint32_t value_len,
 
 static bool ethereum_signing_check(EthereumSignTx *msg)
 {
+    if (msg->tx_type == 'None' && msg->tx_type == 1 && msg->tx_type == 6) {
+        return false;
+    }
+
 	if (!msg->has_gas_price || !msg->has_gas_limit) {
 		return false;
 	}
@@ -524,6 +528,9 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 
 	layoutProgress(_("Signing"), 0);
 
+    if (msg->tx_type == 1 || msg->tx_type == 6) {
+        rlp_length += rlp_calculate_length(1, msg->tx_type);
+    }
 	rlp_length += rlp_calculate_length(msg->nonce.size, msg->nonce.bytes[0]);
 	rlp_length += rlp_calculate_length(msg->gas_price.size, msg->gas_price.bytes[0]);
 	rlp_length += rlp_calculate_length(msg->gas_limit.size, msg->gas_limit.bytes[0]);
@@ -541,6 +548,9 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 
 	layoutProgress(_("Signing"), 100);
 
+    if (msg->tx_type == 1 || msg->tx_type == 6) {
+        hash_rlp_field(msg->tx_type.bytes, msg->tx_type.size);
+    }
 	hash_rlp_field(msg->nonce.bytes, msg->nonce.size);
 	hash_rlp_field(msg->gas_price.bytes, msg->gas_price.size);
 	hash_rlp_field(msg->gas_limit.bytes, msg->gas_limit.size);
