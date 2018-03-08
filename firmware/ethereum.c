@@ -240,19 +240,23 @@ static void ethereumFormatAmount(const bignum256 *amnt, const TokenType *token, 
 		suffix = " Wei";
 		decimals = 0;
 	} else {
-		switch (chain_id) {
-			case  1: suffix = " ETH";  break;  // Ethereum Mainnet
-			case 61: suffix = " ETC";  break;  // Ethereum Classic Mainnet
-			case 62: suffix = " tETC"; break;  // Ethereum Classic Testnet
-			case 30: suffix = " RSK";  break;  // Rootstock Mainnet
-			case 31: suffix = " tRSK"; break;  // Rootstock Testnet
-			case  3: suffix = " tETH"; break;  // Ethereum Testnet: Ropsten
-			case  4: suffix = " tETH"; break;  // Ethereum Testnet: Rinkeby
-			case 42: suffix = " tETH"; break;  // Ethereum Testnet: Kovan
-			case  2: suffix = " EXP";  break;  // Expanse
-			case  8: suffix = " UBQ";  break;  // UBIQ
-			default: suffix = " UNKN"; break;  // unknown chain
-		}
+	    if (tx_type == 1 || tx_type == 6) {
+	        suffix = " WAN";
+	    } else {
+            switch (chain_id) {
+                case  1: suffix = " ETH";  break;  // Ethereum Mainnet
+                case 61: suffix = " ETC";  break;  // Ethereum Classic Mainnet
+                case 62: suffix = " tETC"; break;  // Ethereum Classic Testnet
+                case 30: suffix = " RSK";  break;  // Rootstock Mainnet
+                case 31: suffix = " tRSK"; break;  // Rootstock Testnet
+                case  3: suffix = " tETH"; break;  // Ethereum Testnet: Ropsten
+                case  4: suffix = " tETH"; break;  // Ethereum Testnet: Rinkeby
+                case 42: suffix = " tETH"; break;  // Ethereum Testnet: Kovan
+                case  2: suffix = " EXP";  break;  // Expanse
+                case  8: suffix = " UBQ";  break;  // UBIQ
+                default: suffix = " UNKN"; break;  // unknown chain
+            }
+	    }
 	}
 	bn_format(amnt, NULL, suffix, decimals, 0, false, buf, buflen);
 }
@@ -400,10 +404,6 @@ static void layoutEthereumFee(const uint8_t *value, uint32_t value_len,
 
 static bool ethereum_signing_check(EthereumSignTx *msg)
 {
-    if (msg->has_tx_type && (msg->tx_type == 1 || msg->tx_type == 6)) {
-        return false;
-    }
-
 	if (!msg->has_gas_price || !msg->has_gas_limit) {
 		return false;
 	}
@@ -452,6 +452,19 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 		chain_id = msg->chain_id;
 	} else {
 		chain_id = 0;
+	}
+
+    /* Wanchain txtype */
+	if (msg->has_tx_type) {
+		if (msg->has_tx_type == 1 || msg->has_tx_type == 6) {
+    		tx_type = msg->tx_type;
+		} else {
+			fsm_sendFailure(FailureType_Failure_DataError, _("Txtype out of bounds"));
+			ethereum_signing_abort();
+			return;
+		}
+	} else {
+		tx_type = 0;
 	}
 
 	if (msg->has_data_length && msg->data_length > 0) {
@@ -528,16 +541,16 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 
 	layoutProgress(_("Signing"), 0);
 
-    if (msg->tx_type == 1 || msg->tx_type == 6) {
-        rlp_length += rlp_calculate_length(1, msg->tx_type);
-    }
 	rlp_length += rlp_calculate_length(msg->nonce.size, msg->nonce.bytes[0]);
 	rlp_length += rlp_calculate_length(msg->gas_price.size, msg->gas_price.bytes[0]);
 	rlp_length += rlp_calculate_length(msg->gas_limit.size, msg->gas_limit.bytes[0]);
 	rlp_length += rlp_calculate_length(msg->to.size, msg->to.bytes[0]);
 	rlp_length += rlp_calculate_length(msg->value.size, msg->value.bytes[0]);
 	rlp_length += rlp_calculate_length(data_total, msg->data_initial_chunk.bytes[0]);
-	if (chain_id) {
+    if (tx_type != 0) {
+        rlp_length += rlp_calculate_length(1, tx_type);
+    }
+	if (chain_id != 0) {
 		rlp_length += rlp_calculate_length(1, chain_id);
 		rlp_length += rlp_calculate_length(0, 0);
 		rlp_length += rlp_calculate_length(0, 0);
@@ -548,8 +561,8 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 
 	layoutProgress(_("Signing"), 100);
 
-    if (msg->tx_type == 1 || msg->tx_type == 6) {
-        hash_rlp_number(msg->tx_type);
+    if (tx_type != 0) {
+        hash_rlp_number(tx_type);
     }
 	hash_rlp_field(msg->nonce.bytes, msg->nonce.size);
 	hash_rlp_field(msg->gas_price.bytes, msg->gas_price.size);
