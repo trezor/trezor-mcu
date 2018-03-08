@@ -43,6 +43,7 @@ static uint32_t data_total, data_left;
 static EthereumTxRequest msg_tx_request;
 static CONFIDENTIAL uint8_t privkey[32];
 static uint32_t chain_id;
+static uint32_t tx_type;
 struct SHA3_CTX keccak_ctx;
 
 static inline void hash_data(const uint8_t *buf, size_t size)
