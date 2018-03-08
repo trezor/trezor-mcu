@@ -588,7 +588,8 @@ void tx_init(TxStruct *tx, uint32_t inputs_len, uint32_t outputs_len, uint32_t v
 
 void tx_hash_final(TxStruct *t, uint8_t *hash, bool reverse)
 {
-	hasher_Double(&(t->hasher), hash);
+	hasher_Final(&(t->hasher), hash);
+	/* hasher_Double(&(t->hasher), hash); */
 	if (!reverse) return;
 	for (uint8_t i = 0; i < 16; i++) {
 		uint8_t k = hash[31 - i];

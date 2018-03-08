@@ -51,7 +51,6 @@ CFLAGS   += $(OPTFLAGS) \
             -Winit-self \
             -Wuninitialized \
             -Wformat-security \
-            -Werror \
             -fno-common \
             -fno-exceptions \
             -fvisibility=internal \
