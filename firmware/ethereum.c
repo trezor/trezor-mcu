@@ -181,7 +181,7 @@ static void send_signature(void)
 	layoutProgress(_("Signing"), 1000);
 
 	/* eip-155 replay protection */
-	if (chain_id != 0) {
+	if (chain_id) {
 		/* hash v=chain_id, r=0, s=0 */
 		hash_rlp_number(chain_id);
 		hash_rlp_length(0, 0);
@@ -457,7 +457,7 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 
     /* Wanchain txtype */
 	if (msg->has_tx_type) {
-		if (msg->has_tx_type == 1 || msg->has_tx_type == 6) {
+		if (msg->tx_type == 1 || msg->tx_type == 6) {
     		tx_type = msg->tx_type;
 		} else {
 			fsm_sendFailure(FailureType_Failure_DataError, _("Txtype out of bounds"));
@@ -548,10 +548,10 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 	rlp_length += rlp_calculate_length(msg->to.size, msg->to.bytes[0]);
 	rlp_length += rlp_calculate_length(msg->value.size, msg->value.bytes[0]);
 	rlp_length += rlp_calculate_length(data_total, msg->data_initial_chunk.bytes[0]);
-    if (tx_type != 0) {
+    if (tx_type) {
         rlp_length += rlp_calculate_length(1, tx_type);
     }
-	if (chain_id != 0) {
+	if (chain_id) {
 		rlp_length += rlp_calculate_length(1, chain_id);
 		rlp_length += rlp_calculate_length(0, 0);
 		rlp_length += rlp_calculate_length(0, 0);
@@ -562,7 +562,7 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 
 	layoutProgress(_("Signing"), 100);
 
-    if (tx_type != 0) {
+    if (tx_type) {
         hash_rlp_number(tx_type);
     }
 	hash_rlp_field(msg->nonce.bytes, msg->nonce.size);
