@@ -14,6 +14,9 @@ else
 fi
 
 make
+if [ "$EMULATOR" != 1 ]; then
+    make -C bootloader
+fi
 
 if [ "$FASTFLASH" = 1 ]; then
     make -C fastflash
