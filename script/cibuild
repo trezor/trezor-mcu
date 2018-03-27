@@ -7,13 +7,17 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-if [ "$EMULATOR" = 1 ]; then
-    make -C emulator
-else
-    make -C vendor/libopencm3 lib/stm32/f2
-fi
+make -C vendor/libopencm3 lib/stm32/f2
 
-make
+# make unemulated bootloader
+EMULATOR=0 make
+EMULATOR=0 make -C bootloader
+
+if [ "$EMULATOR" = 1 ]; then
+    # remake base files
+    make -C emulator
+    make clean && make
+fi
 
 if [ "$FASTFLASH" = 1 ]; then
     make -C fastflash

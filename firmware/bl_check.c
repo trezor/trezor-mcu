@@ -47,7 +47,7 @@ void check_bootloader(void)
 
 	if (!known_bootloader(r, hash)) {
 		layoutDialog(&bmp_icon_error, NULL, NULL, NULL, "Unknown bootloader", "detected.", NULL, "Unplug your TREZOR", "contact our support.", NULL);
-		system_halt();
+		shutdown();
 	}
 
 	if (r == 32 && 0 == memcmp(hash, bl_hash, 32)) {
@@ -71,5 +71,5 @@ void check_bootloader(void)
 
 	// show info and halt
 	layoutDialog(&bmp_icon_info, NULL, NULL, NULL, _("Update finished"), _("successfully."), NULL, _("Please reconnect"), _("the device."), NULL);
-	system_halt();
+	shutdown();
 }
