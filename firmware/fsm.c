@@ -55,6 +55,7 @@
 #include "nem2.h"
 #include "rfc6979.h"
 #include "gettext.h"
+#include "supervise.h"
 
 // message methods
 
@@ -1678,7 +1679,7 @@ void fsm_msgDebugLinkMemoryRead(DebugLinkMemoryRead *msg)
 	if (msg->has_length && msg->length < length)
 		length = msg->length;
 	resp->has_memory = true;
-	memcpy(resp->memory.bytes, (void*) msg->address, length);
+	memcpy(resp->memory.bytes, FLASH_PTR(msg->address), length);
 	resp->memory.size = length;
 	msg_debug_write(MessageType_MessageType_DebugLinkMemory, resp);
 }
@@ -1687,24 +1688,25 @@ void fsm_msgDebugLinkMemoryWrite(DebugLinkMemoryWrite *msg)
 {
 	uint32_t length = msg->memory.size;
 	if (msg->flash) {
-		flash_clear_status_flags();
-		flash_unlock();
+		svc_flash_unlock();
+		svc_flash_program(FLASH_CR_PROGRAM_X32);
 		for (uint32_t i = 0; i < length; i += 4) {
 			uint32_t word;
 			memcpy(&word, msg->memory.bytes + i, 4);
-			flash_program_word(msg->address + i, word);
+			flash_write32(msg->address + i, word);
 		}
-		flash_lock();
+		svc_flash_lock();
 	} else {
+#if !EMULATOR
 		memcpy((void *) msg->address, msg->memory.bytes, length);
+#endif
 	}
 }
 
 void fsm_msgDebugLinkFlashErase(DebugLinkFlashErase *msg)
 {
-	flash_clear_status_flags();
-	flash_unlock();
-	flash_erase_sector(msg->sector, FLASH_CR_PROGRAM_X32);
-	flash_lock();
+	svc_flash_unlock();
+	svc_flash_erase_sector(msg->sector);
+	svc_flash_lock();
 }
 #endif

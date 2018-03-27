@@ -19,6 +19,7 @@
 
 #include "protect.h"
 #include "storage.h"
+#include "memory.h"
 #include "messages.h"
 #include "usb.h"
 #include "oled.h"
@@ -159,8 +160,8 @@ bool protectPin(bool use_cached)
 	if (!storage_hasPin() || (use_cached && session_isPinCached())) {
 		return true;
 	}
-	uint32_t *fails = storage_getPinFailsPtr();
-	uint32_t wait = ~*fails;
+	uint32_t fails = storage_getPinFailsOffset();
+	uint32_t wait = storage_getPinWait(fails);
 	protectCheckMaxTry(wait);
 	usbTiny(1);
 	while (wait > 0) {
@@ -205,7 +206,7 @@ bool protectPin(bool use_cached)
 		storage_resetPinFails(fails);
 		return true;
 	} else {
-		protectCheckMaxTry(~*fails);
+		protectCheckMaxTry(storage_getPinWait(fails));
 		fsm_sendFailure(FailureType_Failure_PinInvalid, NULL);
 		return false;
 	}

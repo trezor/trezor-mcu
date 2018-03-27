@@ -17,9 +17,9 @@
  * along with this library.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libopencm3/stm32/flash.h>
-
 #include <string.h>
+#include <assert.h>
+#include <stdbool.h>
 
 #include "memory.h"
 
@@ -66,7 +66,7 @@ static void *sector_to_address(uint8_t sector) {
 		return NULL;
 	}
 
-	return (void *) (FLASH_ORIGIN + offset);
+	return (void *) FLASH_PTR(FLASH_ORIGIN + offset);
 }
 
 static ssize_t sector_to_size(uint8_t sector) {
@@ -106,9 +106,30 @@ void flash_erase_all_sectors(uint32_t program_size) {
 }
 
 void flash_program_word(uint32_t address, uint32_t data) {
-	MMIO32(address) = data;
+	*(volatile uint32_t *)FLASH_PTR(address) = data;
 }
 
 void flash_program_byte(uint32_t address, uint8_t data) {
-	MMIO8(address) = data;
+	*(volatile uint8_t *)FLASH_PTR(address) = data;
+}
+
+static bool flash_locked = true;
+void svc_flash_unlock(void) {
+	assert (flash_locked);
+	flash_locked = false;
+}
+void svc_flash_program(uint32_t size) {
+	(void) size;
+	assert (!flash_locked);
+}
+void svc_flash_erase_sector(uint16_t sector) {
+	assert (!flash_locked);
+	assert (sector >= FLASH_META_SECTOR_FIRST &&
+			sector <= FLASH_META_SECTOR_LAST);
+	flash_erase_sector(sector, 3);
+}
+uint32_t svc_flash_lock(void) {
+	assert (!flash_locked);
+	flash_locked = true;
+	return 0;
 }

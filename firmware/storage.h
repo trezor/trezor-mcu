@@ -35,7 +35,7 @@
 #define STORAGE_BYTES(NAME, SIZE) \
     bool has_##NAME; \
     struct { \
-        size_t size; \
+        uint32_t size; \
         uint8_t bytes[SIZE]; \
     } NAME;
 
@@ -48,7 +48,7 @@ typedef struct {
     uint32_t fingerprint;
     uint32_t child_num;
     struct {
-        size_t size;
+        uint32_t size;
         uint8_t bytes[32];
     } chain_code;
 
@@ -122,9 +122,10 @@ void storage_setPin(const char *pin);
 void session_cachePin(void);
 bool session_isPinCached(void);
 void storage_clearPinArea(void);
-void storage_resetPinFails(uint32_t *pinfailptr);
-bool storage_increasePinFails(uint32_t *pinfailptr);
-uint32_t *storage_getPinFailsPtr(void);
+void storage_resetPinFails(uint32_t flash_pinfails);
+bool storage_increasePinFails(uint32_t flash_pinfails);
+uint32_t storage_getPinWait(uint32_t flash_pinfails);
+uint32_t storage_getPinFailsOffset(void);
 
 uint32_t storage_nextU2FCounter(void);
 void storage_setU2FCounter(uint32_t u2fcounter);
