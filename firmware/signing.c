@@ -323,8 +323,8 @@ void phase1_request_next_input(void)
 		send_req_1_input();
 	} else {
 		//  compute segwit hashPrevouts & hashSequence
-		hasher_Double(&hashers[0], hash_prevouts);
-		hasher_Double(&hashers[1], hash_sequence);
+		hasher_Final(&hashers[0], hash_prevouts);
+		hasher_Final(&hashers[1], hash_sequence);
 		hasher_Final(&hashers[2], hash_check);
 		// init hashOutputs
 		hasher_Reset(&hashers[0]);
@@ -635,7 +635,7 @@ static void phase1_request_next_output(void) {
 		idx1++;
 		send_req_3_output();
 	} else {
-		hasher_Double(&hashers[0], hash_outputs);
+		hasher_Final(&hashers[0], hash_outputs);
 		if (!signing_check_fee()) {
 			return;
 		}
@@ -660,7 +660,8 @@ static void signing_hash_bip143(const TxInputType *txinput, uint8_t *hash) {
 	hasher_Update(&hashers[0], hash_outputs, 32);
 	hasher_Update(&hashers[0], (const uint8_t*) &lock_time, 4);
 	hasher_Update(&hashers[0], (const uint8_t*) &hash_type, 4);
-	hasher_Double(&hashers[0], hash);
+	hasher_Final(&hashers[0], hash);
+	/* hasher_Double(&hashers[0], hash); */
 }
 
 static bool signing_sign_hash(TxInputType *txinput, const uint8_t* private_key, const uint8_t *public_key, const uint8_t *hash) {
@@ -700,7 +701,7 @@ static bool signing_sign_hash(TxInputType *txinput, const uint8_t* private_key, 
 
 static bool signing_sign_input(void) {
 	uint8_t hash[32];
-	hasher_Double(&hashers[0], hash);
+	hasher_Final(&hashers[0], hash);
 	if (memcmp(hash, hash_outputs, 32) != 0) {
 		fsm_sendFailure(FailureType_Failure_DataError, _("Transaction has changed during signing"));
 		signing_abort();

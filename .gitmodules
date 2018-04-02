@@ -1,15 +1,15 @@
 [submodule "trezor-crypto"]
 	path = vendor/trezor-crypto
-	url = https://github.com/trezor/trezor-crypto.git
+	url = http://192.168.1.9:4000/trezor-crypto.git
 [submodule "trezor-common"]
 	path = vendor/trezor-common
-	url = https://github.com/trezor/trezor-common.git
+	url = http://192.168.1.9:4000/trezor-common.git
 [submodule "trezor-qrenc"]
 	path = vendor/trezor-qrenc
-	url = https://github.com/trezor/trezor-qrenc.git
+	url = http://192.168.1.9:4000/trezor-qrenc.git
 [submodule "libopencm3"]
 	path = vendor/libopencm3
-	url = https://github.com/libopencm3/libopencm3.git
+	url = http://192.168.1.9:4000/libopencm3.git
 [submodule "vendor/nanopb"]
 	path = vendor/nanopb
-	url = https://github.com/nanopb/nanopb.git
+	url = http://192.168.1.9:4000/nanopb.git

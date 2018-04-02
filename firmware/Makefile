@@ -64,6 +64,7 @@ OBJS += ../vendor/trezor-crypto/sha2.o
 OBJS += ../vendor/trezor-crypto/sha3.o
 OBJS += ../vendor/trezor-crypto/blake256.o
 OBJS += ../vendor/trezor-crypto/hasher.o
+OBJS += ../vendor/trezor-crypto/groestl.o
 
 OBJS += ../vendor/trezor-crypto/aes/aescrypt.o
 OBJS += ../vendor/trezor-crypto/aes/aeskey.o

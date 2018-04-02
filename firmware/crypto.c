@@ -119,7 +119,8 @@ static void cryptoMessageHash(const CoinInfo *coin, const uint8_t *message, size
 	uint32_t l = ser_length(message_len, varint);
 	hasher_Update(&hasher, varint, l);
 	hasher_Update(&hasher, message, message_len);
-	hasher_Double(&hasher, hash);
+	hasher_Final(&hasher, hash);
+	/* hasher_Double(&hasher, hash); */
 }
 
 int cryptoMessageSign(const CoinInfo *coin, HDNode *node, InputScriptType script_type, const uint8_t *message, size_t message_len, uint8_t *signature)
