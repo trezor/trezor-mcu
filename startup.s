@@ -33,7 +33,43 @@ reset_handler:
   // enter the application code
   bl main
 
-  // loop forever if the application code returns
-  b .
+  // shutdown if the application code returns
+  b shutdown
+
+  .global shutdown
+  .type shutdown, STT_FUNC
+shutdown:
+  cpsid f
+  ldr r0, =0
+  mov r1, r0
+  mov r2, r0
+  mov r3, r0
+  mov r4, r0
+  mov r5, r0
+  mov r6, r0
+  mov r7, r0
+  mov r8, r0
+  mov r9, r0
+  mov r10, r0
+  mov r11, r0
+  mov r12, r0
+  ldr lr, =0xffffffff
+  ldr r0, =_ram_start
+  ldr r1, =_ram_end
+  // set to value in r2
+  bl memset_reg
+  b . // loop forever
+
+  .ltorg // dump literal pool (for the ldr ...,=... commands above)
+
+  .global sv_call_handler
+  .type sv_call_handler, STT_FUNC
+
+sv_call_handler:
+  tst lr, #4
+  ite eq
+  mrseq r0, msp
+  mrsne r0, psp
+  b svc_handler_main
 
   .end

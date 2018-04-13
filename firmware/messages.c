@@ -48,12 +48,7 @@ const pb_field_t *MessageFields(char type, char dir, uint16_t msg_id)
 {
 	const struct MessagesMap_t *m = MessagesMap;
 	while (m->type) {
-#if EMULATOR
-		(void) type;
-		if (dir == m->dir && msg_id == m->msg_id) {
-#else
 		if (type == m->type && dir == m->dir && msg_id == m->msg_id) {
-#endif
 			return m->fields;
 		}
 		m++;
@@ -65,12 +60,7 @@ void MessageProcessFunc(char type, char dir, uint16_t msg_id, void *ptr)
 {
 	const struct MessagesMap_t *m = MessagesMap;
 	while (m->type) {
-#if EMULATOR
-		(void) type;
-		if (dir == m->dir && msg_id == m->msg_id) {
-#else
 		if (type == m->type && dir == m->dir && msg_id == m->msg_id) {
-#endif
 			m->process_func(ptr);
 			return;
 		}
@@ -259,7 +249,7 @@ void msg_read_common(char type, const uint8_t *buf, int len)
 			return;
 		}
 		msg_id = (buf[3] << 8) + buf[4];
-		msg_size = (buf[5] << 24)+ (buf[6] << 16) + (buf[7] << 8) + buf[8];
+		msg_size = ((uint32_t) buf[5] << 24)+ (buf[6] << 16) + (buf[7] << 8) + buf[8];
 
 		fields = MessageFields(type, 'i', msg_id);
 		if (!fields) { // unknown message
@@ -314,7 +304,16 @@ const uint8_t *msg_debug_out_data(void)
 
 #endif
 
-CONFIDENTIAL uint8_t msg_tiny[64];
+CONFIDENTIAL uint8_t msg_tiny[128];
+_Static_assert(sizeof(msg_tiny) >= sizeof(Cancel), "msg_tiny too tiny");
+_Static_assert(sizeof(msg_tiny) >= sizeof(Initialize), "msg_tiny too tiny");
+_Static_assert(sizeof(msg_tiny) >= sizeof(PassphraseAck), "msg_tiny too tiny");
+_Static_assert(sizeof(msg_tiny) >= sizeof(ButtonAck), "msg_tiny too tiny");
+_Static_assert(sizeof(msg_tiny) >= sizeof(PinMatrixAck), "msg_tiny too tiny");
+#if DEBUG_LINK
+_Static_assert(sizeof(msg_tiny) >= sizeof(DebugLinkDecision), "msg_tiny too tiny");
+_Static_assert(sizeof(msg_tiny) >= sizeof(DebugLinkGetState), "msg_tiny too tiny");
+#endif
 uint16_t msg_tiny_id = 0xFFFF;
 
 void msg_read_tiny(const uint8_t *buf, int len)
@@ -324,7 +323,7 @@ void msg_read_tiny(const uint8_t *buf, int len)
 		return;
 	}
 	uint16_t msg_id = (buf[3] << 8) + buf[4];
-	uint32_t msg_size = (buf[5] << 24) + (buf[6] << 16) + (buf[7] << 8) + buf[8];
+	uint32_t msg_size = ((uint32_t) buf[5] << 24) + (buf[6] << 16) + (buf[7] << 8) + buf[8];
 	if (msg_size > 64 || len - msg_size < 9) {
 		return;
 	}

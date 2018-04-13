@@ -14,14 +14,11 @@ endif
 
 OBJS += util.o
 OBJS += memory.o
+OBJS += supervise.o
 
 ifneq ($(EMULATOR),1)
 OBJS += timer.o
 endif
-
-OBJS += usb21_standard.o
-OBJS += webusb.o
-OBJS += winusb.o
 
 OBJS += gen/bitmaps.o
 OBJS += gen/fonts.o

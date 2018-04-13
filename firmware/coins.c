@@ -20,15 +20,8 @@
 #include <string.h>
 #include "coins.h"
 #include "address.h"
-#include "curves.h"
 #include "ecdsa.h"
 #include "base58.h"
-#include "secp256k1.h"
-
-// filled CoinInfo structure defined in coins.h
-const CoinInfo coins[COINS_COUNT] = {
-#include "coins_array.h"
-};
 
 const CoinInfo *coinByName(const char *name)
 {
@@ -65,7 +58,7 @@ bool coinExtractAddressType(const CoinInfo *coin, const char *addr, uint32_t *ad
 {
 	if (!addr) return false;
 	uint8_t addr_raw[MAX_ADDR_RAW_SIZE];
-	int len = base58_decode_check(addr, coin->curve->hasher_type, addr_raw, MAX_ADDR_RAW_SIZE);
+	int len = base58_decode_check(addr, coin->curve->hasher_base58, addr_raw, MAX_ADDR_RAW_SIZE);
 	if (len >= 21) {
 		return coinExtractAddressTypeRaw(coin, addr_raw, address_type);
 	}

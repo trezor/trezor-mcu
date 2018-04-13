@@ -35,7 +35,7 @@
 #define STORAGE_BYTES(NAME, SIZE) \
     bool has_##NAME; \
     struct { \
-        size_t size; \
+        uint32_t size; \
         uint8_t bytes[SIZE]; \
     } NAME;
 
@@ -48,7 +48,7 @@ typedef struct {
     uint32_t fingerprint;
     uint32_t child_num;
     struct {
-        size_t size;
+        uint32_t size;
         uint8_t bytes[32];
     } chain_code;
 
@@ -72,6 +72,8 @@ typedef struct _Storage {
     STORAGE_BOOL   (needs_backup)
     STORAGE_UINT32 (flags)
     STORAGE_NODE   (u2froot)
+    STORAGE_BOOL   (unfinished_backup)
+    STORAGE_UINT32 (auto_lock_delay_ms)
 } Storage;
 
 extern Storage storageUpdate;
@@ -122,9 +124,10 @@ void storage_setPin(const char *pin);
 void session_cachePin(void);
 bool session_isPinCached(void);
 void storage_clearPinArea(void);
-void storage_resetPinFails(uint32_t *pinfailptr);
-bool storage_increasePinFails(uint32_t *pinfailptr);
-uint32_t *storage_getPinFailsPtr(void);
+void storage_resetPinFails(uint32_t flash_pinfails);
+bool storage_increasePinFails(uint32_t flash_pinfails);
+uint32_t storage_getPinWait(uint32_t flash_pinfails);
+uint32_t storage_getPinFailsOffset(void);
 
 uint32_t storage_nextU2FCounter(void);
 void storage_setU2FCounter(uint32_t u2fcounter);
@@ -137,8 +140,14 @@ void storage_setImported(bool imported);
 bool storage_needsBackup(void);
 void storage_setNeedsBackup(bool needs_backup);
 
+bool storage_unfinishedBackup(void);
+void storage_setUnfinishedBackup(bool unfinished_backup);
+
 void storage_applyFlags(uint32_t flags);
 uint32_t storage_getFlags(void);
+
+uint32_t storage_getAutoLockDelayMs(void);
+void storage_setAutoLockDelayMs(uint32_t auto_lock_delay_ms);
 
 void storage_wipe(void);
 

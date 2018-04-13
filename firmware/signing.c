@@ -45,7 +45,8 @@ enum {
 	STAGE_REQUEST_4_OUTPUT,
 	STAGE_REQUEST_SEGWIT_INPUT,
 	STAGE_REQUEST_5_OUTPUT,
-	STAGE_REQUEST_SEGWIT_WITNESS
+	STAGE_REQUEST_SEGWIT_WITNESS,
+	STAGE_REQUEST_DECRED_WITNESS
 } signing_stage;
 static uint32_t idx1, idx2;
 static uint32_t signatures;
@@ -57,6 +58,7 @@ static Hasher hashers[3];
 static uint8_t CONFIDENTIAL privkey[32];
 static uint8_t pubkey[33], sig[64];
 static uint8_t hash_prevouts[32], hash_sequence[32],hash_outputs[32];
+static uint8_t hash_prefix[32];
 static uint8_t hash_check[32];
 static uint64_t to_spend, authorized_amount, spending, change_spend;
 static uint32_t version = 1;
@@ -92,6 +94,12 @@ enum {
 	SIGHASH_FORKID = 0x40,
 };
 
+enum {
+	DECRED_SERIALIZE_FULL = 0,
+	DECRED_SERIALIZE_NO_WITNESS = 1,
+	DECRED_SERIALIZE_WITNESS_SIGNING = 3,
+};
+
 
 /* progress_step/meta_step are fixed point numbers, giving the
  * progress per input in permille with these many additional bits.
@@ -114,7 +122,10 @@ Phase1 - check inputs, previous transactions, and outputs
 foreach I (idx1):
     Request I                                                         STAGE_REQUEST_1_INPUT
     Add I to segwit hash_prevouts, hash_sequence
+    Add I to Decred hash_prefix
     Add I to TransactionChecksum (prevout and type)
+    if (Decred)
+        Return I
     If not segwit, Calculate amount of I:
         Request prevhash I, META                                      STAGE_REQUEST_2_PREV_META
         foreach prevhash I (idx2):
@@ -126,7 +137,10 @@ foreach I (idx1):
         Calculate hash of streamed tx, compare to prevhash I
 foreach O (idx1):
     Request O                                                         STAGE_REQUEST_3_OUTPUT
+    Add O to Decred hash_prefix
     Add O to TransactionChecksum
+    if (Decred)
+        Return O
     Display output
     Ask for confirmation
 
@@ -135,6 +149,9 @@ Ask for confirmation
 
 Phase2: sign inputs, check that nothing changed
 ===============================================
+
+if (Decred)
+    Skip to STAGE_REQUEST_DECRED_WITNESS
 
 foreach I (idx1):  // input to sign
     if (idx1 is segwit)
@@ -145,8 +162,8 @@ foreach I (idx1):  // input to sign
         foreach I (idx2):
             Request I                                                 STAGE_REQUEST_4_INPUT
             If idx1 == idx2
-            Remember key for signing
                 Fill scriptsig
+                Remember key for signing
             Add I to StreamTransactionSign
             Add I to TransactionChecksum
         foreach O (idx2):
@@ -173,6 +190,17 @@ foreach I (idx1):  // input to sign
     Request I                                                         STAGE_REQUEST_SEGWIT_WITNESS
     Check amount
     Sign  segwit prevhash, sequence, amount, outputs
+    Return witness
+
+Phase3: sign Decred inputs
+==========================
+
+foreach I (idx1): // input to sign                                    STAGE_REQUEST_DECRED_WITNESS
+    Request I
+    Fill scriptSig
+    Compute hash_witness
+
+    Sign (hash_type || hash_prefix || hash_witness)
     Return witness
 */
 
@@ -298,6 +326,17 @@ void send_req_segwit_witness(void)
 	msg_write(MessageType_MessageType_TxRequest, &resp);
 }
 
+void send_req_decred_witness(void)
+{
+	signing_stage = STAGE_REQUEST_DECRED_WITNESS;
+	resp.has_request_type = true;
+	resp.request_type = RequestType_TXINPUT;
+	resp.has_details = true;
+	resp.details.has_request_index = true;
+	resp.details.request_index = idx1;
+	msg_write(MessageType_MessageType_TxRequest, &resp);
+}
+
 void send_req_5_output(void)
 {
 	signing_stage = STAGE_REQUEST_5_OUTPUT;
@@ -323,8 +362,8 @@ void phase1_request_next_input(void)
 		send_req_1_input();
 	} else {
 		//  compute segwit hashPrevouts & hashSequence
-		hasher_Double(&hashers[0], hash_prevouts);
-		hasher_Double(&hashers[1], hash_sequence);
+		hasher_Final(&hashers[0], hash_prevouts);
+		hasher_Final(&hashers[1], hash_sequence);
 		hasher_Final(&hashers[2], hash_check);
 		// init hashOutputs
 		hasher_Reset(&hashers[0]);
@@ -421,27 +460,31 @@ bool compile_input_script_sig(TxInputType *tinput)
 	}
 	hdnode_fill_public_key(&node);
 	if (tinput->has_multisig) {
-		tinput->script_sig.size = compile_script_multisig(&(tinput->multisig), tinput->script_sig.bytes);
+		tinput->script_sig.size = compile_script_multisig(coin, &(tinput->multisig), tinput->script_sig.bytes);
 	} else { // SPENDADDRESS
 		uint8_t hash[20];
-		ecdsa_get_pubkeyhash(node.public_key, coin->curve->hasher_type, hash);
+		ecdsa_get_pubkeyhash(node.public_key, coin->curve->hasher_pubkey, hash);
 		tinput->script_sig.size = compile_script_sig(coin->address_type, hash, tinput->script_sig.bytes);
 	}
 	return tinput->script_sig.size > 0;
 }
 
-void signing_init(uint32_t _inputs_count, uint32_t _outputs_count, const CoinInfo *_coin, const HDNode *_root, uint32_t _version, uint32_t _lock_time)
+void signing_init(const SignTx *msg, const CoinInfo *_coin, const HDNode *_root)
 {
-	inputs_count = _inputs_count;
-	outputs_count = _outputs_count;
+	inputs_count = msg->inputs_count;
+	outputs_count = msg->outputs_count;
 	coin = _coin;
 	root = _root;
-	version = _version;
-	lock_time = _lock_time;
+	version = msg->version;
+	lock_time = msg->lock_time;
 
-	tx_weight = 4 * (TXSIZE_HEADER + TXSIZE_FOOTER
-					 + ser_length_size(inputs_count)
-					 + ser_length_size(outputs_count));
+	uint32_t size = TXSIZE_HEADER + TXSIZE_FOOTER + ser_length_size(inputs_count) + ser_length_size(outputs_count);
+	if (coin->decred) {
+		size += 4; // Decred expiry
+		size += ser_length_size(inputs_count); // Witness inputs count
+	}
+
+	tx_weight = 4 * size;
 
 	signatures = 0;
 	idx1 = 0;
@@ -463,11 +506,23 @@ void signing_init(uint32_t _inputs_count, uint32_t _outputs_count, const CoinInf
 	multisig_fp_mismatch = false;
 	next_nonsegwit_input = 0xffffffff;
 
-	tx_init(&to, inputs_count, outputs_count, version, lock_time, 0, coin->curve->hasher_type);
+	tx_init(&to, inputs_count, outputs_count, version, lock_time, 0, coin->curve->hasher_sign);
+
+	if (coin->decred) {
+		to.version |= (DECRED_SERIALIZE_FULL << 16);
+		to.is_decred = true;
+		to.decred_expiry = msg->decred_expiry;
+
+		tx_init(&ti, inputs_count, outputs_count, version, lock_time, 0, coin->curve->hasher_sign);
+		ti.version |= (DECRED_SERIALIZE_NO_WITNESS << 16);
+		ti.is_decred = true;
+		ti.decred_expiry = msg->decred_expiry;
+	}
+
 	// segwit hashes for hashPrevouts and hashSequence
-	hasher_Init(&hashers[0], coin->curve->hasher_type);
-	hasher_Init(&hashers[1], coin->curve->hasher_type);
-	hasher_Init(&hashers[2], coin->curve->hasher_type);
+	hasher_Init(&hashers[0], coin->curve->hasher_sign);
+	hasher_Init(&hashers[1], coin->curve->hasher_sign);
+	hasher_Init(&hashers[2], coin->curve->hasher_sign);
 
 	layoutProgressSwipe(_("Signing transaction"), 0);
 
@@ -503,6 +558,21 @@ static bool signing_check_input(TxInputType *txinput) {
 	// compute segwit hashPrevouts & hashSequence
 	tx_prevout_hash(&hashers[0], txinput);
 	tx_sequence_hash(&hashers[1], txinput);
+	if (coin->decred) {
+		if (txinput->decred_script_version > 0) {
+			fsm_sendFailure(FailureType_Failure_DataError, _("Decred v1+ scripts are not supported"));
+			signing_abort();
+			return false;
+		}
+
+		// serialize Decred prefix in Phase 1
+		resp.has_serialized = true;
+		resp.serialized.has_serialized_tx = true;
+		resp.serialized.serialized_tx.size = tx_serialize_input(&to, txinput, resp.serialized.serialized_tx.bytes);
+
+		// compute Decred hashPrefix
+		tx_serialize_input_hash(&ti, txinput);
+	}
 	// hash prevout and script type to check it later (relevant for fee computation)
 	tx_prevout_hash(&hashers[2], txinput);
 	hasher_Update(&hashers[2], (const uint8_t *) &txinput->script_type, sizeof(&txinput->script_type));
@@ -589,8 +659,17 @@ static bool signing_check_output(TxOutputType *txoutput) {
 		signing_abort();
 		return false;
 	}
+	if (coin->decred) {
+		// serialize Decred prefix in Phase 1
+		resp.has_serialized = true;
+		resp.serialized.has_serialized_tx = true;
+		resp.serialized.serialized_tx.size = tx_serialize_output(&to, &bin_output, resp.serialized.serialized_tx.bytes);
+
+		// compute Decred hashPrefix
+		tx_serialize_output_hash(&ti, &bin_output);
+	}
 	//  compute segwit hashOuts
-	tx_output_hash(&hashers[0], &bin_output);
+	tx_output_hash(&hashers[0], &bin_output, coin->decred);
 	return true;
 }
 
@@ -635,7 +714,11 @@ static void phase1_request_next_output(void) {
 		idx1++;
 		send_req_3_output();
 	} else {
-		hasher_Double(&hashers[0], hash_outputs);
+		if (coin->decred) {
+			// compute Decred hashPrefix
+			tx_hash_final(&ti, hash_prefix, false);
+		}
+		hasher_Final(&hashers[0], hash_outputs);
 		if (!signing_check_fee()) {
 			return;
 		}
@@ -643,7 +726,12 @@ static void phase1_request_next_output(void) {
 		progress_meta_step = progress_step / (inputs_count + outputs_count);
 		layoutProgress(_("Signing transaction"), progress);
 		idx1 = 0;
-		phase2_request_next_input();
+		if (coin->decred) {
+			// Decred prefix serialized in Phase 1, skip Phase 2
+			send_req_decred_witness();
+		} else {
+			phase2_request_next_input();
+		}
 	}
 }
 
@@ -660,7 +748,16 @@ static void signing_hash_bip143(const TxInputType *txinput, uint8_t *hash) {
 	hasher_Update(&hashers[0], hash_outputs, 32);
 	hasher_Update(&hashers[0], (const uint8_t*) &lock_time, 4);
 	hasher_Update(&hashers[0], (const uint8_t*) &hash_type, 4);
-	hasher_Double(&hashers[0], hash);
+	hasher_Final(&hashers[0], hash);
+}
+
+static void signing_hash_decred(const uint8_t *hash_witness, uint8_t *hash) {
+	uint32_t hash_type = signing_hash_type();
+	hasher_Reset(&hashers[0]);
+	hasher_Update(&hashers[0], (const uint8_t*) &hash_type, 4);
+	hasher_Update(&hashers[0], hash_prefix, 32);
+	hasher_Update(&hashers[0], hash_witness, 32);
+	hasher_Final(&hashers[0], hash);
 }
 
 static bool signing_sign_hash(TxInputType *txinput, const uint8_t* private_key, const uint8_t *public_key, const uint8_t *hash) {
@@ -668,7 +765,7 @@ static bool signing_sign_hash(TxInputType *txinput, const uint8_t* private_key, 
 	resp.serialized.signature_index = idx1;
 	resp.serialized.has_signature = true;
 	resp.serialized.has_serialized_tx = true;
-	if (ecdsa_sign_digest(&secp256k1, private_key, hash, sig, NULL, NULL) != 0) {
+	if (ecdsa_sign_digest(coin->curve->params, private_key, hash, sig, NULL, NULL) != 0) {
 		fsm_sendFailure(FailureType_Failure_ProcessError, _("Signing failed"));
 		signing_abort();
 		return false;
@@ -678,7 +775,7 @@ static bool signing_sign_hash(TxInputType *txinput, const uint8_t* private_key, 
 	uint8_t sighash = signing_hash_type() & 0xff;
 	if (txinput->has_multisig) {
 		// fill in the signature
-		int pubkey_idx = cryptoMultisigPubkeyIndex(&(txinput->multisig), public_key);
+		int pubkey_idx = cryptoMultisigPubkeyIndex(coin, &(txinput->multisig), public_key);
 		if (pubkey_idx < 0) {
 			fsm_sendFailure(FailureType_Failure_DataError, _("Pubkey not found in multisig script"));
 			signing_abort();
@@ -686,7 +783,7 @@ static bool signing_sign_hash(TxInputType *txinput, const uint8_t* private_key, 
 		}
 		memcpy(txinput->multisig.signatures[pubkey_idx].bytes, resp.serialized.signature.bytes, resp.serialized.signature.size);
 		txinput->multisig.signatures[pubkey_idx].size = resp.serialized.signature.size;
-		txinput->script_sig.size = serialize_script_multisig(&(txinput->multisig), sighash, txinput->script_sig.bytes);
+		txinput->script_sig.size = serialize_script_multisig(coin, &(txinput->multisig), sighash, txinput->script_sig.bytes);
 		if (txinput->script_sig.size == 0) {
 			fsm_sendFailure(FailureType_Failure_ProcessError, _("Failed to serialize multisig script"));
 			signing_abort();
@@ -700,7 +797,7 @@ static bool signing_sign_hash(TxInputType *txinput, const uint8_t* private_key, 
 
 static bool signing_sign_input(void) {
 	uint8_t hash[32];
-	hasher_Double(&hashers[0], hash);
+	hasher_Final(&hashers[0], hash);
 	if (memcmp(hash, hash_outputs, 32) != 0) {
 		fsm_sendFailure(FailureType_Failure_DataError, _("Transaction has changed during signing"));
 		signing_abort();
@@ -754,9 +851,9 @@ static bool signing_sign_segwit_input(TxInputType *txinput) {
 				txinput->multisig.signatures[i].bytes[txinput->multisig.signatures[i].size] = sighash;
 				r += tx_serialize_script(txinput->multisig.signatures[i].size + 1, txinput->multisig.signatures[i].bytes, resp.serialized.serialized_tx.bytes + r);
 			}
-			uint32_t script_len = compile_script_multisig(&txinput->multisig, 0);
+			uint32_t script_len = compile_script_multisig(coin, &txinput->multisig, 0);
 			r += ser_length(script_len, resp.serialized.serialized_tx.bytes + r);
-			r += compile_script_multisig(&txinput->multisig, resp.serialized.serialized_tx.bytes + r);
+			r += compile_script_multisig(coin, &txinput->multisig, resp.serialized.serialized_tx.bytes + r);
 			resp.serialized.serialized_tx.bytes[0] = nwitnesses;
 			resp.serialized.serialized_tx.size = r;
 		} else { // single signature
@@ -785,6 +882,17 @@ static bool signing_sign_segwit_input(TxInputType *txinput) {
 	return true;
 }
 
+static bool signing_sign_decred_input(TxInputType *txinput) {
+	uint8_t hash[32], hash_witness[32];
+	tx_hash_final(&ti, hash_witness, false);
+	signing_hash_decred(hash_witness, hash);
+	resp.has_serialized = true;
+	if (!signing_sign_hash(txinput, node.private_key, node.public_key, hash))
+		return false;
+	resp.serialized.serialized_tx.size = tx_serialize_decred_witness(&to, txinput, resp.serialized.serialized_tx.bytes);
+	return true;
+}
+
 #define ENABLE_SEGWIT_NONSEGWIT_MIXING  1
 
 void signing_txack(TransactionType *tx)
@@ -806,7 +914,12 @@ void signing_txack(TransactionType *tx)
 	switch (signing_stage) {
 		case STAGE_REQUEST_1_INPUT:
 			signing_check_input(&tx->inputs[0]);
-			tx_weight += tx_input_weight(&tx->inputs[0]);
+
+			tx_weight += tx_input_weight(coin, &tx->inputs[0]);
+			if (coin->decred) {
+				tx_weight += tx_decred_witness_weight(&tx->inputs[0]);
+			}
+
 			if (tx->inputs[0].script_type == InputScriptType_SPENDMULTISIG
 				|| tx->inputs[0].script_type == InputScriptType_SPENDADDRESS) {
 				memcpy(&input, tx->inputs, sizeof(TxInputType));
@@ -842,6 +955,11 @@ void signing_txack(TransactionType *tx)
 				}
 			} else if  (tx->inputs[0].script_type == InputScriptType_SPENDWITNESS
 						|| tx->inputs[0].script_type == InputScriptType_SPENDP2SHWITNESS) {
+				if (coin->decred) {
+					fsm_sendFailure(FailureType_Failure_DataError, _("Decred does not support Segwit"));
+					signing_abort();
+					return;
+				}
 				if (!coin->has_segwit) {
 					fsm_sendFailure(FailureType_Failure_DataError, _("Segwit not enabled on this coin"));
 					signing_abort();
@@ -882,7 +1000,22 @@ void signing_txack(TransactionType *tx)
 			}
 			return;
 		case STAGE_REQUEST_2_PREV_META:
-			tx_init(&tp, tx->inputs_cnt, tx->outputs_cnt, tx->version, tx->lock_time, tx->extra_data_len, coin->curve->hasher_type);
+			if (tx->outputs_cnt <= input.prev_index) {
+				fsm_sendFailure(FailureType_Failure_DataError, _("Not enough outputs in previous transaction."));
+				signing_abort();
+				return;
+			}
+			if (tx->inputs_cnt + tx->outputs_cnt < tx->inputs_cnt) {
+				fsm_sendFailure(FailureType_Failure_DataError, _("Value overflow"));
+				signing_abort();
+				return;
+			}
+			tx_init(&tp, tx->inputs_cnt, tx->outputs_cnt, tx->version, tx->lock_time, tx->extra_data_len, coin->curve->hasher_sign);
+			if (coin->decred) {
+				tp.version |= (DECRED_SERIALIZE_NO_WITNESS << 16);
+				tp.is_decred = true;
+				tp.decred_expiry = tx->decred_expiry;
+			}
 			progress_meta_step = progress_step / (tp.inputs_len + tp.outputs_len);
 			idx2 = 0;
 			if (tp.inputs_len > 0) {
@@ -917,6 +1050,11 @@ void signing_txack(TransactionType *tx)
 			if (idx2 == input.prev_index) {
 				if (to_spend + tx->bin_outputs[0].amount < to_spend) {
 					fsm_sendFailure(FailureType_Failure_DataError, _("Value overflow"));
+					signing_abort();
+					return;
+				}
+				if (coin->decred && tx->bin_outputs[0].decred_script_version > 0) {
+					fsm_sendFailure(FailureType_Failure_DataError, _("Decred script version does not match previous output"));
 					signing_abort();
 					return;
 				}
@@ -956,7 +1094,7 @@ void signing_txack(TransactionType *tx)
 		case STAGE_REQUEST_4_INPUT:
 			progress = 500 + ((signatures * progress_step + idx2 * progress_meta_step) >> PROGRESS_PRECISION);
 			if (idx2 == 0) {
-				tx_init(&ti, inputs_count, outputs_count, version, lock_time, 0, coin->curve->hasher_type);
+				tx_init(&ti, inputs_count, outputs_count, version, lock_time, 0, coin->curve->hasher_sign);
 				hasher_Reset(&hashers[0]);
 			}
 			// check prevouts and script type
@@ -1008,7 +1146,7 @@ void signing_txack(TransactionType *tx)
 				return;
 			}
 			//  check hashOutputs
-			tx_output_hash(&hashers[0], &bin_output);
+			tx_output_hash(&hashers[0], &bin_output, coin->decred);
 			if (!tx_serialize_output_hash(&ti, &bin_output)) {
 				fsm_sendFailure(FailureType_Failure_ProcessError, _("Failed to serialize output"));
 				signing_abort();
@@ -1090,7 +1228,7 @@ void signing_txack(TransactionType *tx)
 				tx->inputs[0].script_sig.bytes[1] = 0x00; // witness 0 script
 				tx->inputs[0].script_sig.bytes[2] = 0x20; // push 32 bytes (digest)
 				// compute digest of multisig script
-				if (!compile_script_multisig_hash(&tx->inputs[0].multisig, coin->curve->hasher_type, tx->inputs[0].script_sig.bytes + 3)) {
+				if (!compile_script_multisig_hash(coin, &tx->inputs[0].multisig, tx->inputs[0].script_sig.bytes + 3)) {
 					fsm_sendFailure(FailureType_Failure_ProcessError, _("Failed to compile input"));
 					signing_abort();
 					return;
@@ -1141,6 +1279,56 @@ void signing_txack(TransactionType *tx)
 			if (idx1 < inputs_count - 1) {
 				idx1++;
 				send_req_segwit_witness();
+			} else {
+				send_req_finished();
+				signing_abort();
+			}
+			return;
+
+		case STAGE_REQUEST_DECRED_WITNESS:
+			progress = 500 + ((signatures * progress_step + idx2 * progress_meta_step) >> PROGRESS_PRECISION);
+			if (idx1 == 0) {
+				// witness
+				tx_init(&to, inputs_count, outputs_count, version, lock_time, 0, coin->curve->hasher_sign);
+				to.is_decred = true;
+			}
+
+			// witness hash
+			tx_init(&ti, inputs_count, outputs_count, version, lock_time, 0, coin->curve->hasher_sign);
+			ti.version |= (DECRED_SERIALIZE_WITNESS_SIGNING << 16);
+			ti.is_decred = true;
+			if (!compile_input_script_sig(&tx->inputs[0])) {
+				fsm_sendFailure(FailureType_Failure_ProcessError, _("Failed to compile input"));
+				signing_abort();
+				return;
+			}
+
+			for (idx2 = 0; idx2 < inputs_count; idx2++) {
+				uint32_t r;
+				if (idx2 == idx1) {
+					r = tx_serialize_decred_witness_hash(&ti, &tx->inputs[0]);
+				} else {
+					r = tx_serialize_decred_witness_hash(&ti, NULL);
+				}
+
+				if (!r) {
+					fsm_sendFailure(FailureType_Failure_ProcessError, _("Failed to serialize input"));
+					signing_abort();
+					return;
+				}
+			}
+
+			if (!signing_sign_decred_input(&tx->inputs[0])) {
+				return;
+			}
+			// since this took a longer time, update progress
+			signatures++;
+			progress = 500 + ((signatures * progress_step) >> PROGRESS_PRECISION);
+			layoutProgress(_("Signing transaction"), progress);
+			update_ctr = 0;
+			if (idx1 < inputs_count - 1) {
+				idx1++;
+				send_req_decred_witness();
 			} else {
 				send_req_finished();
 				signing_abort();

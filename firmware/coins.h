@@ -24,7 +24,6 @@
 #include <stdbool.h>
 
 #include "bip32.h"
-#include "coins_count.h"
 #include "hasher.h"
 
 typedef struct _CoinInfo {
@@ -37,6 +36,7 @@ typedef struct _CoinInfo {
 	bool has_segwit;
 	bool has_forkid;
 	bool force_bip143;
+	bool decred;
 	// address types > 0xFF represent a two-byte prefix in big-endian order
 	uint32_t address_type;
 	uint32_t address_type_p2sh;
@@ -44,12 +44,13 @@ typedef struct _CoinInfo {
 	uint32_t xprv_magic;
 	uint32_t forkid;
 	const char *bech32_prefix;
+	const char *cashaddr_prefix;
 	uint32_t coin_type;
 	const char *curve_name;
 	const curve_info *curve;
 } CoinInfo;
 
-extern const CoinInfo coins[COINS_COUNT];
+#include "coin_info.h"
 
 const CoinInfo *coinByName(const char *name);
 const CoinInfo *coinByAddressType(uint32_t address_type);

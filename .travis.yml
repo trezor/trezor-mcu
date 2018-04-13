@@ -16,10 +16,8 @@ env:
     - PYTHON=python3
     - PROTOBUF_VERSION=3.4.0
   matrix:
-    - DEBUG_LINK=0 FASTFLASH=0
-    - DEBUG_LINK=1 FASTFLASH=0
-    - DEBUG_LINK=0 FASTFLASH=1
-    - DEBUG_LINK=1 FASTFLASH=1
+    - DEBUG_LINK=0
+    - DEBUG_LINK=1
 
 matrix:
   include:
@@ -37,8 +35,7 @@ matrix:
         - $PYTHON -m pip install --user rlp
         - $PYTHON -m pip install --user --no-deps git+https://github.com/trezor/python-trezor@master
       script:
-        - script/cibuild
-        - script/test -k 'not skip_t1'
+        - script/cibuild && script/test -k 'not skip_t1'
 
 install:
   - curl -LO "https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-linux-x86_64.zip"

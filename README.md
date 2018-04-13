@@ -1,17 +1,17 @@
-# TREZOR Firmware
+# TREZOR One Bootloader and Firmware
 
 [![Build Status](https://travis-ci.org/trezor/trezor-mcu.svg?branch=master)](https://travis-ci.org/trezor/trezor-mcu) [![gitter](https://badges.gitter.im/trezor/community.svg)](https://gitter.im/trezor/community)
 
 https://trezor.io/
 
-## How to build TREZOR firmware?
+## How to build the TREZOR bootloader and firmware?
 
 1. [Install Docker](https://docs.docker.com/engine/installation/)
 2. `git clone https://github.com/trezor/trezor-mcu.git`
 3. `cd trezor-mcu`
-4. `./build-firmware.sh TAG` (where TAG is v1.5.0 for example, if left blank the script builds latest commit in master branch)
+4. `./build.sh BOOTLOADER_TAG FIRMWARE_TAG` (where BOOTLOADER_TAG is bl1.5.0 and FIRMWARE_TAG is v1.7.0 for example, if left blank the script builds latest commit in master branch)
 
-This creates file `build/trezor-TAG.bin` and prints its fingerprint and size at the end of the build log.
+This creates the files `build/bootloader-BOOTLOADER_TAG.bin` and `build/trezor-FIRMWARE_TAG.bin` and prints their fingerprints and sizes at the end of the build log.
 
 ## How to build TREZOR emulator for Linux?
 
@@ -22,19 +22,10 @@ This creates file `build/trezor-TAG.bin` and prints its fingerprint and size at 
 
 This creates binary file `build/trezor-emulator-TAG`, which can be run and works as a trezor emulator. (Use `TREZOR_OLED_SCALE` env. variable to make screen bigger.)
 
-## How to build TREZOR bootloader?
-
-1. [Install Docker](https://docs.docker.com/engine/installation/)
-2. `git clone https://github.com/trezor/trezor-mcu.git`
-3. `cd trezor-mcu`
-4. `./build-bootloader.sh TAG` (where TAG is bl1.3.2 for example, if left blank the script builds latest commit in master branch)
-
-This creates file `build/bootloader-TAG.bin` and prints its fingerprint and size at the end of the build log.
-
 ## How to get fingerprint of firmware signed and distributed by SatoshiLabs?
 
-1. Pick version of firmware binary listed on https://wallet.trezor.io/data/firmware/releases.json
-2. Download it: `wget -O trezor.signed.bin https://wallet.trezor.io/data/firmware/trezor-1.3.6.bin`
+1. Pick version of firmware binary listed on https://wallet.trezor.io/data/firmware/1/releases.json
+2. Download it: `wget -O trezor.signed.bin https://wallet.trezor.io/data/firmware/1/trezor-1.6.1.bin`
 3. Compute fingerprint: `tail -c +257 trezor.signed.bin | sha256sum`
 
 Step 3 should produce the same sha256 fingerprint like your local build (for the same version tag). Firmware has a special header (of length 256 bytes) holding signatures themselves, which must be avoided while calculating the fingerprint, that's why tail command has to be used.

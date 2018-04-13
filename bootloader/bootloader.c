@@ -33,6 +33,7 @@
 #include "layout.h"
 #include "serialno.h"
 #include "rng.h"
+#include "timer.h"
 
 void layoutFirmwareHash(const uint8_t *hash)
 {
@@ -46,7 +47,7 @@ void layoutFirmwareHash(const uint8_t *hash)
 void show_halt(void)
 {
 	layoutDialog(&bmp_icon_error, NULL, NULL, NULL, "Unofficial firmware", "aborted.", NULL, "Unplug your TREZOR", "contact our support.", NULL);
-	system_halt();
+	shutdown();
 }
 
 void show_unofficial_warning(const uint8_t *hash)
@@ -76,24 +77,24 @@ void show_unofficial_warning(const uint8_t *hash)
 	// everything is OK, user pressed 2x Continue -> continue program
 }
 
-void __attribute__((noreturn)) load_app(void)
+void __attribute__((noreturn)) load_app(int signed_firmware)
 {
 	// zero out SRAM
 	memset_reg(_ram_start, _ram_end, 0);
 
-	load_vector_table((const vector_table_t *) FLASH_APP_START);
+	jump_to_firmware((const vector_table_t *) FLASH_PTR(FLASH_APP_START), signed_firmware);
 }
 
 bool firmware_present(void)
 {
 #ifndef APPVER
-	if (memcmp((const void *)FLASH_META_MAGIC, "TRZR", 4)) { // magic does not match
+	if (memcmp(FLASH_PTR(FLASH_META_MAGIC), "TRZR", 4)) { // magic does not match
 		return false;
 	}
-	if (*((const uint32_t *)FLASH_META_CODELEN) < 4096) { // firmware reports smaller size than 4kB
+	if (*((const uint32_t *)FLASH_PTR(FLASH_META_CODELEN)) < 4096) { // firmware reports smaller size than 4kB
 		return false;
 	}
-	if (*((const uint32_t *)FLASH_META_CODELEN) > FLASH_TOTAL_SIZE - (FLASH_APP_START - FLASH_ORIGIN)) { // firmware reports bigger size than flash size
+	if (*((const uint32_t *)FLASH_PTR(FLASH_META_CODELEN)) > FLASH_TOTAL_SIZE - (FLASH_APP_START - FLASH_ORIGIN)) { // firmware reports bigger size than flash size
 		return false;
 	}
 #endif
@@ -146,13 +147,13 @@ int main(void)
 		oledRefresh();
 
 		uint8_t hash[32];
-		if (!signatures_ok(hash)) {
+		int signed_firmware = signatures_ok(hash);
+		if (SIG_OK != signed_firmware) {
 			show_unofficial_warning(hash);
+			timer_init();
 		}
 
-		delay(100000);
-
-		load_app();
+		load_app(signed_firmware);
 	}
 #endif
 

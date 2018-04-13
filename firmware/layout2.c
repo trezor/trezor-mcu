@@ -230,6 +230,10 @@ void layoutHome(void)
 			oledDrawBitmap(40, 0, &bmp_logo64);
 		}
 	}
+	if (storage_unfinishedBackup()) {
+		oledBox(0, 0, 127, 8, false);
+		oledDrawStringCenter(0, "BACKUP FAILED!", FONT_STANDARD);
+	} else
 	if (storage_needsBackup()) {
 		oledBox(0, 0, 127, 8, false);
 		oledDrawStringCenter(0, "NEEDS BACKUP!", FONT_STANDARD);
@@ -246,6 +250,16 @@ void layoutConfirmOutput(const CoinInfo *coin, const TxOutputType *out)
 	bn_format_uint64(out->amount, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_out, sizeof(str_out) - 3);
 	strlcat(str_out, " to", sizeof(str_out));
 	const char *addr = out->address;
+	if (coin->cashaddr_prefix) {
+		/* If this is a cashaddr address, remove the prefix from the
+		 * string presented to the user
+		 */
+		int prefix_len = strlen(coin->cashaddr_prefix);
+		if (strncmp(addr, coin->cashaddr_prefix, prefix_len) == 0
+			&& addr[prefix_len] == ':') {
+			addr += prefix_len + 1;
+		}
+	}
 	int addrlen = strlen(addr);
 	int numlines = addrlen <= 42 ? 2 : 3;
 	int linelen = (addrlen - 1) / numlines + 1;
@@ -511,11 +525,16 @@ void layoutAddress(const char *address, const char *desc, bool qrcode, bool igno
 
 void layoutPublicKey(const uint8_t *pubkey)
 {
-	char hex[32*2+1], desc[16];
+	char hex[32 * 2 + 1], desc[16];
 	strlcpy(desc, "Public Key: 00", sizeof(desc));
-	data2hex(pubkey, 1, desc + 12);
+	if (pubkey[0] == 1) {
+		/* ed25519 public key */
+		// pass - leave 00
+	} else {
+		data2hex(pubkey, 1, desc + 12);
+	}
 	data2hex(pubkey + 1, 32, hex);
-	const char **str = split_message((const uint8_t *)hex, 32*2, 16);
+	const char **str = split_message((const uint8_t *)hex, 32 * 2, 16);
 	layoutDialogSwipe(&bmp_icon_question, NULL, _("Continue"), NULL,
 		desc, str[0], str[1], str[2], str[3], NULL);
 }

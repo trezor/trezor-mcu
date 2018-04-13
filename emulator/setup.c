@@ -34,7 +34,7 @@
 
 #define EMULATOR_FLASH_FILE "emulator.img"
 
-void *emulator_flash_base = NULL;
+uint8_t *emulator_flash_base = NULL;
 
 uint32_t __stack_chk_guard;
 
@@ -46,6 +46,10 @@ static void setup_flash(void);
 void setup(void) {
 	setup_urandom();
 	setup_flash();
+}
+
+void __attribute__((noreturn)) shutdown(void) {
+	for(;;) pause();
 }
 
 void emulatorRandom(void *buffer, size_t size) {

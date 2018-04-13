@@ -18,6 +18,7 @@
  */
 
 #include <libopencm3/usb/usbd.h>
+#include <libopencm3/usb/hid.h>
 #include <libopencm3/stm32/flash.h>
 
 #include <string.h>
@@ -36,13 +37,7 @@
 #include "secp256k1.h"
 #include "memzero.h"
 
-#include "usb21_standard.h"
-#include "webusb.h"
-#include "winusb.h"
-
 #define FIRMWARE_MAGIC "TRZR"
-
-#define USB_INTERFACE_INDEX_MAIN 0
 
 #define ENDPOINT_ADDRESS_IN         (0x81)
 #define ENDPOINT_ADDRESS_OUT        (0x01)
@@ -53,21 +48,60 @@ static bool old_was_unsigned;
 static const struct usb_device_descriptor dev_descr = {
 	.bLength = USB_DT_DEVICE_SIZE,
 	.bDescriptorType = USB_DT_DEVICE,
-	.bcdUSB = 0x0210,
+	.bcdUSB = 0x0200,
 	.bDeviceClass = 0,
 	.bDeviceSubClass = 0,
 	.bDeviceProtocol = 0,
 	.bMaxPacketSize0 = 64,
 	.idVendor = 0x534c,
 	.idProduct = 0x0001,
-	.bcdDevice = 0x0300,
+	.bcdDevice = 0x0100,
 	.iManufacturer = 1,
 	.iProduct = 2,
 	.iSerialNumber = 3,
 	.bNumConfigurations = 1,
 };
 
-static const struct usb_endpoint_descriptor endpoints[2] = {{
+static const uint8_t hid_report_descriptor[] = {
+	0x06, 0x00, 0xff,  // USAGE_PAGE (Vendor Defined)
+	0x09, 0x01,        // USAGE (1)
+	0xa1, 0x01,        // COLLECTION (Application)
+	0x09, 0x20,        // USAGE (Input Report Data)
+	0x15, 0x00,        // LOGICAL_MINIMUM (0)
+	0x26, 0xff, 0x00,  // LOGICAL_MAXIMUM (255)
+	0x75, 0x08,        // REPORT_SIZE (8)
+	0x95, 0x40,        // REPORT_COUNT (64)
+	0x81, 0x02,        // INPUT (Data,Var,Abs)
+	0x09, 0x21,        // USAGE (Output Report Data)
+	0x15, 0x00,        // LOGICAL_MINIMUM (0)
+	0x26, 0xff, 0x00,  // LOGICAL_MAXIMUM (255)
+	0x75, 0x08,        // REPORT_SIZE (8)
+	0x95, 0x40,        // REPORT_COUNT (64)
+	0x91, 0x02,        // OUTPUT (Data,Var,Abs)
+	0xc0               // END_COLLECTION
+};
+
+static const struct {
+	struct usb_hid_descriptor hid_descriptor;
+	struct {
+		uint8_t bReportDescriptorType;
+		uint16_t wDescriptorLength;
+	} __attribute__((packed)) hid_report;
+} __attribute__((packed)) hid_function = {
+	.hid_descriptor = {
+		.bLength = sizeof(hid_function),
+		.bDescriptorType = USB_DT_HID,
+		.bcdHID = 0x0111,
+		.bCountryCode = 0,
+		.bNumDescriptors = 1,
+	},
+	.hid_report = {
+		.bReportDescriptorType = USB_DT_REPORT,
+		.wDescriptorLength = sizeof(hid_report_descriptor),
+	}
+};
+
+static const struct usb_endpoint_descriptor hid_endpoints[2] = {{
 	.bLength = USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType = USB_DT_ENDPOINT,
 	.bEndpointAddress = ENDPOINT_ADDRESS_IN,
@@ -83,24 +117,24 @@ static const struct usb_endpoint_descriptor endpoints[2] = {{
 	.bInterval = 1,
 }};
 
-static const struct usb_interface_descriptor iface[] = {{
+static const struct usb_interface_descriptor hid_iface[] = {{
 	.bLength = USB_DT_INTERFACE_SIZE,
 	.bDescriptorType = USB_DT_INTERFACE,
-	.bInterfaceNumber = USB_INTERFACE_INDEX_MAIN,
+	.bInterfaceNumber = 0,
 	.bAlternateSetting = 0,
 	.bNumEndpoints = 2,
-	.bInterfaceClass = USB_CLASS_VENDOR,
+	.bInterfaceClass = USB_CLASS_HID,
 	.bInterfaceSubClass = 0,
 	.bInterfaceProtocol = 0,
 	.iInterface = 0,
-	.endpoint = endpoints,
-	.extra = NULL,
-	.extralen = 0,
+	.endpoint = hid_endpoints,
+	.extra = &hid_function,
+	.extralen = sizeof(hid_function),
 }};
 
 static const struct usb_interface ifaces[] = {{
 	.num_altsetting = 1,
-	.altsetting = iface,
+	.altsetting = hid_iface,
 }};
 
 static const struct usb_config_descriptor config = {
@@ -120,6 +154,23 @@ static const char *usb_strings[] = {
 	"TREZOR",
 	"", // empty serial
 };
+
+static int hid_control_request(usbd_device *dev, struct usb_setup_data *req, uint8_t **buf, uint16_t *len, usbd_control_complete_callback *complete)
+{
+	(void)complete;
+	(void)dev;
+
+	if ((req->bmRequestType != 0x81) ||
+	    (req->bRequest != USB_REQ_GET_DESCRIPTOR) ||
+	    (req->wValue != 0x2200))
+		return 0;
+
+	/* Handle the HID report descriptor. */
+	*buf = (uint8_t *)hid_report_descriptor;
+	*len = sizeof(hid_report_descriptor);
+
+	return 1;
+}
 
 enum {
 	STATE_READY,
@@ -251,7 +302,7 @@ static void erase_metadata_sectors(void)
 
 static void backup_metadata(uint8_t *backup)
 {
-	memcpy(backup, (void *)FLASH_META_START, FLASH_META_LEN);
+	memcpy(backup, FLASH_PTR(FLASH_META_START), FLASH_META_LEN);
 }
 
 static void restore_metadata(const uint8_t *backup)
@@ -264,7 +315,7 @@ static void restore_metadata(const uint8_t *backup)
 	flash_lock();
 }
 
-static void rx_callback(usbd_device *dev, uint8_t ep)
+static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 {
 	(void)ep;
 	static uint8_t buf[64] __attribute__((aligned(4)));
@@ -283,7 +334,7 @@ static void rx_callback(usbd_device *dev, uint8_t ep)
 		}
 		// struct.unpack(">HL") => msg, size
 		msg_id = (buf[3] << 8) + buf[4];
-		msg_size = (buf[5] << 24) + (buf[6] << 16) + (buf[7] << 8) + buf[8];
+		msg_size = ((uint32_t) buf[5] << 24) + (buf[6] << 16) + (buf[7] << 8) + buf[8];
 	}
 
 	if (flash_state == STATE_READY || flash_state == STATE_OPEN) {
@@ -292,8 +343,44 @@ static void rx_callback(usbd_device *dev, uint8_t ep)
 			flash_state = STATE_OPEN;
 			return;
 		}
+		if (msg_id == 0x0037) {		// GetFeatures message (id 55)
+			send_msg_features(dev);
+			return;
+		}
 		if (msg_id == 0x0001) {		// Ping message (id 1)
 			send_msg_success(dev);
+			return;
+		}
+		if (msg_id == 0x0005) {		// WipeDevice message (id 5)
+			layoutDialog(&bmp_icon_question, "Cancel", "Confirm", NULL, "Do you really want to", "wipe the device?", NULL, "All data will be lost.", NULL, NULL);
+			do {
+				delay(100000);
+				buttonUpdate();
+			} while (!button.YesUp && !button.NoUp);
+			if (button.YesUp) {
+				flash_wait_for_last_operation();
+				flash_clear_status_flags();
+				flash_unlock();
+				// erase metadata area
+				for (int i = FLASH_META_SECTOR_FIRST; i <= FLASH_META_SECTOR_LAST; i++) {
+					layoutProgress("ERASING ... Please wait", 1000 * (i - FLASH_META_SECTOR_FIRST) / (FLASH_CODE_SECTOR_LAST - FLASH_META_SECTOR_FIRST));
+					flash_erase_sector(i, FLASH_CR_PROGRAM_X32);
+				}
+				// erase code area
+				for (int i = FLASH_CODE_SECTOR_FIRST; i <= FLASH_CODE_SECTOR_LAST; i++) {
+					layoutProgress("ERASING ... Please wait", 1000 * (i - FLASH_META_SECTOR_FIRST) / (FLASH_CODE_SECTOR_LAST - FLASH_META_SECTOR_FIRST));
+					flash_erase_sector(i, FLASH_CR_PROGRAM_X32);
+				}
+				flash_wait_for_last_operation();
+				flash_lock();
+				flash_state = STATE_END;
+				layoutDialog(&bmp_icon_ok, NULL, NULL, NULL, "Device", "successfully wiped.", NULL, "You may now", "unplug your TREZOR.", NULL);
+				send_msg_success(dev);
+			} else {
+				flash_state = STATE_END;
+				layoutDialog(&bmp_icon_warning, NULL, NULL, NULL, "Device wipe", "aborted.", NULL, "You may now", "unplug your TREZOR.", NULL);
+				send_msg_failure(dev);
+			}
 			return;
 		}
 		if (msg_id == 0x0020) {		// SelfTest message (id 32)
@@ -347,7 +434,7 @@ static void rx_callback(usbd_device *dev, uint8_t ep)
 
 			// compute hash of written test pattern
 			uint8_t hash[32];
-			sha256_Raw((unsigned char *)FLASH_META_START, FLASH_META_LEN, hash);
+			sha256_Raw(FLASH_PTR(FLASH_META_START), FLASH_META_LEN, hash);
 
 			// restore metadata from backup
 			erase_metadata_sectors();
@@ -389,7 +476,7 @@ static void rx_callback(usbd_device *dev, uint8_t ep)
 			}
 			if (brand_new_firmware || button.YesUp) {
 				// check whether current firmware is signed
-				if (signatures_ok(NULL)) {
+				if (!brand_new_firmware && SIG_OK == signatures_ok(NULL)) {
 					old_was_unsigned = false;
 					// backup metadata
 					backup_metadata(meta_backup);
@@ -417,7 +504,7 @@ static void rx_callback(usbd_device *dev, uint8_t ep)
 				// flash status register should show now error and
 				// the config block should contain only \xff.
 				uint8_t hash[32];
-				sha256_Raw((unsigned char *)FLASH_META_START, FLASH_META_LEN, hash);
+				sha256_Raw(FLASH_PTR(FLASH_META_START), FLASH_META_LEN, hash);
 				if ((FLASH_SR & (FLASH_SR_PGAERR | FLASH_SR_PGPERR | FLASH_SR_PGSERR | FLASH_SR_WRPERR)) != 0
 					|| memcmp(hash, "\x2d\x86\x4c\x0b\x78\x9a\x43\x21\x4e\xee\x85\x24\xd3\x18\x20\x75\x12\x5e\x5c\xa2\xcd\x52\x7f\x35\x82\xec\x87\xff\xd9\x40\x76\xbc", 32) != 0) {
 					send_msg_failure(dev);
@@ -532,7 +619,7 @@ static void rx_callback(usbd_device *dev, uint8_t ep)
 				return;
 			}
 			uint8_t hash[32];
-			sha256_Raw((unsigned char *)FLASH_APP_START, flash_len - FLASH_META_DESC_LEN, hash);
+			sha256_Raw(FLASH_PTR(FLASH_APP_START), flash_len - FLASH_META_DESC_LEN, hash);
 			layoutFirmwareHash(hash);
 			do {
 				delay(100000);
@@ -543,12 +630,13 @@ static void rx_callback(usbd_device *dev, uint8_t ep)
 		bool hash_check_ok = brand_new_firmware || button.YesUp;
 
 		layoutProgress("INSTALLING ... Please wait", 1000);
-		uint8_t flags = *((uint8_t *)FLASH_META_FLAGS);
+		uint8_t flags = *FLASH_PTR(FLASH_META_FLAGS);
 		// wipe storage if:
+		// 0) there was no firmware
 		// 1) old firmware was unsigned
 		// 2) firmware restore flag isn't set
 		// 3) signatures are not ok
-		if (old_was_unsigned || (flags & 0x01) == 0 || !signatures_ok(NULL)) {
+		if (brand_new_firmware || old_was_unsigned || (flags & 0x01) == 0 || SIG_OK != signatures_ok(NULL)) {
 			memzero(meta_backup, sizeof(meta_backup));
 		}
 		// copy new firmware header
@@ -577,37 +665,23 @@ static void rx_callback(usbd_device *dev, uint8_t ep)
 
 }
 
-static void set_config(usbd_device *dev, uint16_t wValue)
+static void hid_set_config(usbd_device *dev, uint16_t wValue)
 {
 	(void)wValue;
 
-	usbd_ep_setup(dev, ENDPOINT_ADDRESS_IN,  USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
-	usbd_ep_setup(dev, ENDPOINT_ADDRESS_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, rx_callback);
+	usbd_ep_setup(dev, ENDPOINT_ADDRESS_IN, USB_ENDPOINT_ATTR_INTERRUPT, 64, 0);
+	usbd_ep_setup(dev, ENDPOINT_ADDRESS_OUT, USB_ENDPOINT_ATTR_INTERRUPT, 64, hid_rx_callback);
+
+	usbd_register_control_callback(
+		dev,
+		USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_INTERFACE,
+		USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
+		hid_control_request
+	);
 }
 
 static usbd_device *usbd_dev;
-static uint8_t usbd_control_buffer[256] __attribute__ ((aligned (2)));
-
-static const struct usb_device_capability_descriptor* capabilities[] = {
-	(const struct usb_device_capability_descriptor*)&webusb_platform_capability_descriptor,
-};
-
-static const struct usb_bos_descriptor bos_descriptor = {
-	.bLength = USB_DT_BOS_SIZE,
-	.bDescriptorType = USB_DT_BOS,
-	.bNumDeviceCaps = sizeof(capabilities)/sizeof(capabilities[0]),
-	.capabilities = capabilities
-};
-
-void usbInit(void)
-{
-	usbd_dev = usbd_init(&otgfs_usb_driver, &dev_descr, &config, usb_strings, sizeof(usb_strings)/sizeof(const char *), usbd_control_buffer, sizeof(usbd_control_buffer));
-	usbd_register_set_config_callback(usbd_dev, set_config);
-	usb21_setup(usbd_dev, &bos_descriptor);
-	static const char* origin_url = "trezor.io/start";
-	webusb_setup(usbd_dev, origin_url);
-	winusb_setup(usbd_dev, USB_INTERFACE_INDEX_MAIN);
-}
+static uint8_t usbd_control_buffer[128];
 
 void checkButtons(void)
 {
@@ -641,7 +715,8 @@ void checkButtons(void)
 void usbLoop(bool firmware_present)
 {
 	brand_new_firmware = !firmware_present;
-	usbInit();
+	usbd_dev = usbd_init(&otgfs_usb_driver, &dev_descr, &config, usb_strings, 3, usbd_control_buffer, sizeof(usbd_control_buffer));
+	usbd_register_set_config_callback(usbd_dev, hid_set_config);
 	for (;;) {
 		usbd_poll(usbd_dev);
 		if (brand_new_firmware && (flash_state == STATE_READY || flash_state == STATE_OPEN)) {
