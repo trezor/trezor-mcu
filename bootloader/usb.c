@@ -343,8 +343,44 @@ static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 			flash_state = STATE_OPEN;
 			return;
 		}
+		if (msg_id == 0x0037) {		// GetFeatures message (id 55)
+			send_msg_features(dev);
+			return;
+		}
 		if (msg_id == 0x0001) {		// Ping message (id 1)
 			send_msg_success(dev);
+			return;
+		}
+		if (msg_id == 0x0005) {		// WipeDevice message (id 5)
+			layoutDialog(&bmp_icon_question, "Cancel", "Confirm", NULL, "Do you really want to", "wipe the device?", NULL, "All data will be lost.", NULL, NULL);
+			do {
+				delay(100000);
+				buttonUpdate();
+			} while (!button.YesUp && !button.NoUp);
+			if (button.YesUp) {
+				flash_wait_for_last_operation();
+				flash_clear_status_flags();
+				flash_unlock();
+				// erase metadata area
+				for (int i = FLASH_META_SECTOR_FIRST; i <= FLASH_META_SECTOR_LAST; i++) {
+					layoutProgress("ERASING ... Please wait", 1000 * (i - FLASH_META_SECTOR_FIRST) / (FLASH_CODE_SECTOR_LAST - FLASH_META_SECTOR_FIRST));
+					flash_erase_sector(i, FLASH_CR_PROGRAM_X32);
+				}
+				// erase code area
+				for (int i = FLASH_CODE_SECTOR_FIRST; i <= FLASH_CODE_SECTOR_LAST; i++) {
+					layoutProgress("ERASING ... Please wait", 1000 * (i - FLASH_META_SECTOR_FIRST) / (FLASH_CODE_SECTOR_LAST - FLASH_META_SECTOR_FIRST));
+					flash_erase_sector(i, FLASH_CR_PROGRAM_X32);
+				}
+				flash_wait_for_last_operation();
+				flash_lock();
+				flash_state = STATE_END;
+				layoutDialog(&bmp_icon_ok, NULL, NULL, NULL, "Device", "successfully wiped.", NULL, "You may now", "unplug your TREZOR.", NULL);
+				send_msg_success(dev);
+			} else {
+				flash_state = STATE_END;
+				layoutDialog(&bmp_icon_warning, NULL, NULL, NULL, "Device wipe", "aborted.", NULL, "You may now", "unplug your TREZOR.", NULL);
+				send_msg_failure(dev);
+			}
 			return;
 		}
 		if (msg_id == 0x0020) {		// SelfTest message (id 32)
@@ -440,7 +476,7 @@ static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 			}
 			if (brand_new_firmware || button.YesUp) {
 				// check whether current firmware is signed
-				if (signatures_ok(NULL)) {
+				if (!brand_new_firmware && SIG_OK == signatures_ok(NULL)) {
 					old_was_unsigned = false;
 					// backup metadata
 					backup_metadata(meta_backup);
@@ -596,10 +632,11 @@ static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 		layoutProgress("INSTALLING ... Please wait", 1000);
 		uint8_t flags = *((uint8_t *)FLASH_META_FLAGS);
 		// wipe storage if:
+		// 0) there was no firmware
 		// 1) old firmware was unsigned
 		// 2) firmware restore flag isn't set
 		// 3) signatures are not ok
-		if (old_was_unsigned || (flags & 0x01) == 0 || !signatures_ok(NULL)) {
+		if (brand_new_firmware || old_was_unsigned || (flags & 0x01) == 0 || SIG_OK != signatures_ok(NULL)) {
 			memzero(meta_backup, sizeof(meta_backup));
 		}
 		// copy new firmware header

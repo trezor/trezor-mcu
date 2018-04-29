@@ -18,24 +18,20 @@
  */
 
 #include "strl.h"
+#include "util.h"
 
 #include <string.h>
 
 size_t strlcpy(char *dst, const char *src, size_t size) {
-	if (size == 0) {
-		return 0;
+	size_t ret = strlen(src);
+
+	if (size) {
+		size_t len = MIN(ret, size - 1);
+		memcpy(dst, src, len);
+		dst[len] = '\0';
 	}
 
-	for (size_t i = 0; i < size - 1; i++) {
-		dst[i] = src[i];
-
-		if (src[i] == '\0') {
-			return i;
-		}
-	}
-
-	dst[size - 1] = '\0';
-	return size - 2;
+	return ret;
 }
 
 size_t strlcat(char *dst, const char *src, size_t size) {

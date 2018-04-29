@@ -1,7 +1,7 @@
 /*
  * This file is part of the TREZOR project, https://trezor.io/
  *
- * Copyright (C) 2014 Pavol Rusnak <stick@satoshilabs.com>
+ * Copyright (C) 2018 Pavol Rusnak <stick@satoshilabs.com>
  *
  * This library is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -17,12 +17,9 @@
  * along with this library.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __SIGNATURES_H__
-#define __SIGNATURES_H__
+#ifndef __BL_CHECK_H__
+#define __BL_CHECK_H__
 
-#define SIG_OK      0x5A3CA5C3
-#define SIG_FAIL    0x00000000
-
-int signatures_ok(uint8_t *store_hash);
+void check_bootloader(void);
 
 #endif

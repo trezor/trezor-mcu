@@ -28,6 +28,7 @@
 #include "sha2.h"
 #include "aes/aes.h"
 #include "pbkdf2.h"
+#include "hmac.h"
 #include "bip32.h"
 #include "bip39.h"
 #include "curves.h"
@@ -707,6 +708,33 @@ void session_cachePassphrase(const char *passphrase)
 bool session_isPassphraseCached(void)
 {
 	return sessionPassphraseCached;
+}
+
+bool session_getState(const uint8_t *salt, uint8_t *state, const char *passphrase)
+{
+	if (!passphrase && !sessionPassphraseCached) {
+		return false;
+	} else {
+		passphrase = sessionPassphrase;
+	}
+	if (!salt) {
+		// if salt is not provided fill the first half of the state with random data
+		random_buffer(state, 32);
+	} else {
+		// if salt is provided fill the first half of the state with salt
+		memcpy(state, salt, 32);
+	}
+	// state[0:32] = salt
+	// state[32:64] = HMAC(passphrase, salt || device_id)
+	HMAC_SHA256_CTX ctx;
+	hmac_sha256_Init(&ctx, (const uint8_t *)passphrase, strlen(passphrase));
+	hmac_sha256_Update(&ctx, state, 32);
+	hmac_sha256_Update(&ctx, (const uint8_t *)storage_uuid, sizeof(storage_uuid));
+	hmac_sha256_Final(&ctx, state + 32);
+
+	memzero(&ctx, sizeof(ctx));
+
+	return true;
 }
 
 void session_cachePin(void)

@@ -41,20 +41,28 @@ static SDL_Rect dstrect;
 
 static int scale_factor = 1;
 
+#define ENV_OLED_SCALE "TREZOR_OLED_SCALE"
+
+static int emulatorScale(void) {
+	const char *variable = getenv(ENV_OLED_SCALE);
+	if (!variable) {
+		return 1;
+	}
+	int scale = atoi(variable);
+	if (scale >= 1 && scale <= 16) {
+		return scale;
+	}
+	return 1;
+}
+
 void oledInit(void) {
-	if (getenv("TREZOR_SDL_SCALE")) {
-		scale_factor = atoi(getenv("TREZOR_SDL_SCALE"));
-	}
-
-	if (scale_factor < 1 || scale_factor > 10) {
-		scale_factor = 1;
-	}
-
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		fprintf(stderr, "Failed to initialize SDL: %s\n", SDL_GetError());
 		exit(1);
 	}
 	atexit(SDL_Quit);
+
+	scale_factor = emulatorScale();
 
 	int width = OLED_WIDTH * scale_factor;
 	int height = OLED_HEIGHT * scale_factor;

@@ -23,8 +23,7 @@ OBJCOPY  := $(PREFIX)objcopy
 OBJDUMP  := $(PREFIX)objdump
 AR       := $(PREFIX)ar
 AS       := $(PREFIX)as
-FLASH    := st-flash
-OPENOCD  := openocd
+OPENOCD  := openocd -f interface/stlink-v2.cfg -c "transport select hla_swd" -f target/stm32f2x.cfg
 
 OPTFLAGS ?= -O3
 DBGFLAGS ?= -g -DNDEBUG
@@ -83,6 +82,16 @@ CFLAGS   += -include stdio.h
 
 LDFLAGS  += -L$(TOP_DIR)emulator
 
+ifeq ($(TRANSPORT), PIPE)
+  CFLAGS += -DTRANSPORT_PIPE=1
+else
+ ifeq ($(TRANSPORT), USBG)
+   CFLAGS += -DTRANSPORT_USBG=1
+   CFLAGS   += $(shell pkg-config --cflags libusbgx)
+   LDLIBS   += $(shell pkg-config --libs libusbgx)
+ endif
+endif
+
 LDLIBS   += -ltrezor -lemulator
 LIBDEPS  += $(TOP_DIR)/libtrezor.a $(TOP_DIR)emulator/libemulator.a
 
@@ -101,16 +110,6 @@ endif
 
 ifdef USE_RANDOM
 CFLAGS += -DUSE_RANDOM=1
-endif
-
-ifeq ($(TRANSPORT), PIPE)
-  CFLAGS += -DTRANSPORT_PIPE=1
-else
- ifeq ($(TRANSPORT), USBG)
-   CFLAGS += -DTRANSPORT_USBG=1
-   CFLAGS   += $(shell pkg-config --cflags libusbgx)
-   LDLIBS   += $(shell pkg-config --libs libusbgx)
- endif
 endif
 
 else
@@ -156,16 +155,7 @@ endif
 all: $(NAME).bin
 
 flash: $(NAME).bin
-	$(FLASH) write $(NAME).bin 0x8000000
-
-flash2: $(NAME).hex
-	$(OPENOCD) -f board/stm32f4discovery.cfg \
-		-c "init" \
-		-c "reset init" \
-		-c "stm32f2x mass_erase 0" \
-		-c "flash write_image $(NAME).hex" \
-		-c "reset" \
-		-c "shutdown"
+	$(OPENOCD) -c "init; reset halt; flash write_image erase $(NAME).bin 0x8000000; exit"
 
 upload: sign
 	trezorctl firmware_update -f $(NAME).bin

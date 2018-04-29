@@ -36,6 +36,122 @@
 
 #define BITCOIN_DIVISIBILITY (8)
 
+static const char *slip44_extras(uint32_t coin_type)
+{
+	if ((coin_type & 0x80000000) == 0) {
+		return 0;
+	}
+	switch (coin_type & 0x7fffffff) {
+		case    40: return "EXP";  // Expanse
+		case    43: return "NEM";  // NEM
+		case    60: return "ETH";  // Ethereum Mainnet
+		case    61: return "ETC";  // Ethereum Classic Mainnet
+		case   108: return "UBQ";  // UBIQ
+		case   137: return "RSK";  // Rootstock Mainnet
+		case 37310: return "tRSK"; // Rootstock Testnet
+	}
+	return 0;
+}
+
+#define BIP32_MAX_LAST_ELEMENT 1000000
+
+static const char *address_n_str(const uint32_t *address_n, size_t address_n_count)
+{
+	if (address_n_count > 8) {
+		return _("Unknown long path");
+	}
+	if (address_n_count == 0) {
+		return _("Path: m");
+	}
+
+	// known BIP44/49 path
+	static char path[100];
+	if (address_n_count == 5 &&
+		(address_n[0] == (0x80000000 + 44) || address_n[0] == (0x80000000 + 49) || address_n[0] == (0x80000000 + 84)) &&
+		(address_n[1] & 0x80000000) &&
+		(address_n[2] & 0x80000000) &&
+		(address_n[3] <= 1) &&
+		(address_n[4] <= BIP32_MAX_LAST_ELEMENT)) {
+			bool native_segwit = (address_n[0] == (0x80000000 + 84));
+			bool p2sh_segwit = (address_n[0] == (0x80000000 + 49));
+			bool legacy = false;
+			const CoinInfo *coin = coinByCoinType(address_n[1]);
+			const char *abbr = 0;
+			if (native_segwit) {
+				if (coin && coin->has_segwit && coin->bech32_prefix) {
+					abbr = coin->coin_shortcut + 1;
+				}
+			} else
+			if (p2sh_segwit) {
+				if (coin && coin->has_segwit && coin->has_address_type_p2sh) {
+					abbr = coin->coin_shortcut + 1;
+				}
+			} else {
+				if (coin) {
+					if (coin->has_segwit && coin->has_address_type_p2sh) {
+						legacy = true;
+					}
+					abbr = coin->coin_shortcut + 1;
+				} else {
+					abbr = slip44_extras(address_n[1]);
+				}
+			}
+			uint32_t accnum = (address_n[2] & 0x7fffffff) + 1;
+			if (abbr && accnum < 100) {
+				memset(path, 0, sizeof(path));
+				strlcpy(path, abbr, sizeof(path));
+				// TODO: how to name accounts?
+				// currently we have "legacy account", "account" and "segwit account"
+				// for BIP44/P2PKH, BIP49/P2SH-P2WPKH and BIP84/P2WPKH respectivelly
+				if (legacy) {
+					strlcat(path, " legacy", sizeof(path));
+				}
+				if (native_segwit) {
+					strlcat(path, " segwit", sizeof(path));
+				}
+				strlcat(path, " account #", sizeof(path));
+				char acc[3];
+				memset(acc, 0, sizeof(acc));
+				if (accnum < 10) {
+					acc[0] = '0' + accnum;
+				} else {
+					acc[0] = '0' + (accnum / 10);
+					acc[1] = '0' + (accnum % 10);
+				}
+				strlcat(path, acc, sizeof(path));
+				return path;
+			}
+	}
+
+	//                  "Path: m"    /   i   '
+	static char address_str[7 + 8 * (1 + 9 + 1) + 1];
+	char *c = address_str + sizeof(address_str) - 1;
+
+	*c = 0; c--;
+
+	for (int n = (int)address_n_count - 1; n >= 0; n--) {
+		uint32_t i = address_n[n];
+		if (i & 0x80000000) {
+			*c = '\''; c--;
+		}
+		i = i & 0x7fffffff;
+		do {
+			*c = '0' + (i % 10); c--;
+			i /= 10;
+		} while (i > 0);
+		*c = '/'; c--;
+	}
+	*c = 'm'; c--;
+	*c = ' '; c--;
+	*c = ':'; c--;
+	*c = 'h'; c--;
+	*c = 't'; c--;
+	*c = 'a'; c--;
+	*c = 'P';
+
+	return c;
+}
+
 // split longer string into 4 rows, rowlen chars each
 static const char **split_message(const uint8_t *msg, uint32_t len, uint32_t rowlen)
 {
@@ -109,14 +225,14 @@ void layoutHome(void)
 	} else {
 		if (label && strlen(label) > 0) {
 			oledDrawBitmap(44, 4, &bmp_logo48);
-			oledDrawStringCenter(OLED_HEIGHT - 8, label);
+			oledDrawStringCenter(OLED_HEIGHT - 8, label, FONT_STANDARD);
 		} else {
 			oledDrawBitmap(40, 0, &bmp_logo64);
 		}
 	}
 	if (storage_needsBackup()) {
 		oledBox(0, 0, 127, 8, false);
-		oledDrawStringCenter(0, "NEEDS BACKUP!");
+		oledDrawStringCenter(0, "NEEDS BACKUP!", FONT_STANDARD);
 	}
 	oledRefresh();
 
@@ -129,31 +245,35 @@ void layoutConfirmOutput(const CoinInfo *coin, const TxOutputType *out)
 	char str_out[32 + 3];
 	bn_format_uint64(out->amount, NULL, coin->coin_shortcut, BITCOIN_DIVISIBILITY, 0, false, str_out, sizeof(str_out) - 3);
 	strlcat(str_out, " to", sizeof(str_out));
-	static char lines[2][28];
 	const char *addr = out->address;
 	int addrlen = strlen(addr);
-	int numlines = addrlen <= 34 ? 2 : 3;
-	int linelen = (addrlen + 3) / numlines + 1;
-	if (linelen > 27) {
-		linelen = 27;
+	int numlines = addrlen <= 42 ? 2 : 3;
+	int linelen = (addrlen - 1) / numlines + 1;
+	if (linelen > 21) {
+		linelen = 21;
 	}
-	if (numlines == 3) {
-		strlcpy(lines[0], addr, linelen + 1);
-		addr += linelen;
+	const char **str = split_message((const uint8_t *)addr, addrlen, linelen);
+	layoutLast = layoutDialogSwipe;
+	layoutSwipe();
+	oledClear();
+	oledDrawBitmap(0, 0, &bmp_icon_question);
+	oledDrawString(20, 0 * 9, _("Confirm sending"), FONT_STANDARD);
+	oledDrawString(20, 1 * 9, str_out, FONT_STANDARD);
+	int left = linelen > 18 ? 0 : 20;
+	oledDrawString(left, 2 * 9, str[0], FONT_FIXED);
+	oledDrawString(left, 3 * 9, str[1], FONT_FIXED);
+	oledDrawString(left, 4 * 9, str[2], FONT_FIXED);
+	oledDrawString(left, 5 * 9, str[3], FONT_FIXED);
+	if (!str[3][0]) {
+		if (out->address_n_count > 0) {
+			oledDrawString(0, 5*9, address_n_str(out->address_n, out->address_n_count), FONT_STANDARD);
+		} else {
+			oledHLine(OLED_HEIGHT - 13);
+		}
 	}
-	strlcpy(lines[1], addr, linelen + 1);
-	addr += linelen;
-	layoutDialogSwipe(&bmp_icon_question,
-		_("Cancel"),
-		_("Confirm"),
-		NULL,
-		_("Confirm sending"),
-		str_out,
-		lines[0],
-		lines[1],
-		addr,
-		NULL
-	);
+	layoutButtonNo(_("Cancel"));
+	layoutButtonYes(_("Confirm"));
+	oledRefresh();
 }
 
 void layoutConfirmOpReturn(const uint8_t *data, uint32_t size)
@@ -316,130 +436,12 @@ void layoutResetWord(const char *word, int pass, int word_pos, bool last)
 	oledDrawBitmap(0, 0, &bmp_icon_info);
 	left = bmp_icon_info.width + 4;
 
-	oledDrawString(left, 0 * 9, action);
-	oledDrawString(left, 2 * 9, word_pos < 10 ? index_str + 1 : index_str);
-	oledDrawStringDouble(left, 3 * 9, word);
+	oledDrawString(left, 0 * 9, action, FONT_STANDARD);
+	oledDrawString(left, 2 * 9, word_pos < 10 ? index_str + 1 : index_str, FONT_STANDARD);
+	oledDrawString(left, 3 * 9, word, FONT_STANDARD | FONT_DOUBLE);
 	oledHLine(OLED_HEIGHT - 13);
-	oledDrawString(OLED_WIDTH - fontCharWidth('\x06') - 1, OLED_HEIGHT - 8, "\x06");
-	oledDrawString(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 3, OLED_HEIGHT - 8, btnYes);
-	oledInvert(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 4, OLED_HEIGHT - 9, OLED_WIDTH - 1, OLED_HEIGHT - 1);
+	layoutButtonYes(btnYes);
 	oledRefresh();
-}
-
-static const char *slip44_extras(uint32_t coin_type)
-{
-	if ((coin_type & 0x80000000) == 0) {
-		return 0;
-	}
-	switch (coin_type & 0x7fffffff) {
-		case    40: return "EXP";  // Expanse
-		case    43: return "NEM";  // NEM
-		case    60: return "ETH";  // Ethereum Mainnet
-		case    61: return "ETC";  // Ethereum Classic Mainnet
-		case   108: return "UBQ";  // UBIQ
-		case   137: return "RSK";  // Rootstock Mainnet
-		case 37310: return "tRSK"; // Rootstock Testnet
-	}
-	return 0;
-}
-
-#define BIP32_MAX_LAST_ELEMENT 1000000
-
-static const char *address_n_str(const uint32_t *address_n, size_t address_n_count)
-{
-	if (address_n_count > 8) {
-		return _("Unknown long path");
-	}
-	if (address_n_count == 0) {
-		return _("Path: m");
-	}
-
-	// known BIP44/49 path
-	static char path[100];
-	if (address_n_count == 5 &&
-		(address_n[0] == (0x80000000 + 44) || address_n[0] == (0x80000000 + 49) || address_n[0] == (0x80000000 + 84)) &&
-		(address_n[1] & 0x80000000) &&
-		(address_n[2] & 0x80000000) &&
-		(address_n[3] <= 1) &&
-		(address_n[4] <= BIP32_MAX_LAST_ELEMENT)) {
-			bool native_segwit = (address_n[0] == (0x80000000 + 84));
-			bool p2sh_segwit = (address_n[0] == (0x80000000 + 49));
-			bool legacy = false;
-			const CoinInfo *coin = coinByCoinType(address_n[1]);
-			const char *abbr = 0;
-			if (native_segwit) {
-				if (coin && coin->has_segwit && coin->bech32_prefix) {
-					abbr = coin->coin_shortcut + 1;
-				}
-			} else
-			if (p2sh_segwit) {
-				if (coin && coin->has_segwit && coin->has_address_type_p2sh) {
-					abbr = coin->coin_shortcut + 1;
-				}
-			} else {
-				if (coin) {
-					if (coin->has_segwit && coin->has_address_type_p2sh) {
-						legacy = true;
-					}
-					abbr = coin->coin_shortcut + 1;
-				} else {
-					abbr = slip44_extras(address_n[1]);
-				}
-			}
-			uint32_t accnum = (address_n[2] & 0x7fffffff) + 1;
-			if (abbr && accnum < 100) {
-				memset(path, 0, sizeof(path));
-				strlcpy(path, abbr, sizeof(path));
-				// TODO: how to name accounts?
-				// currently we have "legacy account", "account" and "segwit account"
-				// for BIP44/P2PKH, BIP49/P2SH-P2WPKH and BIP84/P2WPKH respectivelly
-				if (legacy) {
-					strlcat(path, " legacy", sizeof(path));
-				}
-				if (native_segwit) {
-					strlcat(path, " segwit", sizeof(path));
-				}
-				strlcat(path, " account #", sizeof(path));
-				char acc[3];
-				memset(acc, 0, sizeof(acc));
-				if (accnum < 10) {
-					acc[0] = '0' + accnum;
-				} else {
-					acc[0] = '0' + (accnum / 10);
-					acc[1] = '0' + (accnum % 10);
-				}
-				strlcat(path, acc, sizeof(path));
-				return path;
-			}
-	}
-
-	//                  "Path: m"    /   i   '
-	static char address_str[7 + 8 * (1 + 9 + 1) + 1];
-	char *c = address_str + sizeof(address_str) - 1;
-
-	*c = 0; c--;
-
-	for (int n = (int)address_n_count - 1; n >= 0; n--) {
-		uint32_t i = address_n[n];
-		if (i & 0x80000000) {
-			*c = '\''; c--;
-		}
-		i = i & 0x7fffffff;
-		do {
-			*c = '0' + (i % 10); c--;
-			i /= 10;
-		} while (i > 0);
-		*c = '/'; c--;
-	}
-	*c = 'm'; c--;
-	*c = ' '; c--;
-	*c = ':'; c--;
-	*c = 'h'; c--;
-	*c = 't'; c--;
-	*c = 'a'; c--;
-	*c = 'P';
-
-	return c;
 }
 
 void layoutAddress(const char *address, const char *desc, bool qrcode, bool ignorecase, const uint32_t *address_n, size_t address_n_count)
@@ -488,38 +490,37 @@ void layoutAddress(const char *address, const char *desc, bool qrcode, bool igno
 			}
 		}
 	} else {
-		uint32_t rowlen = (addrlen - 1) / (addrlen <= 40 ? 2 : addrlen <= 60 ? 3 : 4) + 1;
+		uint32_t rowlen = (addrlen - 1) / (addrlen <= 42 ? 2 : addrlen <= 63 ? 3 : 4) + 1;
 		const char **str = split_message((const uint8_t *)address, addrlen, rowlen);
 		if (desc) {
-			oledDrawString(0, 0 * 9, desc);
+			oledDrawString(0, 0 * 9, desc, FONT_STANDARD);
 		}
 		for (int i = 0; i < 4; i++) {
-			oledDrawString(0, (i + 1) * 9 + 4, str[i]);
+			oledDrawString(0, (i + 1) * 9 + 4, str[i], FONT_FIXED);
 		}
-		oledDrawString(0, 42, address_n_str(address_n, address_n_count));
+		oledDrawString(0, 42, address_n_str(address_n, address_n_count), FONT_STANDARD);
 	}
 
 	if (!qrcode) {
-		static const char *btnNo = _("QR Code");
-		oledDrawString(2, OLED_HEIGHT - 8, btnNo);
-		oledInvert(0, OLED_HEIGHT - 9, oledStringWidth(btnNo) + 3, OLED_HEIGHT - 1);
+		layoutButtonNo(_("QR Code"));
 	}
 
-	static const char *btnYes = _("Continue");
-	oledDrawString(OLED_WIDTH - fontCharWidth('\x06') - 1, OLED_HEIGHT - 8, "\x06");
-	oledDrawString(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 3, OLED_HEIGHT - 8, btnYes);
-	oledInvert(OLED_WIDTH - oledStringWidth(btnYes) - fontCharWidth('\x06') - 4, OLED_HEIGHT - 9, OLED_WIDTH - 1, OLED_HEIGHT - 1);
-
+	layoutButtonYes(_("Continue"));
 	oledRefresh();
 }
 
 void layoutPublicKey(const uint8_t *pubkey)
 {
-	char hex[32*2+1], desc[16];
+	char hex[32 * 2 + 1], desc[16];
 	strlcpy(desc, "Public Key: 00", sizeof(desc));
-	data2hex(pubkey, 1, desc + 12);
+	if (pubkey[0] == 1) {
+		/* ed25519 public key */
+		// pass - leave 00
+	} else {
+		data2hex(pubkey, 1, desc + 12);
+	}
 	data2hex(pubkey + 1, 32, hex);
-	const char **str = split_message((const uint8_t *)hex, 32*2, 16);
+	const char **str = split_message((const uint8_t *)hex, 32 * 2, 16);
 	layoutDialogSwipe(&bmp_icon_question, NULL, _("Continue"), NULL,
 		desc, str[0], str[1], str[2], str[3], NULL);
 }

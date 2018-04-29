@@ -37,5 +37,5 @@ void __attribute__((noreturn)) run_bootloader(void)
 	// copy bootloader
 	memcpy(bootloader_vec, __bootloader_start__, (size_t) __bootloader_size__);
 
-	load_vector_table(bootloader_vec);
+	jump_to_firmware(bootloader_vec, FW_TRUSTED);
 }

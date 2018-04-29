@@ -17,11 +17,13 @@
  * along with this library.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <libopencm3/cm3/mpu.h>
+#include <libopencm3/cm3/nvic.h>
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/spi.h>
-#include <libopencm3/stm32/f2/rng.h>
+#include <libopencm3/stm32/rng.h>
 
 #include "rng.h"
 #include "layout.h"
@@ -29,19 +31,29 @@
 
 uint32_t __stack_chk_guard;
 
-void __attribute__((noreturn)) __stack_chk_fail(void)
-{
-	layoutDialog(&bmp_icon_error, NULL, NULL, NULL, "Stack smashing", "detected.", NULL, "Please unplug", "the device.", NULL);
+static inline void __attribute__((noreturn)) fault_handler(const char *line1) {
+	layoutDialog(&bmp_icon_error, NULL, NULL, NULL, line1, "detected.", NULL, "Please unplug", "the device.", NULL);
 	for (;;) {} // loop forever
+}
+
+void __attribute__((noreturn)) __stack_chk_fail(void) {
+	fault_handler("Stack smashing");
 }
 
 void nmi_handler(void)
 {
 	// Clock Security System triggered NMI
 	if ((RCC_CIR & RCC_CIR_CSSF) != 0) {
-		layoutDialog(&bmp_icon_error, NULL, NULL, NULL, "Clock instability", "detected.", NULL, "Please unplug", "the device.", NULL);
-		for (;;) {} // loop forever
+		fault_handler("Clock instability");
 	}
+}
+
+void hard_fault_handler(void) {
+	fault_handler("Hard fault");
+}
+
+void mem_manage_handler(void) {
+	fault_handler("Memory fault");
 }
 
 void setup(void)
@@ -127,4 +139,61 @@ void setupApp(void)
 
 	gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO10);
 	gpio_set_af(GPIOA, GPIO_AF10, GPIO10);
+}
+
+#define MPU_RASR_SIZE_32KB  (0x0EUL << MPU_RASR_SIZE_LSB)
+#define MPU_RASR_SIZE_64KB  (0x0FUL << MPU_RASR_SIZE_LSB)
+#define MPU_RASR_SIZE_128KB (0x10UL << MPU_RASR_SIZE_LSB)
+#define MPU_RASR_SIZE_256KB (0x11UL << MPU_RASR_SIZE_LSB)
+#define MPU_RASR_SIZE_512MB (0x1CUL << MPU_RASR_SIZE_LSB)
+
+// http://infocenter.arm.com/help/topic/com.arm.doc.dui0552a/BABDJJGF.html
+#define MPU_RASR_ATTR_FLASH  (MPU_RASR_ATTR_C)
+#define MPU_RASR_ATTR_SRAM   (MPU_RASR_ATTR_C | MPU_RASR_ATTR_S)
+#define MPU_RASR_ATTR_PERIPH (MPU_RASR_ATTR_B | MPU_RASR_ATTR_S)
+
+#define FLASH_BASE	(0x08000000U)
+#define SRAM_BASE	(0x20000000U)
+
+// Never use in bootloader! Disables access to PPB (including MPU, NVIC, SCB)
+void mpu_config(void)
+{
+	// Disable MPU
+	MPU_CTRL = 0;
+
+	// Bootloader (0x08000000 - 0x08007FFF, 32 KiB, read-only, execute never)
+	MPU_RBAR = FLASH_BASE | MPU_RBAR_VALID | (0 << MPU_RBAR_REGION_LSB);
+	MPU_RASR = MPU_RASR_ENABLE | MPU_RASR_ATTR_FLASH | MPU_RASR_SIZE_32KB | MPU_RASR_ATTR_AP_PRO_URO | MPU_RASR_ATTR_XN;
+
+	// Metadata (0x08008000 - 0x0800FFFF, 32 KiB, read-write, execute never)
+	MPU_RBAR = FLASH_BASE | 0x8000 | MPU_RBAR_VALID | (1 << MPU_RBAR_REGION_LSB);
+	MPU_RASR = MPU_RASR_ENABLE | MPU_RASR_ATTR_FLASH | MPU_RASR_SIZE_32KB | MPU_RASR_ATTR_AP_PRW_URW | MPU_RASR_ATTR_XN;
+
+	// Firmware (0x08010000 - 0x0807FFFF, 64 + 3 * 128 KiB = 64 + 128 + 256 KiB = 448 KiB, read-only)
+	MPU_RBAR = FLASH_BASE | 0x10000 | MPU_RBAR_VALID | (2 << MPU_RBAR_REGION_LSB);
+	MPU_RASR = MPU_RASR_ENABLE | MPU_RASR_ATTR_FLASH | MPU_RASR_SIZE_64KB | MPU_RASR_ATTR_AP_PRO_URO;
+	MPU_RBAR = FLASH_BASE | 0x20000 | MPU_RBAR_VALID | (3 << MPU_RBAR_REGION_LSB);
+	MPU_RASR = MPU_RASR_ENABLE | MPU_RASR_ATTR_FLASH | MPU_RASR_SIZE_128KB | MPU_RASR_ATTR_AP_PRO_URO;
+	MPU_RBAR = FLASH_BASE | 0x40000 | MPU_RBAR_VALID | (4 << MPU_RBAR_REGION_LSB);
+	MPU_RASR = MPU_RASR_ENABLE | MPU_RASR_ATTR_FLASH | MPU_RASR_SIZE_256KB | MPU_RASR_ATTR_AP_PRO_URO;
+
+	// SRAM (0x20000000 - 0x2001FFFF, read-write, execute never)
+	MPU_RBAR = SRAM_BASE | MPU_RBAR_VALID | (5 << MPU_RBAR_REGION_LSB);
+	MPU_RASR = MPU_RASR_ENABLE | MPU_RASR_ATTR_SRAM | MPU_RASR_SIZE_128KB | MPU_RASR_ATTR_AP_PRW_URW | MPU_RASR_ATTR_XN;
+
+	// Peripherals (0x40000000 - 0x5FFFFFFF, read-write, execute never)
+	MPU_RBAR = PERIPH_BASE | MPU_RBAR_VALID | (6 << MPU_RBAR_REGION_LSB);
+	MPU_RASR = MPU_RASR_ENABLE | MPU_RASR_ATTR_PERIPH | MPU_RASR_SIZE_512MB | MPU_RASR_ATTR_AP_PRW_URW | MPU_RASR_ATTR_XN;
+
+	// Enable MPU
+	MPU_CTRL = MPU_CTRL_ENABLE;
+
+	// Enable memory fault handler
+	SCB_SHCSR |= SCB_SHCSR_MEMFAULTENA;
+
+	__asm__ volatile("dsb");
+	__asm__ volatile("isb");
+
+	// Switch to unprivileged software execution to prevent access to MPU
+	set_mode_unprivileged();
 }

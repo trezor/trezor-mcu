@@ -253,10 +253,11 @@ bool protectPassphrase(void)
 	bool result;
 	for (;;) {
 		usbPoll();
+		// TODO: correctly process PassphraseAck with state field set (mismatch => Failure)
 		if (msg_tiny_id == MessageType_MessageType_PassphraseAck) {
 			msg_tiny_id = 0xFFFF;
 			PassphraseAck *ppa = (PassphraseAck *)msg_tiny;
-			session_cachePassphrase(ppa->passphrase);
+			session_cachePassphrase(ppa->has_passphrase ? ppa->passphrase : "");
 			result = true;
 			break;
 		}
