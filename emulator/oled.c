@@ -94,9 +94,14 @@ void oledInit(void) {
 	//output on oled if configured also
 	if (getenv("TREZOR_OLED_TYPE")) {
 		oled_type = atoi(getenv("TREZOR_OLED_TYPE"));
+		bool flip = atoi(getenv("TREZOR_OLED_FLIP")) ? true : false;
 
 		if (oled_type > 0 && oled_type < OLED_LAST_OLED) {
-			oled_init_i2c(oled_type);
+			bool init_done = oled_init(oled_type, flip);
+			if (!init_done) {
+				fprintf(stderr, "Failed to initialize oled");
+				exit(1);
+			}
 		}
 	}
 #endif

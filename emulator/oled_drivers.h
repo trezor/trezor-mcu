@@ -24,9 +24,11 @@
 #define OLED_ADAFRUIT_I2C_128x64  1
 #define OLED_SEEED_I2C_128x64     2
 #define OLED_SH1106_I2C_128x64    3
-#define OLED_LAST_OLED            4
+#define OLED_ADAFRUIT_SPI_128x64  4
+#define OLED_SH1106_SPI_128x64    5
+#define OLED_LAST_OLED            6
 
-bool oled_init_i2c(uint8_t OLED_TYPE);
+bool oled_init(uint8_t OLED_TYPE, bool FLIP);
 void oled_display(const uint8_t * p);
 
 #endif
