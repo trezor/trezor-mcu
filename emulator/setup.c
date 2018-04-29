@@ -27,6 +27,7 @@
 
 #ifdef PIZERO
 #include <bcm2835.h>
+#include "buttons.h"
 #endif
 
 #include <libopencm3/stm32/flash.h>
@@ -59,10 +60,7 @@ void setup(void) {
 	setup_flash();
 #ifdef PIZERO
     bcm2835_init();
-    bcm2835_gpio_fsel(RPI_V2_GPIO_P1_32 , BCM2835_GPIO_FSEL_INPT);
-    bcm2835_gpio_fsel(RPI_V2_GPIO_P1_36, BCM2835_GPIO_FSEL_INPT);
-    bcm2835_gpio_set_pud(RPI_V2_GPIO_P1_32 , BCM2835_GPIO_PUD_UP );
-    bcm2835_gpio_set_pud(RPI_V2_GPIO_P1_36, BCM2835_GPIO_PUD_UP );
+    buttonInit();
 #endif
 }
 
