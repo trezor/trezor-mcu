@@ -408,9 +408,7 @@ static void recovery_digit(const char digit) {
 		int x = 64 * (((digit - '1') % 3) > 0);
 		oledInvert(x + 1, y, x + 62, y + 9);
 		oledRefresh();
-		usbTiny(1);
 		usbSleep(250);
-		usbTiny(0);
 
 		/* index of the chosen word */
 		int idx = TABLE2(TABLE1(word_pincode / 9) + (word_pincode % 9)) + choice;

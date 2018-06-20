@@ -25,8 +25,6 @@
 #include "timer.h"
 #include "debug.h"
 
-static volatile char tiny = 0;
-
 void usbInit(void) {
 	emulatorSocketInit();
 }
@@ -37,7 +35,7 @@ void usbInit(void) {
 #define _ISDBG ('n')
 #endif
 
-void usbPoll(void) {
+void usbPoll(bool tiny) {
 	emulatorPoll();
 
 	static uint8_t buffer[64];
@@ -64,16 +62,10 @@ void usbPoll(void) {
 #endif
 }
 
-char usbTiny(char set) {
-	char old = tiny;
-	tiny = set;
-	return old;
-}
-
 void usbSleep(uint32_t millis) {
 	uint32_t start = timer_ms();
 
 	while ((timer_ms() - start) < millis) {
-		usbPoll();
+		usbPoll(true);
 	}
 }

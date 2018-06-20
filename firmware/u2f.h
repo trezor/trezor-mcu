@@ -35,7 +35,7 @@ typedef struct {
 
 #define APDU_LEN(A) (uint32_t)(((A).lc1 << 16) + ((A).lc2 << 8) + ((A).lc3))
 
-void u2fhid_read(char tiny, const U2FHID_FRAME *buf);
+void u2fhid_read(bool tiny, const U2FHID_FRAME *buf);
 void u2fhid_init_cmd(const U2FHID_FRAME *f);
 void u2fhid_read_start(const U2FHID_FRAME *f);
 bool u2fhid_write(uint8_t *buf);

@@ -50,12 +50,11 @@ bool protectButton(ButtonRequest_ButtonRequestType type, bool confirm_only)
 	memset(&resp, 0, sizeof(ButtonRequest));
 	resp.has_code = true;
 	resp.code = type;
-	usbTiny(1);
 	buttonUpdate(); // Clear button state
 	msg_write(MessageType_MessageType_ButtonRequest, &resp);
 
 	for (;;) {
-		usbPoll();
+		usbPoll(true);
 
 		// check for ButtonAck
 		if (msg_tiny_id == MessageType_MessageType_ButtonAck) {
@@ -106,7 +105,6 @@ bool protectButton(ButtonRequest_ButtonRequestType type, bool confirm_only)
 #endif
 	}
 
-	usbTiny(0);
 
 	return result;
 }
@@ -117,16 +115,14 @@ const char *requestPin(PinMatrixRequest_PinMatrixRequestType type, const char *t
 	memset(&resp, 0, sizeof(PinMatrixRequest));
 	resp.has_type = true;
 	resp.type = type;
-	usbTiny(1);
 	msg_write(MessageType_MessageType_PinMatrixRequest, &resp);
 	pinmatrix_start(text);
 	for (;;) {
-		usbPoll();
+		usbPoll(true);
 		if (msg_tiny_id == MessageType_MessageType_PinMatrixAck) {
 			msg_tiny_id = 0xFFFF;
 			PinMatrixAck *pma = (PinMatrixAck *)msg_tiny;
 			pinmatrix_done(pma->pin); // convert via pinmatrix
-			usbTiny(0);
 			return pma->pin;
 		}
 		// check for Cancel / Initialize
@@ -135,7 +131,6 @@ const char *requestPin(PinMatrixRequest_PinMatrixRequestType type, const char *t
 		if (protectAbortedByCancel || protectAbortedByInitialize) {
 			pinmatrix_done(0);
 			msg_tiny_id = 0xFFFF;
-			usbTiny(0);
 			return 0;
 		}
 #if DEBUG_LINK
@@ -164,7 +159,6 @@ bool protectPin(bool use_cached)
 	uint32_t fails = storage_getPinFailsOffset();
 	uint32_t wait = storage_getPinWait(fails);
 	protectCheckMaxTry(wait);
-	usbTiny(1);
 	while (wait > 0) {
 		// convert wait to secstr string
 		char secstrbuf[20];
@@ -186,13 +180,11 @@ bool protectPin(bool use_cached)
 			protectAbortedByCancel = false;
 			protectAbortedByInitialize = true;
 			msg_tiny_id = 0xFFFF;
-			usbTiny(0);
 			fsm_sendFailure(Failure_FailureType_Failure_PinCancelled, NULL);
 			return false;
 		}
 		wait--;
 	}
-	usbTiny(0);
 	const char *pin;
 	pin = requestPin(PinMatrixRequest_PinMatrixRequestType_PinMatrixRequestType_Current, _("Please enter current PIN:"));
 	if (!pin) {
@@ -248,14 +240,13 @@ bool protectPassphrase(void)
 
 	PassphraseRequest resp;
 	memset(&resp, 0, sizeof(PassphraseRequest));
-	usbTiny(1);
 	msg_write(MessageType_MessageType_PassphraseRequest, &resp);
 
 	layoutDialogSwipe(&bmp_icon_info, NULL, NULL, NULL, _("Please enter your"), _("passphrase using"), _("the computer's"), _("keyboard."), NULL, NULL);
 
 	bool result;
 	for (;;) {
-		usbPoll();
+		usbPoll(true);
 		// TODO: correctly process PassphraseAck with state field set (mismatch => Failure)
 		if (msg_tiny_id == MessageType_MessageType_PassphraseAck) {
 			msg_tiny_id = 0xFFFF;
@@ -273,7 +264,6 @@ bool protectPassphrase(void)
 			break;
 		}
 	}
-	usbTiny(0);
 	layoutHome();
 	return result;
 }

@@ -110,7 +110,7 @@ typedef struct {
 
 U2F_ReadBuffer *reader;
 
-void u2fhid_read(char tiny, const U2FHID_FRAME *f)
+void u2fhid_read(bool tiny, const U2FHID_FRAME *f)
 {
 	// Always handle init packets directly
 	if (f->init.cmd == U2FHID_INIT) {
@@ -187,7 +187,6 @@ void u2fhid_read_start(const U2FHID_FRAME *f) {
 	reader = &readbuffer;
 	u2fhid_init_cmd(f);
 
-	usbTiny(1);
 	for(;;) {
 		// Do we need to wait for more data
 		while ((reader->buf_ptr - reader->buf) < (signed)reader->len) {
@@ -200,11 +199,10 @@ void u2fhid_read_start(const U2FHID_FRAME *f) {
 					send_u2fhid_error(cid, ERR_MSG_TIMEOUT);
 					cid = 0;
 					reader = 0;
-					usbTiny(0);
 					layoutHome();
 					return;
 				}
-				usbPoll();
+				usbPoll(true);
 			}
 		}
 
@@ -232,7 +230,7 @@ void u2fhid_read_start(const U2FHID_FRAME *f) {
 		reader->seq = 255;
 		while (dialog_timeout > 0 && reader->cmd == 0) {
 			dialog_timeout--;
-			usbPoll(); // may trigger new request
+			usbPoll(true); // may trigger new request
 			buttonUpdate();
 			if (button.YesUp &&
 				(last_req_state == AUTH || last_req_state == REG)) {
@@ -246,7 +244,6 @@ void u2fhid_read_start(const U2FHID_FRAME *f) {
 			last_req_state = INIT;
 			cid = 0;
 			reader = 0;
-			usbTiny(0);
 			layoutHome();
 			return;
 		}

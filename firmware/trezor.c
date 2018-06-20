@@ -51,7 +51,6 @@ void check_lock_screen(void)
 		layoutDialog(&bmp_icon_question, _("Cancel"), _("Lock Device"), NULL, _("Do you really want to"), _("lock your TREZOR?"), NULL, NULL, NULL, NULL);
 
 		// wait until NoButton is released
-		usbTiny(1);
 		do {
 			usbSleep(5);
 			buttonUpdate();
@@ -62,7 +61,6 @@ void check_lock_screen(void)
 			usbSleep(5);
 			buttonUpdate();
 		} while (!button.YesUp && !button.NoUp);
-		usbTiny(0);
 
 		if (button.YesUp) {
 			// lock the screen
@@ -118,7 +116,7 @@ int main(void)
 	layoutHome();
 	usbInit();
 	for (;;) {
-		usbPoll();
+		usbPoll(false);
 		check_lock_screen();
 	}
 

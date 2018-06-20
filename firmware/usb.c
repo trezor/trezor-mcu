@@ -338,7 +338,7 @@ static int hid_control_request(usbd_device *dev, struct usb_setup_data *req, uin
 	return 1;
 }
 
-static volatile char tiny = 0;
+static volatile bool usbTiny = false;
 
 static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 {
@@ -346,7 +346,7 @@ static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 	static CONFIDENTIAL uint8_t buf[64] __attribute__ ((aligned(4)));
 	if ( usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_OUT, buf, 64) != 64) return;
 	debugLog(0, "", "hid_rx_callback");
-	if (!tiny) {
+	if (!usbTiny) {
 		msg_read(buf, 64);
 	} else {
 		msg_read_tiny(buf, 64);
@@ -360,7 +360,7 @@ static void hid_u2f_rx_callback(usbd_device *dev, uint8_t ep)
 
 	debugLog(0, "", "hid_u2f_rx_callback");
 	if ( usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_U2F_OUT, buf, 64) != 64) return;
-	u2fhid_read(tiny, (const U2FHID_FRAME *) (void*) buf);
+	u2fhid_read(usbTiny, (const U2FHID_FRAME *) (void*) buf);
 }
 
 #if DEBUG_LINK
@@ -370,7 +370,7 @@ static void hid_debug_rx_callback(usbd_device *dev, uint8_t ep)
 	static CONFIDENTIAL uint8_t buf[64] __attribute__ ((aligned(4)));
 	if ( usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_DEBUG_OUT, buf, 64) != 64) return;
 	debugLog(0, "", "hid_debug_rx_callback");
-	if (!tiny) {
+	if (!usbTiny) {
 		msg_debug_read(buf, 64);
 	} else {
 		msg_read_tiny(buf, 64);
@@ -407,8 +407,10 @@ void usbInit(void)
 	usbd_register_set_config_callback(usbd_dev, hid_set_config);
 }
 
-void usbPoll(void)
+void usbPoll(bool tiny)
 {
+	usbTiny = tiny;
+
 	static const uint8_t *data;
 	// poll read buffer
 	usbd_poll(usbd_dev);
@@ -437,15 +439,9 @@ void usbReconnect(void)
 	usbd_disconnect(usbd_dev, 0);
 }
 
-char usbTiny(char set)
-{
-	char old = tiny;
-	tiny = set;
-	return old;
-}
-
 void usbSleep(uint32_t millis)
 {
+	usbTiny = true;
 	uint32_t start = timer_ms();
 
 	while ((timer_ms() - start) < millis) {

@@ -265,9 +265,7 @@ static void get_u2froot_callback(uint32_t iter, uint32_t total)
 
 static void storage_compute_u2froot(const char* mnemonic, StorageHDNode *u2froot) {
 	static CONFIDENTIAL HDNode node;
-	char oldTiny = usbTiny(1);
 	mnemonic_to_seed(mnemonic, "", sessionSeed, get_u2froot_callback); // BIP-0039
-	usbTiny(oldTiny);
 	hdnode_from_seed(sessionSeed, 64, NIST256P1_NAME, &node);
 	hdnode_private_ckd(&node, U2F_KEY_PATH);
 	u2froot->depth = node.depth;
@@ -531,9 +529,7 @@ const uint8_t *storage_getSeed(bool usePassphrase)
 				storage_show_error();
 			}
 		}
-		char oldTiny = usbTiny(1);
 		mnemonic_to_seed(storageRom->mnemonic, usePassphrase ? sessionPassphrase : "", sessionSeed, get_root_node_callback); // BIP-0039
-		usbTiny(oldTiny);
 		sessionSeedCached = true;
 		sessionSeedUsesPassphrase = usePassphrase;
 		return sessionSeed;
@@ -565,7 +561,6 @@ bool storage_getRootNode(HDNode *node, const char *curve, bool usePassphrase)
 			// decrypt hd node
 			uint8_t secret[64];
 			PBKDF2_HMAC_SHA512_CTX pctx;
-			char oldTiny = usbTiny(1);
 			pbkdf2_hmac_sha512_Init(&pctx, (const uint8_t *)sessionPassphrase, strlen(sessionPassphrase), (const uint8_t *)"TREZORHD", 8);
 			get_root_node_callback(0, BIP39_PBKDF2_ROUNDS);
 			for (int i = 0; i < 8; i++) {
@@ -573,7 +568,6 @@ bool storage_getRootNode(HDNode *node, const char *curve, bool usePassphrase)
 				get_root_node_callback((i + 1) * BIP39_PBKDF2_ROUNDS / 8, BIP39_PBKDF2_ROUNDS);
 			}
 			pbkdf2_hmac_sha512_Final(&pctx, secret);
-			usbTiny(oldTiny);
 			aes_decrypt_ctx ctx;
 			aes_decrypt_key256(secret, &ctx);
 			aes_cbc_decrypt(node->chain_code, node->chain_code, 32, secret + 32, &ctx);
