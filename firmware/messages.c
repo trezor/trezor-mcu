@@ -30,6 +30,8 @@
 #include "pb_encode.h"
 #include "messages.pb.h"
 
+#include "messages_map.h"
+
 struct MessagesMap_t {
 	char type;	// n = normal, d = debug
 	char dir; 	// i = in, o = out
@@ -38,8 +40,25 @@ struct MessagesMap_t {
 	void (*process_func)(void *ptr);
 };
 
+#define MSG_PROCESS_FUNC(NAME) (void (*)(void *)) fsm_msg##NAME
+
 static const struct MessagesMap_t MessagesMap[] = {
-#include "messages_map.h"
+#define X(NAME, MSG_ID, FIELDS) { 'n', 'i', MSG_ID, FIELDS, MSG_PROCESS_FUNC(NAME) },
+	MESSAGES_MAP_IN(X)
+#undef X
+#define X(NAME, MSG_ID, FIELDS) { 'n', 'o', MSG_ID, FIELDS, NULL },
+	MESSAGES_MAP_OUT(X)
+#undef X
+
+#if DEBUG_LINK
+#define X(NAME, MSG_ID, FIELDS) { 'd', 'i', MSG_ID, FIELDS, MSG_PROCESS_FUNC(NAME) },
+	MESSAGES_MAP_DEBUG_IN(X)
+#undef X
+#define X(NAME, MSG_ID, FIELDS) { 'd', 'o', MSG_ID, FIELDS, NULL },
+	MESSAGES_MAP_DEBUG_OUT(X)
+#undef X
+#endif
+
 	// end
 	{0, 0, 0, 0, 0}
 };
@@ -306,16 +325,15 @@ const uint8_t *msg_debug_out_data(void)
 #endif
 
 CONFIDENTIAL uint8_t msg_tiny[128];
-_Static_assert(sizeof(msg_tiny) >= sizeof(Cancel), "msg_tiny too tiny");
-_Static_assert(sizeof(msg_tiny) >= sizeof(Initialize), "msg_tiny too tiny");
-_Static_assert(sizeof(msg_tiny) >= sizeof(PassphraseAck), "msg_tiny too tiny");
-_Static_assert(sizeof(msg_tiny) >= sizeof(ButtonAck), "msg_tiny too tiny");
-_Static_assert(sizeof(msg_tiny) >= sizeof(PinMatrixAck), "msg_tiny too tiny");
-#if DEBUG_LINK
-_Static_assert(sizeof(msg_tiny) >= sizeof(DebugLinkDecision), "msg_tiny too tiny");
-_Static_assert(sizeof(msg_tiny) >= sizeof(DebugLinkGetState), "msg_tiny too tiny");
-#endif
 uint16_t msg_tiny_id = 0xFFFF;
+
+#define MSG_TINY_ASSERT(NAME, MSG_ID, FIELDS) \
+	_Static_assert(sizeof(msg_tiny) >= sizeof(NAME), "msg_tiny too tiny");
+
+MESSAGES_MAP_TINY(MSG_TINY_ASSERT)
+#if DEBUG_LINK
+MESSAGES_MAP_DEBUG_TINY(MSG_TINY_ASSERT)
+#endif
 
 void msg_read_tiny(const uint8_t *buf, int len)
 {
@@ -333,28 +351,14 @@ void msg_read_tiny(const uint8_t *buf, int len)
 	pb_istream_t stream = pb_istream_from_buffer(buf + 9, msg_size);
 
 	switch (msg_id) {
-		case MessageType_MessageType_PinMatrixAck:
-			fields = PinMatrixAck_fields;
+#define MSG_TINY_CASE(NAME, MSG_ID, FIELDS) \
+		case MSG_ID: \
+			fields = FIELDS; \
 			break;
-		case MessageType_MessageType_ButtonAck:
-			fields = ButtonAck_fields;
-			break;
-		case MessageType_MessageType_PassphraseAck:
-			fields = PassphraseAck_fields;
-			break;
-		case MessageType_MessageType_Cancel:
-			fields = Cancel_fields;
-			break;
-		case MessageType_MessageType_Initialize:
-			fields = Initialize_fields;
-			break;
+
+		MESSAGES_MAP_TINY(MSG_TINY_CASE)
 #if DEBUG_LINK
-		case MessageType_MessageType_DebugLinkDecision:
-			fields = DebugLinkDecision_fields;
-			break;
-		case MessageType_MessageType_DebugLinkGetState:
-			fields = DebugLinkGetState_fields;
-			break;
+		MESSAGES_MAP_DEBUG_TINY(MSG_TINY_CASE)
 #endif
 	}
 	if (fields) {
