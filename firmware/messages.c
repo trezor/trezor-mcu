@@ -56,6 +56,36 @@ MESSAGE_MAP_DEFINE    (message_map_debug_out,  MESSAGES_MAP_DEBUG_OUT);
 MESSAGE_MAP_DEFINE    (message_map_debug_tiny, MESSAGES_MAP_DEBUG_TINY);
 #endif
 
+static CONFIDENTIAL uint8_t msg_in[MSG_IN_SIZE];
+
+#define MSG_IN_ASSERT(NAME, MSG_ID, FIELDS) \
+	_Static_assert(sizeof(msg_in) >= NAME##_size, "msg_in too tiny");
+MESSAGES_MAP_IN(MSG_IN_ASSERT)
+MESSAGES_MAP_TINY(MSG_IN_ASSERT)
+#if DEBUG_LINK
+MESSAGES_MAP_DEBUG_IN(MSG_IN_ASSERT)
+MESSAGES_MAP_DEBUG_TINY(MSG_IN_ASSERT)
+#endif
+
+static CONFIDENTIAL uint8_t msg_data[MSG_IN_SIZE];
+
+#define MSG_DATA_ASSERT(NAME, MSG_ID, FIELDS) \
+	_Static_assert(sizeof(msg_data) >= sizeof(NAME), "msg_data too tiny");
+MESSAGES_MAP_IN(MSG_DATA_ASSERT)
+#if DEBUG_LINK
+MESSAGES_MAP_DEBUG_IN(MSG_DATA_ASSERT)
+#endif
+
+CONFIDENTIAL uint8_t msg_tiny[MSG_TINY_SIZE];
+uint16_t msg_tiny_id = 0xFFFF;
+
+#define MSG_TINY_ASSERT(NAME, MSG_ID, FIELDS) \
+	_Static_assert(sizeof(msg_tiny) >= sizeof(NAME), "msg_tiny too tiny");
+MESSAGES_MAP_TINY(MSG_TINY_ASSERT)
+#if DEBUG_LINK
+MESSAGES_MAP_DEBUG_TINY(MSG_TINY_ASSERT)
+#endif
+
 static const message_map *message_map_find(const message_map *m, uint16_t msg_id) {
 	if (m == NULL) {
 		return NULL;
@@ -70,28 +100,21 @@ static const message_map *message_map_find(const message_map *m, uint16_t msg_id
 	return NULL;
 }
 
-static const message_map *message_map_find_in(char type, uint16_t msg_id) {
-	if (type == 'n') {
-		return message_map_find(message_map_in, msg_id);
-	}
-
+static const message_map *message_map_get_in(enum msg_type type) {
+	switch (type) {
+	case MSG_TYPE_NORMAL:
+		return message_map_in;
+	case MSG_TYPE_TINY:
+		return message_map_tiny;
 #if DEBUG_LINK
-	if (type == 'd') {
-		return message_map_find(message_map_debug_in, msg_id);
-	}
+	case MSG_TYPE_DEBUG:
+		return message_map_debug_in;
+	case MSG_TYPE_DEBUG_TINY:
+		return message_map_debug_tiny;
 #endif
-
-	if (type == 't') {
-		const message_map *m = message_map_find(message_map_tiny, msg_id);
-#if DEBUG_LINK
-		if (!m) {
-			m = message_map_find(message_map_debug_tiny, msg_id);
-		}
-#endif
-		return m;
+	default:
+		return NULL;
 	}
-
-	return NULL;
 }
 
 static uint32_t msg_out_start = 0;
@@ -99,12 +122,20 @@ static uint32_t msg_out_end = 0;
 static uint32_t msg_out_cur = 0;
 static uint8_t msg_out[MSG_OUT_SIZE];
 
+#define MSG_OUT_ASSERT(NAME, MSG_ID, FIELDS) \
+	_Static_assert(sizeof(msg_out) >= NAME##_size, "msg_out too tiny");
+MESSAGES_MAP_OUT(MSG_OUT_ASSERT)
+
 #if DEBUG_LINK
 
 static uint32_t msg_debug_out_start = 0;
 static uint32_t msg_debug_out_end = 0;
 static uint32_t msg_debug_out_cur = 0;
 static uint8_t msg_debug_out[MSG_DEBUG_OUT_SIZE];
+
+#define MSG_DEBUG_OUT_ASSERT(NAME, MSG_ID, FIELDS) \
+	_Static_assert(sizeof(msg_debug_out) >= NAME##_size, "msg_debug_out too tiny");
+MESSAGES_MAP_DEBUG_OUT(MSG_DEBUG_OUT_ASSERT)
 
 #endif
 
@@ -188,24 +219,28 @@ static bool pb_debug_callback_out(pb_ostream_t *stream, const uint8_t *buf, size
 
 #endif
 
-bool msg_write_common(char type, uint16_t msg_id, const void *msg_ptr)
+bool msg_write_common(enum msg_type type, uint16_t msg_id, const void *msg_ptr)
 {
 	void (*append)(uint8_t);
 	bool (*pb_callback)(pb_ostream_t *, const uint8_t *, size_t);
 	const message_map *m = NULL;
 
-	if (type == 'n') {
+	switch (type) {
+	case MSG_TYPE_NORMAL:
 		append = msg_out_append;
 		pb_callback = pb_callback_out;
 		m = message_map_find(message_map_out, msg_id);
-	}
+		break;
 #if DEBUG_LINK
-	if (type == 'd') {
+	case MSG_TYPE_DEBUG:
 		append = msg_debug_out_append;
 		pb_callback = pb_debug_callback_out;
 		m = message_map_find(message_map_debug_out, msg_id);
-	}
+		break;
 #endif
+	default:
+		return false;
+	}
 
 	if (!m) { // unknown message
 		return false;
@@ -226,14 +261,19 @@ bool msg_write_common(char type, uint16_t msg_id, const void *msg_ptr)
 	append(len & 0xFF);
 	pb_ostream_t stream = {pb_callback, 0, SIZE_MAX, 0, 0};
 	bool status = pb_encode(&stream, m->fields, msg_ptr);
-	if (type == 'n') {
+
+	switch (type) {
+	case MSG_TYPE_NORMAL:
 		msg_out_pad();
-	}
+		break;
 #if DEBUG_LINK
-	else if (type == 'd') {
+	case MSG_TYPE_DEBUG:
 		msg_debug_out_pad();
-	}
+		break;
 #endif
+	default:
+		return false;
+	}
 	return status;
 }
 
@@ -242,16 +282,11 @@ enum {
 	READSTATE_READING,
 };
 
-CONFIDENTIAL uint8_t msg_tiny[128];
-uint16_t msg_tiny_id = 0xFFFF;
-
-#define MSG_TINY_ASSERT(NAME, MSG_ID, FIELDS) \
-	_Static_assert(sizeof(msg_tiny) >= sizeof(NAME), "msg_tiny too tiny");
-
-MESSAGES_MAP_TINY(MSG_TINY_ASSERT)
-#if DEBUG_LINK
-MESSAGES_MAP_DEBUG_TINY(MSG_TINY_ASSERT)
-#endif
+uint16_t msg_tiny_get_id(void) {
+	uint16_t msg_id = msg_tiny_id;
+	msg_tiny_id = 0xFFFF;
+	return msg_id;
+}
 
 bool msg_decode(pb_istream_t *stream, const pb_field_t *fields, uint8_t *data, size_t size) {
 	memset(data, 0, size);
@@ -260,7 +295,6 @@ bool msg_decode(pb_istream_t *stream, const pb_field_t *fields, uint8_t *data, s
 
 void msg_process(const message_map *m, uint8_t *msg_raw, uint32_t msg_size)
 {
-	static CONFIDENTIAL uint8_t msg_data[MSG_IN_SIZE];
 	pb_istream_t stream = pb_istream_from_buffer(msg_raw, msg_size);
 
 	bool status;
@@ -281,14 +315,13 @@ void msg_process(const message_map *m, uint8_t *msg_raw, uint32_t msg_size)
 	}
 }
 
-void msg_read_common(char type, const uint8_t *buf, uint32_t len)
+void msg_read_common(enum msg_type type, const uint8_t *buf, uint32_t len)
 {
+
 	static char read_state = READSTATE_IDLE;
-	static CONFIDENTIAL uint8_t msg_in[MSG_IN_SIZE];
 	static uint16_t msg_id = 0xFFFF;
 	static uint32_t msg_size = 0;
 	static uint32_t msg_pos = 0;
-	static const message_map *m = NULL;
 
 	if (len != 64) return;
 
@@ -298,12 +331,6 @@ void msg_read_common(char type, const uint8_t *buf, uint32_t len)
 		}
 		msg_id = (buf[3] << 8) + buf[4];
 		msg_size = ((uint32_t) buf[5] << 24)+ (buf[6] << 16) + (buf[7] << 8) + buf[8];
-
-		m = message_map_find_in(type, msg_id);
-		if (!m) { // unknown message
-			fsm_sendFailure(Failure_FailureType_Failure_UnexpectedMessage, _("Unknown message"));
-			return;
-		}
 		if (msg_size > MSG_IN_SIZE) { // message is too big :(
 			fsm_sendFailure(Failure_FailureType_Failure_DataError, _("Message too big"));
 			return;
@@ -330,6 +357,12 @@ void msg_read_common(char type, const uint8_t *buf, uint32_t len)
 	if (msg_pos >= msg_size) {
 		msg_pos = 0;
 		read_state = READSTATE_IDLE;
+
+		const message_map *m = message_map_find(message_map_get_in(type), msg_id);
+		if (!m) { // unknown message
+			fsm_sendFailure(Failure_FailureType_Failure_UnexpectedMessage, _("Unknown message"));
+			return;
+		}
 		msg_process(m, msg_in, msg_size);
 	}
 }

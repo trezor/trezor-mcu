@@ -55,10 +55,10 @@ bool protectButton(ButtonRequest_ButtonRequestType type, bool confirm_only)
 
 	for (;;) {
 		usbPoll(true);
+		uint16_t msg_id = msg_tiny_get_id();
 
 		// check for ButtonAck
-		if (msg_tiny_id == MessageType_MessageType_ButtonAck) {
-			msg_tiny_id = 0xFFFF;
+		if (msg_id == MessageType_MessageType_ButtonAck) {
 			acked = true;
 		}
 
@@ -77,18 +77,16 @@ bool protectButton(ButtonRequest_ButtonRequestType type, bool confirm_only)
 		}
 
 		// check for Cancel / Initialize
-		protectAbortedByCancel = (msg_tiny_id == MessageType_MessageType_Cancel);
-		protectAbortedByInitialize = (msg_tiny_id == MessageType_MessageType_Initialize);
+		protectAbortedByCancel = (msg_id == MessageType_MessageType_Cancel);
+		protectAbortedByInitialize = (msg_id == MessageType_MessageType_Initialize);
 		if (protectAbortedByCancel || protectAbortedByInitialize) {
-			msg_tiny_id = 0xFFFF;
 			result = false;
 			break;
 		}
 
 #if DEBUG_LINK
 		// check DebugLink
-		if (msg_tiny_id == MessageType_MessageType_DebugLinkDecision) {
-			msg_tiny_id = 0xFFFF;
+		if (msg_id == MessageType_MessageType_DebugLinkDecision) {
 			DebugLinkDecision *dld = (DebugLinkDecision *)msg_tiny;
 			result = dld->yes_no;
 			debug_decided = true;
@@ -98,8 +96,7 @@ bool protectButton(ButtonRequest_ButtonRequestType type, bool confirm_only)
 			break;
 		}
 
-		if (msg_tiny_id == MessageType_MessageType_DebugLinkGetState) {
-			msg_tiny_id = 0xFFFF;
+		if (msg_id == MessageType_MessageType_DebugLinkGetState) {
 			fsm_msgDebugLinkGetState((DebugLinkGetState *)msg_tiny);
 		}
 #endif
@@ -119,23 +116,21 @@ const char *requestPin(PinMatrixRequest_PinMatrixRequestType type, const char *t
 	pinmatrix_start(text);
 	for (;;) {
 		usbPoll(true);
-		if (msg_tiny_id == MessageType_MessageType_PinMatrixAck) {
-			msg_tiny_id = 0xFFFF;
+		uint16_t msg_id = msg_tiny_get_id();
+		if (msg_id == MessageType_MessageType_PinMatrixAck) {
 			PinMatrixAck *pma = (PinMatrixAck *)msg_tiny;
 			pinmatrix_done(pma->pin); // convert via pinmatrix
 			return pma->pin;
 		}
 		// check for Cancel / Initialize
-		protectAbortedByCancel = (msg_tiny_id == MessageType_MessageType_Cancel);
-		protectAbortedByInitialize = (msg_tiny_id == MessageType_MessageType_Initialize);
+		protectAbortedByCancel = (msg_id == MessageType_MessageType_Cancel);
+		protectAbortedByInitialize = (msg_id == MessageType_MessageType_Initialize);
 		if (protectAbortedByCancel || protectAbortedByInitialize) {
 			pinmatrix_done(0);
-			msg_tiny_id = 0xFFFF;
 			return 0;
 		}
 #if DEBUG_LINK
-		if (msg_tiny_id == MessageType_MessageType_DebugLinkGetState) {
-			msg_tiny_id = 0xFFFF;
+		if (msg_id == MessageType_MessageType_DebugLinkGetState) {
 			fsm_msgDebugLinkGetState((DebugLinkGetState *)msg_tiny);
 		}
 #endif
@@ -176,10 +171,10 @@ bool protectPin(bool use_cached)
 		layoutDialog(&bmp_icon_info, NULL, NULL, NULL, _("Wrong PIN entered"), NULL, _("Please wait"), secstr, _("to continue ..."), NULL);
 		// wait one second
 		usbSleep(1000);
-		if (msg_tiny_id == MessageType_MessageType_Initialize) {
+		uint16_t msg_id = msg_tiny_get_id();
+		if (msg_id == MessageType_MessageType_Initialize) {
 			protectAbortedByCancel = false;
 			protectAbortedByInitialize = true;
-			msg_tiny_id = 0xFFFF;
 			fsm_sendFailure(Failure_FailureType_Failure_PinCancelled, NULL);
 			return false;
 		}
@@ -247,19 +242,18 @@ bool protectPassphrase(void)
 	bool result;
 	for (;;) {
 		usbPoll(true);
+		uint16_t msg_id = msg_tiny_get_id();
 		// TODO: correctly process PassphraseAck with state field set (mismatch => Failure)
-		if (msg_tiny_id == MessageType_MessageType_PassphraseAck) {
-			msg_tiny_id = 0xFFFF;
+		if (msg_id == MessageType_MessageType_PassphraseAck) {
 			PassphraseAck *ppa = (PassphraseAck *)msg_tiny;
 			session_cachePassphrase(ppa->has_passphrase ? ppa->passphrase : "");
 			result = true;
 			break;
 		}
 		// check for Cancel / Initialize
-		protectAbortedByCancel = (msg_tiny_id == MessageType_MessageType_Cancel);
-		protectAbortedByInitialize = (msg_tiny_id == MessageType_MessageType_Initialize);
+		protectAbortedByCancel = (msg_id == MessageType_MessageType_Cancel);
+		protectAbortedByInitialize = (msg_id == MessageType_MessageType_Initialize);
 		if (protectAbortedByCancel || protectAbortedByInitialize) {
-			msg_tiny_id = 0xFFFF;
 			result = false;
 			break;
 		}

@@ -24,29 +24,33 @@
 #include <stdbool.h>
 #include "trezor.h"
 
-#define MSG_IN_SIZE (12*1024)
+enum msg_type {
+    MSG_TYPE_NORMAL,
+    MSG_TYPE_DEBUG,
+    MSG_TYPE_TINY,
+    MSG_TYPE_DEBUG_TINY,
+};
 
-#define MSG_OUT_SIZE (12*1024)
+void msg_read_common(enum msg_type type, const uint8_t *buf, uint32_t len);
+bool msg_write_common(enum msg_type type, uint16_t msg_id, const void *msg_ptr);
 
-#define msg_read(buf, len) msg_read_common('n', (buf), (len))
-#define msg_write(id, ptr) msg_write_common('n', (id), (ptr))
+#define MSG_IN_SIZE   (12 * 1024)
+#define MSG_OUT_SIZE  (12 * 1024)
+#define MSG_TINY_SIZE (128)
+
 const uint8_t *msg_out_data(void);
+#define msg_write(msg_id, msg_ptr) msg_write_common(MSG_TYPE_NORMAL, msg_id, msg_ptr)
+
+extern uint8_t msg_tiny[MSG_TINY_SIZE];
+uint16_t msg_tiny_get_id(void);
 
 #if DEBUG_LINK
 
-#define MSG_DEBUG_OUT_SIZE (4*1024)
+#define MSG_DEBUG_OUT_SIZE (4 * 1024)
 
-#define msg_debug_read(buf, len) msg_read_common('d', (buf), (len))
-#define msg_debug_write(id, ptr) msg_write_common('d', (id), (ptr))
 const uint8_t *msg_debug_out_data(void);
+#define msg_debug_write(msg_id, msg_ptr) msg_write_common(MSG_TYPE_DEBUG, msg_id, msg_ptr)
 
 #endif
-
-void msg_read_common(char type, const uint8_t *buf, uint32_t len);
-bool msg_write_common(char type, uint16_t msg_id, const void *msg_ptr);
-
-#define msg_read_tiny(buf, len) msg_read_common('t', (buf), (len))
-extern uint8_t msg_tiny[128];
-extern uint16_t msg_tiny_id;
 
 #endif

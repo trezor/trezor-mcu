@@ -75,8 +75,13 @@ def map_extensions():
     return d
 
 
-def print_item(*args):
-    print("\tX({}) \\".format(", ".join(args)))
+def handle_messages(name, message_types):
+    print("#define {}(X) \\".format(name))
+
+    for message_type in message_types:
+        handle_message(message_type)
+
+    print()
 
 
 def handle_message(message_type):
@@ -90,13 +95,8 @@ def handle_message(message_type):
     print_item(name, msg_id, fields)
 
 
-def handle_messages(name, message_types):
-    print("#define {}(X) \\".format(name))
-
-    for message_type in message_types:
-        handle_message(message_type)
-
-    print()
+def print_item(*args):
+    print("\tX({}) \\".format(", ".join(args)))
 
 
 if __name__ == "__main__":

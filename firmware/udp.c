@@ -30,9 +30,9 @@ void usbInit(void) {
 }
 
 #if DEBUG_LINK
-#define _ISDBG (((iface == 1) ? 'd' : 'n'))
+#define _ISDBG (iface == 1)
 #else
-#define _ISDBG ('n')
+#define _ISDBG (false)
 #endif
 
 void usbPoll(bool tiny) {
@@ -42,11 +42,14 @@ void usbPoll(bool tiny) {
 
 	int iface = 0;
 	if (emulatorSocketRead(&iface, buffer, sizeof(buffer)) > 0) {
+		enum msg_type type;
 		if (!tiny) {
-			msg_read_common(_ISDBG, buffer, sizeof(buffer));
+			type = _ISDBG ? MSG_TYPE_DEBUG : MSG_TYPE_NORMAL;
 		} else {
-			msg_read_tiny(buffer, sizeof(buffer));
+			type = _ISDBG ? MSG_TYPE_DEBUG_TINY : MSG_TYPE_TINY;
 		}
+
+		msg_read_common(type, buffer, sizeof(buffer));
 	}
 
 	const uint8_t *data = msg_out_data();

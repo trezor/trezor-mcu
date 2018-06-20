@@ -347,9 +347,9 @@ static void hid_rx_callback(usbd_device *dev, uint8_t ep)
 	if ( usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_OUT, buf, 64) != 64) return;
 	debugLog(0, "", "hid_rx_callback");
 	if (!usbTiny) {
-		msg_read(buf, 64);
+		msg_read_common(MSG_TYPE_NORMAL, buf, 64);
 	} else {
-		msg_read_tiny(buf, 64);
+		msg_read_common(MSG_TYPE_TINY, buf, 64);
 	}
 }
 
@@ -371,9 +371,9 @@ static void hid_debug_rx_callback(usbd_device *dev, uint8_t ep)
 	if ( usbd_ep_read_packet(dev, ENDPOINT_ADDRESS_DEBUG_OUT, buf, 64) != 64) return;
 	debugLog(0, "", "hid_debug_rx_callback");
 	if (!usbTiny) {
-		msg_debug_read(buf, 64);
+		msg_read_common(MSG_TYPE_DEBUG, buf, 64);
 	} else {
-		msg_read_tiny(buf, 64);
+		msg_read_common(MSG_TYPE_DEBUG_TINY, buf, 64);
 	}
 }
 #endif
