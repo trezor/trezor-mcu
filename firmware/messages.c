@@ -32,59 +32,33 @@
 
 #include "messages_map.h"
 
-struct MessagesMap_t {
-	char type;	// n = normal, d = debug
-	char dir; 	// i = in, o = out
+typedef struct {
 	uint16_t msg_id;
 	const pb_field_t *fields;
 	void (*process_func)(void *ptr);
-};
+} message_map;
 
-#define MSG_PROCESS_FUNC(NAME) (void (*)(void *)) fsm_msg##NAME
+#define _MESSAGE_MAP_DEFINE(NAME, MAP, X) \
+	static const message_map NAME[] = { MAP(X) { 0 } }
+#define _MESSAGE_MAP(NAME, MSG_ID, FIELDS)     { MSG_ID, FIELDS, NULL },
+#define _MESSAGE_MAP_IN(NAME, MSG_ID, FIELDS)  { MSG_ID, FIELDS, (void (*)(void *)) fsm_msg##NAME },
 
-static const struct MessagesMap_t MessagesMap[] = {
-#define X(NAME, MSG_ID, FIELDS) { 'n', 'i', MSG_ID, FIELDS, MSG_PROCESS_FUNC(NAME) },
-	MESSAGES_MAP_IN(X)
-#undef X
-#define X(NAME, MSG_ID, FIELDS) { 'n', 'o', MSG_ID, FIELDS, NULL },
-	MESSAGES_MAP_OUT(X)
-#undef X
+#define MESSAGE_MAP_DEFINE(NAME, MAP)    _MESSAGE_MAP_DEFINE(NAME, MAP, _MESSAGE_MAP)
+#define MESSAGE_MAP_DEFINE_IN(NAME, MAP) _MESSAGE_MAP_DEFINE(NAME, MAP, _MESSAGE_MAP_IN)
 
-#if DEBUG_LINK
-#define X(NAME, MSG_ID, FIELDS) { 'd', 'i', MSG_ID, FIELDS, MSG_PROCESS_FUNC(NAME) },
-	MESSAGES_MAP_DEBUG_IN(X)
-#undef X
-#define X(NAME, MSG_ID, FIELDS) { 'd', 'o', MSG_ID, FIELDS, NULL },
-	MESSAGES_MAP_DEBUG_OUT(X)
-#undef X
-#endif
+MESSAGE_MAP_DEFINE_IN (message_map_in,        MESSAGES_MAP_IN);
+MESSAGE_MAP_DEFINE_IN (message_map_debug_in,  MESSAGES_MAP_DEBUG_IN);
+MESSAGE_MAP_DEFINE    (message_map_out,       MESSAGES_MAP_OUT);
+MESSAGE_MAP_DEFINE    (message_map_debug_out, MESSAGES_MAP_DEBUG_OUT);
 
-	// end
-	{0, 0, 0, 0, 0}
-};
-
-const pb_field_t *MessageFields(char type, char dir, uint16_t msg_id)
-{
-	const struct MessagesMap_t *m = MessagesMap;
-	while (m->type) {
-		if (type == m->type && dir == m->dir && msg_id == m->msg_id) {
-			return m->fields;
+static const message_map *message_map_find(const message_map *m, uint16_t msg_id) {
+	for (; m->fields; m++) {
+		if (m->msg_id == msg_id) {
+			return m;
 		}
-		m++;
 	}
-	return 0;
-}
 
-void MessageProcessFunc(char type, char dir, uint16_t msg_id, void *ptr)
-{
-	const struct MessagesMap_t *m = MessagesMap;
-	while (m->type) {
-		if (type == m->type && dir == m->dir && msg_id == m->msg_id) {
-			m->process_func(ptr);
-			return;
-		}
-		m++;
-	}
+	return NULL;
 }
 
 static uint32_t msg_out_start = 0;
@@ -183,30 +157,29 @@ static bool pb_debug_callback_out(pb_ostream_t *stream, const uint8_t *buf, size
 
 bool msg_write_common(char type, uint16_t msg_id, const void *msg_ptr)
 {
-	const pb_field_t *fields = MessageFields(type, 'o', msg_id);
-	if (!fields) { // unknown message
-		return false;
-	}
-
-	size_t len;
-	if (!pb_get_encoded_size(&len, fields, msg_ptr)) {
-		return false;
-	}
-
 	void (*append)(uint8_t);
 	bool (*pb_callback)(pb_ostream_t *, const uint8_t *, size_t);
+	const message_map *m = NULL;
 
 	if (type == 'n') {
 		append = msg_out_append;
 		pb_callback = pb_callback_out;
-	} else
+		m = message_map_find(message_map_out, msg_id);
+	}
 #if DEBUG_LINK
 	if (type == 'd') {
 		append = msg_debug_out_append;
 		pb_callback = pb_debug_callback_out;
-	} else
+		m = message_map_find(message_map_debug_out, msg_id);
+	}
 #endif
-	{
+
+	if (!m) { // unknown message
+		return false;
+	}
+
+	size_t len;
+	if (!pb_get_encoded_size(&len, m->fields, msg_ptr)) {
 		return false;
 	}
 
@@ -219,7 +192,7 @@ bool msg_write_common(char type, uint16_t msg_id, const void *msg_ptr)
 	append((len >> 8) & 0xFF);
 	append(len & 0xFF);
 	pb_ostream_t stream = {pb_callback, 0, SIZE_MAX, 0, 0};
-	bool status = pb_encode(&stream, fields, msg_ptr);
+	bool status = pb_encode(&stream, m->fields, msg_ptr);
 	if (type == 'n') {
 		msg_out_pad();
 	}
@@ -236,14 +209,14 @@ enum {
 	READSTATE_READING,
 };
 
-void msg_process(char type, uint16_t msg_id, const pb_field_t *fields, uint8_t *msg_raw, uint32_t msg_size)
+void msg_process(const message_map *m, uint8_t *msg_raw, uint32_t msg_size)
 {
 	static CONFIDENTIAL uint8_t msg_data[MSG_IN_SIZE];
 	memset(msg_data, 0, sizeof(msg_data));
 	pb_istream_t stream = pb_istream_from_buffer(msg_raw, msg_size);
-	bool status = pb_decode(&stream, fields, msg_data);
+	bool status = pb_decode(&stream, m->fields, msg_data);
 	if (status) {
-		MessageProcessFunc(type, 'i', msg_id, msg_data);
+		m->process_func(msg_data);
 	} else {
 		fsm_sendFailure(Failure_FailureType_Failure_DataError, stream.errmsg);
 	}
@@ -256,7 +229,7 @@ void msg_read_common(char type, const uint8_t *buf, uint32_t len)
 	static uint16_t msg_id = 0xFFFF;
 	static uint32_t msg_size = 0;
 	static uint32_t msg_pos = 0;
-	static const pb_field_t *fields = 0;
+	static const message_map *m = NULL;
 
 	if (len != 64) return;
 
@@ -267,8 +240,12 @@ void msg_read_common(char type, const uint8_t *buf, uint32_t len)
 		msg_id = (buf[3] << 8) + buf[4];
 		msg_size = ((uint32_t) buf[5] << 24)+ (buf[6] << 16) + (buf[7] << 8) + buf[8];
 
-		fields = MessageFields(type, 'i', msg_id);
-		if (!fields) { // unknown message
+		if (type == 'n') {
+			m = message_map_find(message_map_in, msg_id);
+		} else if (type == 'd') {
+			m = message_map_find(message_map_debug_in, msg_id);
+		}
+		if (!m) { // unknown message
 			fsm_sendFailure(Failure_FailureType_Failure_UnexpectedMessage, _("Unknown message"));
 			return;
 		}
@@ -296,7 +273,7 @@ void msg_read_common(char type, const uint8_t *buf, uint32_t len)
 	}
 
 	if (msg_pos >= msg_size) {
-		msg_process(type, msg_id, fields, msg_in, msg_size);
+		msg_process(m, msg_in, msg_size);
 		msg_pos = 0;
 		read_state = READSTATE_IDLE;
 	}
