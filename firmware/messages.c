@@ -46,16 +46,49 @@ typedef struct {
 #define MESSAGE_MAP_DEFINE(NAME, MAP)    _MESSAGE_MAP_DEFINE(NAME, MAP, _MESSAGE_MAP)
 #define MESSAGE_MAP_DEFINE_IN(NAME, MAP) _MESSAGE_MAP_DEFINE(NAME, MAP, _MESSAGE_MAP_IN)
 
-MESSAGE_MAP_DEFINE_IN (message_map_in,        MESSAGES_MAP_IN);
-MESSAGE_MAP_DEFINE_IN (message_map_debug_in,  MESSAGES_MAP_DEBUG_IN);
-MESSAGE_MAP_DEFINE    (message_map_out,       MESSAGES_MAP_OUT);
-MESSAGE_MAP_DEFINE    (message_map_debug_out, MESSAGES_MAP_DEBUG_OUT);
+MESSAGE_MAP_DEFINE_IN (message_map_in,         MESSAGES_MAP_IN);
+MESSAGE_MAP_DEFINE    (message_map_out,        MESSAGES_MAP_OUT);
+MESSAGE_MAP_DEFINE    (message_map_tiny,       MESSAGES_MAP_TINY);
+
+#if DEBUG_LINK
+MESSAGE_MAP_DEFINE_IN (message_map_debug_in,   MESSAGES_MAP_DEBUG_IN);
+MESSAGE_MAP_DEFINE    (message_map_debug_out,  MESSAGES_MAP_DEBUG_OUT);
+MESSAGE_MAP_DEFINE    (message_map_debug_tiny, MESSAGES_MAP_DEBUG_TINY);
+#endif
 
 static const message_map *message_map_find(const message_map *m, uint16_t msg_id) {
+	if (m == NULL) {
+		return NULL;
+	}
+
 	for (; m->fields; m++) {
 		if (m->msg_id == msg_id) {
 			return m;
 		}
+	}
+
+	return NULL;
+}
+
+static const message_map *message_map_find_in(char type, uint16_t msg_id) {
+	if (type == 'n') {
+		return message_map_find(message_map_in, msg_id);
+	}
+
+#if DEBUG_LINK
+	if (type == 'd') {
+		return message_map_find(message_map_debug_in, msg_id);
+	}
+#endif
+
+	if (type == 't') {
+		const message_map *m = message_map_find(message_map_tiny, msg_id);
+#if DEBUG_LINK
+		if (!m) {
+			m = message_map_find(message_map_debug_tiny, msg_id);
+		}
+#endif
+		return m;
 	}
 
 	return NULL;
@@ -209,16 +242,42 @@ enum {
 	READSTATE_READING,
 };
 
+CONFIDENTIAL uint8_t msg_tiny[128];
+uint16_t msg_tiny_id = 0xFFFF;
+
+#define MSG_TINY_ASSERT(NAME, MSG_ID, FIELDS) \
+	_Static_assert(sizeof(msg_tiny) >= sizeof(NAME), "msg_tiny too tiny");
+
+MESSAGES_MAP_TINY(MSG_TINY_ASSERT)
+#if DEBUG_LINK
+MESSAGES_MAP_DEBUG_TINY(MSG_TINY_ASSERT)
+#endif
+
+bool msg_decode(pb_istream_t *stream, const pb_field_t *fields, uint8_t *data, size_t size) {
+	memset(data, 0, size);
+	return pb_decode(stream, fields, data);
+}
+
 void msg_process(const message_map *m, uint8_t *msg_raw, uint32_t msg_size)
 {
 	static CONFIDENTIAL uint8_t msg_data[MSG_IN_SIZE];
-	memset(msg_data, 0, sizeof(msg_data));
 	pb_istream_t stream = pb_istream_from_buffer(msg_raw, msg_size);
-	bool status = pb_decode(&stream, m->fields, msg_data);
-	if (status) {
+
+	bool status;
+	if (m->process_func) {
+		status = msg_decode(&stream, m->fields, msg_data, sizeof(msg_data));
+	} else {
+		status = msg_decode(&stream, m->fields, msg_tiny, sizeof(msg_tiny));
+	}
+
+	if (!status) {
+		fsm_sendFailure(Failure_FailureType_Failure_DataError, stream.errmsg);
+	}
+
+	if (m->process_func) {
 		m->process_func(msg_data);
 	} else {
-		fsm_sendFailure(Failure_FailureType_Failure_DataError, stream.errmsg);
+		msg_tiny_id = m->msg_id;
 	}
 }
 
@@ -240,11 +299,7 @@ void msg_read_common(char type, const uint8_t *buf, uint32_t len)
 		msg_id = (buf[3] << 8) + buf[4];
 		msg_size = ((uint32_t) buf[5] << 24)+ (buf[6] << 16) + (buf[7] << 8) + buf[8];
 
-		if (type == 'n') {
-			m = message_map_find(message_map_in, msg_id);
-		} else if (type == 'd') {
-			m = message_map_find(message_map_debug_in, msg_id);
-		}
+		m = message_map_find_in(type, msg_id);
 		if (!m) { // unknown message
 			fsm_sendFailure(Failure_FailureType_Failure_UnexpectedMessage, _("Unknown message"));
 			return;
@@ -273,9 +328,9 @@ void msg_read_common(char type, const uint8_t *buf, uint32_t len)
 	}
 
 	if (msg_pos >= msg_size) {
-		msg_process(m, msg_in, msg_size);
 		msg_pos = 0;
 		read_state = READSTATE_IDLE;
+		msg_process(m, msg_in, msg_size);
 	}
 }
 
@@ -300,54 +355,3 @@ const uint8_t *msg_debug_out_data(void)
 }
 
 #endif
-
-CONFIDENTIAL uint8_t msg_tiny[128];
-uint16_t msg_tiny_id = 0xFFFF;
-
-#define MSG_TINY_ASSERT(NAME, MSG_ID, FIELDS) \
-	_Static_assert(sizeof(msg_tiny) >= sizeof(NAME), "msg_tiny too tiny");
-
-MESSAGES_MAP_TINY(MSG_TINY_ASSERT)
-#if DEBUG_LINK
-MESSAGES_MAP_DEBUG_TINY(MSG_TINY_ASSERT)
-#endif
-
-void msg_read_tiny(const uint8_t *buf, int len)
-{
-	if (len != 64) return;
-	if (buf[0] != '?' || buf[1] != '#' || buf[2] != '#') {
-		return;
-	}
-	uint16_t msg_id = (buf[3] << 8) + buf[4];
-	uint32_t msg_size = ((uint32_t) buf[5] << 24) + (buf[6] << 16) + (buf[7] << 8) + buf[8];
-	if (msg_size > 64 || len - msg_size < 9) {
-		return;
-	}
-
-	const pb_field_t *fields = 0;
-	pb_istream_t stream = pb_istream_from_buffer(buf + 9, msg_size);
-
-	switch (msg_id) {
-#define MSG_TINY_CASE(NAME, MSG_ID, FIELDS) \
-		case MSG_ID: \
-			fields = FIELDS; \
-			break;
-
-		MESSAGES_MAP_TINY(MSG_TINY_CASE)
-#if DEBUG_LINK
-		MESSAGES_MAP_DEBUG_TINY(MSG_TINY_CASE)
-#endif
-	}
-	if (fields) {
-		bool status = pb_decode(&stream, fields, msg_tiny);
-		if (status) {
-			msg_tiny_id = msg_id;
-		} else {
-			fsm_sendFailure(Failure_FailureType_Failure_DataError, stream.errmsg);
-			msg_tiny_id = 0xFFFF;
-		}
-	} else {
-		fsm_sendFailure(Failure_FailureType_Failure_UnexpectedMessage, _("Unknown message"));
-		msg_tiny_id = 0xFFFF;
-	}
-}
