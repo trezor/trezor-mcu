@@ -185,63 +185,6 @@ bool stellar_confirmSourceAccount(bool has_source_account, char *str_account)
     return true;
 }
 
-/**
- * Stellar account string is a base32-encoded string that starts with "G"
- *
- * It decodes to the following format:
- *  Byte 0 - always 0x30 ("G" when base32 encoded), version byte indicating a public key
- *  Bytes 1-33 - 32-byte public key bytes
- *  Bytes 34-35 - 2-byte CRC16 checksum of the version byte + public key bytes (first 33 bytes)
- *
- * Note that the stellar "seed" (private key) also uses this format except the version byte
- * is 0xC0 which encodes to "S" in base32
- */
-bool stellar_validateAddress(const char *str_address)
-{
-    bool valid = false;
-    uint8_t decoded[STELLAR_ADDRESS_SIZE_RAW];
-
-    if (strlen(str_address) != STELLAR_ADDRESS_SIZE) {
-        return false;
-    }
-
-    // Check that it decodes correctly
-    uint8_t *ret = base32_decode(str_address, STELLAR_ADDRESS_SIZE, decoded, sizeof(decoded), BASE32_ALPHABET_RFC4648);
-    valid = (ret != NULL);
-
-    // ... and that version byte is 0x30
-    if (valid && decoded[0] != 0x30) {
-        valid = false;
-    }
-
-    // ... and that checksums match
-    uint16_t checksum_expected = stellar_crc16(decoded, 33);
-    uint16_t checksum_actual = (decoded[34] << 8) | decoded[33]; // unsigned short (little endian)
-    if (valid && checksum_expected != checksum_actual) {
-        valid = false;
-    }
-
-    memzero(decoded, sizeof(decoded));
-    return valid;
-}
-
-
-bool stellar_getAddressBytes(char* str_address, uint8_t *out_bytes)
-{
-    uint8_t decoded[STELLAR_ADDRESS_SIZE_RAW];
-
-    // Ensure address is valid
-    if (!stellar_validateAddress(str_address)) return false;
-
-    base32_decode(str_address, STELLAR_ADDRESS_SIZE, decoded, sizeof(decoded), BASE32_ALPHABET_RFC4648);
-
-    // The 32 bytes with offset 1-33 represent the public key
-    memcpy(out_bytes, &decoded[1], 32);
-
-    memzero(decoded, sizeof(decoded));
-    return true;
-}
-
 bool stellar_confirmCreateAccountOp(StellarCreateAccountOp *msg)
 {
     if (!stellar_signing) return false;
@@ -1462,6 +1405,65 @@ size_t stellar_publicAddressAsStr(uint8_t *bytes, char *out, size_t outlen)
 
     // Public key will always be 56 characters
     return 56;
+}
+
+/**
+ * Stellar account string is a base32-encoded string that starts with "G"
+ *
+ * It decodes to the following format:
+ *  Byte 0 - always 0x30 ("G" when base32 encoded), version byte indicating a public key
+ *  Bytes 1-33 - 32-byte public key bytes
+ *  Bytes 34-35 - 2-byte CRC16 checksum of the version byte + public key bytes (first 33 bytes)
+ *
+ * Note that the stellar "seed" (private key) also uses this format except the version byte
+ * is 0xC0 which encodes to "S" in base32
+ */
+bool stellar_validateAddress(const char *str_address)
+{
+    bool valid = false;
+    uint8_t decoded[STELLAR_ADDRESS_SIZE_RAW];
+
+    if (strlen(str_address) != STELLAR_ADDRESS_SIZE) {
+        return false;
+    }
+
+    // Check that it decodes correctly
+    uint8_t *ret = base32_decode(str_address, STELLAR_ADDRESS_SIZE, decoded, sizeof(decoded), BASE32_ALPHABET_RFC4648);
+    valid = (ret != NULL);
+
+    // ... and that version byte is 0x30
+    if (valid && decoded[0] != 0x30) {
+        valid = false;
+    }
+
+    // ... and that checksums match
+    uint16_t checksum_expected = stellar_crc16(decoded, 33);
+    uint16_t checksum_actual = (decoded[34] << 8) | decoded[33]; // unsigned short (little endian)
+    if (valid && checksum_expected != checksum_actual) {
+        valid = false;
+    }
+
+    memzero(decoded, sizeof(decoded));
+    return valid;
+}
+
+/**
+ * Converts a string address (G...) to the 32-byte raw address
+ */
+bool stellar_getAddressBytes(char* str_address, uint8_t *out_bytes)
+{
+    uint8_t decoded[STELLAR_ADDRESS_SIZE_RAW];
+
+    // Ensure address is valid
+    if (!stellar_validateAddress(str_address)) return false;
+
+    base32_decode(str_address, STELLAR_ADDRESS_SIZE, decoded, sizeof(decoded), BASE32_ALPHABET_RFC4648);
+
+    // The 32 bytes with offset 1-33 represent the public key
+    memcpy(out_bytes, &decoded[1], 32);
+
+    memzero(decoded, sizeof(decoded));
+    return true;
 }
 
 /*
