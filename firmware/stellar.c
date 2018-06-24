@@ -14,13 +14,13 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this library.  If not, see <http://www.gnu.org/licenses/>.
  *
- * Stellar signing has the following workflow:
- *  1. Client sends first 1024 bytes of the transaction
- *  2. Trezor parses the transaction header and confirms the details with the user
- *  3. Trezor responds to the client with an offset for where to send the next chunk of bytes
- *  4. Client sends next 1024 bytes starting at <offset>
- *  5. Trezor parses and confirms the next operation
- *  6. Trezor responds with either an offset for the next operation or a signature
+ * Stellar signing workflow:
+ *  1. Client sends a StellarSignTx method to the device with transaction header information
+ *  2. Device confirms transaction details with the user and requests first operation
+ *  3. Client sends protobuf message with details about the operation to sign
+ *  4. Device confirms operation with user
+ *  5a. If there are more operations in the transaction, device responds with StellarTxOpRequest. Go to 3
+ *  5b. If the operation is the last one, device responds with StellarSignedTx
  */
 
 #include <stdbool.h>
@@ -41,6 +41,7 @@
 #include "util.h"
 #include "layout2.h"
 #include "fonts.h"
+#include "memzero.h"
 
 static bool stellar_signing = false;
 static StellarTransaction stellar_activeTx;
@@ -151,11 +152,17 @@ void stellar_signingInit(StellarSignTx *msg)
     }
 }
 
-void stellar_confirmSourceAccount(bool has_source_account, uint8_t *bytes)
+bool stellar_confirmSourceAccount(bool has_source_account, char *str_account)
 {
     if (!has_source_account) {
         stellar_hashupdate_bool(false);
-        return;
+        return true;
+    }
+
+    // Convert account string to public key bytes
+    uint8_t bytes[32];
+    if (!stellar_getAddressBytes(str_account, bytes)) {
+        return false;
     }
 
     const char **str_addr_rows = stellar_lineBreakAddress(bytes);
@@ -168,21 +175,93 @@ void stellar_confirmSourceAccount(bool has_source_account, uint8_t *bytes)
         str_addr_rows[2]
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Hash: source account
     stellar_hashupdate_address(bytes);
+
+    return true;
 }
 
-void stellar_confirmCreateAccountOp(StellarCreateAccountOp *msg)
+/**
+ * Stellar account string is a base32-encoded string that starts with "G"
+ *
+ * It decodes to the following format:
+ *  Byte 0 - always 0x30 ("G" when base32 encoded), version byte indicating a public key
+ *  Bytes 1-33 - 32-byte public key bytes
+ *  Bytes 34-35 - 2-byte CRC16 checksum of the version byte + public key bytes (first 33 bytes)
+ *
+ * Note that the stellar "seed" (private key) also uses this format except the version byte
+ * is 0xC0 which encodes to "S" in base32
+ */
+bool stellar_validateAddress(const char *str_address)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    bool valid = false;
+    uint8_t decoded[STELLAR_ADDRESS_SIZE_RAW];
+
+    if (strlen(str_address) != STELLAR_ADDRESS_SIZE) {
+        return false;
+    }
+
+    // Check that it decodes correctly
+    uint8_t *ret = base32_decode(str_address, STELLAR_ADDRESS_SIZE, decoded, sizeof(decoded), BASE32_ALPHABET_RFC4648);
+    valid = (ret != NULL);
+
+    // ... and that version byte is 0x30
+    if (valid && decoded[0] != 0x30) {
+        valid = false;
+    }
+
+    // ... and that checksums match
+    uint16_t checksum_expected = stellar_crc16(decoded, 33);
+    uint16_t checksum_actual = (decoded[34] << 8) | decoded[33]; // unsigned short (little endian)
+    if (valid && checksum_expected != checksum_actual) {
+        valid = false;
+    }
+
+    memzero(decoded, sizeof(decoded));
+    return valid;
+}
+
+
+bool stellar_getAddressBytes(char* str_address, uint8_t *out_bytes)
+{
+    uint8_t decoded[STELLAR_ADDRESS_SIZE_RAW];
+
+    // Ensure address is valid
+    if (!stellar_validateAddress(str_address)) return false;
+
+    base32_decode(str_address, STELLAR_ADDRESS_SIZE, decoded, sizeof(decoded), BASE32_ALPHABET_RFC4648);
+
+    // The 32 bytes with offset 1-33 represent the public key
+    memcpy(out_bytes, &decoded[1], 32);
+
+    memzero(decoded, sizeof(decoded));
+    return true;
+}
+
+bool stellar_confirmCreateAccountOp(StellarCreateAccountOp *msg)
+{
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(0);
 
-    const char **str_addr_rows = stellar_lineBreakAddress(msg->new_account.bytes);
+    // Validate new account and convert to bytes
+    uint8_t new_account_bytes[STELLAR_KEY_SIZE];
+    if (!stellar_getAddressBytes(msg->new_account, new_account_bytes)) {
+        stellar_signingAbort(_("Invalid destination account"));
+        return false;
+    }
+
+    const char **str_addr_rows = stellar_lineBreakAddress(new_account_bytes);
 
     // Amount being funded
     char str_amount_line[32];
@@ -201,25 +280,39 @@ void stellar_confirmCreateAccountOp(StellarCreateAccountOp *msg)
         str_amount_line
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Hash: address
-    stellar_hashupdate_address(msg->new_account.bytes);
+    stellar_hashupdate_address(new_account_bytes);
     // Hash: starting amount
     stellar_hashupdate_uint64(msg->starting_balance);
 
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmPaymentOp(StellarPaymentOp *msg)
+bool stellar_confirmPaymentOp(StellarPaymentOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(1);
 
-    const char **str_addr_rows = stellar_lineBreakAddress(msg->destination_account.bytes);
+    // Validate destination account and convert to bytes
+    uint8_t destination_account_bytes[STELLAR_KEY_SIZE];
+    if (!stellar_getAddressBytes(msg->destination_account, destination_account_bytes)) {
+        stellar_signingAbort(_("Invalid destination account"));
+        return false;
+    }
+
+    const char **str_addr_rows = stellar_lineBreakAddress(destination_account_bytes);
 
     // To: G...
     char str_to[32];
@@ -245,12 +338,12 @@ void stellar_confirmPaymentOp(StellarPaymentOp *msg)
         str_addr_rows[2]
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Hash destination
-    stellar_hashupdate_address(msg->destination_account.bytes);
+    stellar_hashupdate_address(destination_account_bytes);
     // asset
     stellar_hashupdate_asset(&(msg->asset));
     // amount (even though amount is signed it doesn't matter for hashing)
@@ -258,15 +351,28 @@ void stellar_confirmPaymentOp(StellarPaymentOp *msg)
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg)
+bool stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(2);
 
-    const char **str_dest_rows = stellar_lineBreakAddress(msg->destination_account.bytes);
+    // Validate destination account and convert to bytes
+    uint8_t destination_account_bytes[STELLAR_KEY_SIZE];
+    if (!stellar_getAddressBytes(msg->destination_account, destination_account_bytes)) {
+        stellar_signingAbort(_("Invalid destination account"));
+        return false;
+    }
+    const char **str_dest_rows = stellar_lineBreakAddress(destination_account_bytes);
 
     // To: G...
     char str_to[32];
@@ -301,8 +407,8 @@ void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg)
         str_dest_rows[2]
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Confirm what the sender is using to pay
@@ -321,8 +427,8 @@ void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg)
         _("from your account.")
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
     // Note: no confirmation for intermediate steps since they don't impact the user
 
@@ -331,7 +437,7 @@ void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg)
     // send max (signed vs. unsigned doesn't matter wrt hashing)
     stellar_hashupdate_uint64(msg->send_max);
     // destination account
-    stellar_hashupdate_address(msg->destination_account.bytes);
+    stellar_hashupdate_address(destination_account_bytes);
     // destination asset
     stellar_hashupdate_asset(&(msg->destination_asset));
     // destination amount
@@ -345,11 +451,18 @@ void stellar_confirmPathPaymentOp(StellarPathPaymentOp *msg)
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmManageOfferOp(StellarManageOfferOp *msg)
+bool stellar_confirmManageOfferOp(StellarManageOfferOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(3);
 
@@ -409,8 +522,8 @@ void stellar_confirmManageOfferOp(StellarManageOfferOp *msg)
         str_buying_asset
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Hash selling asset
@@ -428,11 +541,18 @@ void stellar_confirmManageOfferOp(StellarManageOfferOp *msg)
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg)
+bool stellar_confirmCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(4);
 
@@ -482,8 +602,8 @@ void stellar_confirmCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg)
         str_buying_asset
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Hash selling asset
@@ -499,11 +619,18 @@ void stellar_confirmCreatePassiveOfferOp(StellarCreatePassiveOfferOp *msg)
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
+bool stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(5);
 
@@ -517,7 +644,14 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
     stellar_hashupdate_bool(msg->has_inflation_destination_account);
     if (msg->has_inflation_destination_account) {
         strlcpy(str_title, _("Set Inflation Destination"), sizeof(str_title));
-        const char **str_addr_rows = stellar_lineBreakAddress(msg->inflation_destination_account.bytes);
+
+        // Validate account and convert to bytes
+        uint8_t inflation_destination_account_bytes[STELLAR_KEY_SIZE];
+        if (!stellar_getAddressBytes(msg->inflation_destination_account, inflation_destination_account_bytes)) {
+            stellar_signingAbort(_("Invalid inflation destination account"));
+            return false;
+        }
+        const char **str_addr_rows = stellar_lineBreakAddress(inflation_destination_account_bytes);
 
         stellar_layoutTransactionDialog(
             str_title,
@@ -527,12 +661,12 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
             str_addr_rows[2]
         );
         if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-            stellar_signingAbort();
-            return;
+            stellar_signingAbort(_("User canceled"));
+            return false;
         }
 
         // address
-        stellar_hashupdate_address(msg->inflation_destination_account.bytes);
+        stellar_hashupdate_address(inflation_destination_account_bytes);
     }
 
     // Clear flags
@@ -559,8 +693,8 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
             rows[3]
         );
         if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-            stellar_signingAbort();
-            return;
+            stellar_signingAbort(_("User canceled"));
+            return false;
         }
         memset(rows, 0, sizeof(rows));
         row_idx = 0;
@@ -593,8 +727,8 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
             rows[3]
         );
         if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-            stellar_signingAbort();
-            return;
+            stellar_signingAbort(_("User canceled"));
+            return false;
         }
         memset(rows, 0, sizeof(rows));
         row_idx = 0;
@@ -666,8 +800,8 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
             rows[3]
         );
         if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-            stellar_signingAbort();
-            return;
+            stellar_signingAbort(_("User canceled"));
+            return false;
         }
         memset(rows, 0, sizeof(rows));
         row_idx = 0;
@@ -696,8 +830,8 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
             NULL
         );
         if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-            stellar_signingAbort();
-            return;
+            stellar_signingAbort(_("User canceled"));
+            return false;
         }
         memset(rows, 0, sizeof(rows));
         row_idx = 0;
@@ -738,8 +872,8 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
                 str_addr_rows[2]
             );
             if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-                stellar_signingAbort();
-                return;
+                stellar_signingAbort(_("User canceled"));
+                return false;
             }
         }
         if (msg->signer_type == 1) {
@@ -755,8 +889,8 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
                 _("screen)")
             );
             if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-                stellar_signingAbort();
-                return;
+                stellar_signingAbort(_("User canceled"));
+                return false;
             }
         }
         if (msg->signer_type == 2) {
@@ -772,8 +906,8 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
                 _("screen)")
             );
             if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-                stellar_signingAbort();
-                return;
+                stellar_signingAbort(_("User canceled"));
+                return false;
             }
         }
 
@@ -792,8 +926,8 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
                 rows[3]
             );
             if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-                stellar_signingAbort();
-                return;
+                stellar_signingAbort(_("User canceled"));
+                return false;
             }
             memset(rows, 0, sizeof(rows));
             row_idx = 0;
@@ -809,11 +943,18 @@ void stellar_confirmSetOptionsOp(StellarSetOptionsOp *msg)
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmChangeTrustOp(StellarChangeTrustOp *msg)
+bool stellar_confirmChangeTrustOp(StellarChangeTrustOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(6);
 
@@ -840,8 +981,16 @@ void stellar_confirmChangeTrustOp(StellarChangeTrustOp *msg)
         strlcat(str_amount_row, str_amount, sizeof(str_amount_row));
     }
 
+    // Validate destination account and convert to bytes
+    uint8_t asset_issuer_bytes[STELLAR_KEY_SIZE];
+    if (!stellar_getAddressBytes(msg->asset.issuer, asset_issuer_bytes)) {
+        stellar_signingAbort(_("User canceled"));
+        fsm_sendFailure(FailureType_Failure_ProcessError, _("Invalid asset issuer"));
+        return false;
+    }
+
     // Display full issuer address
-    const char **str_addr_rows = stellar_lineBreakAddress(msg->asset.issuer.bytes);
+    const char **str_addr_rows = stellar_lineBreakAddress(asset_issuer_bytes);
 
     stellar_layoutTransactionDialog(
         str_title,
@@ -851,8 +1000,8 @@ void stellar_confirmChangeTrustOp(StellarChangeTrustOp *msg)
         str_addr_rows[2]
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Hash: asset
@@ -862,11 +1011,18 @@ void stellar_confirmChangeTrustOp(StellarChangeTrustOp *msg)
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg)
+bool stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(7);
 
@@ -883,7 +1039,14 @@ void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg)
     char str_asset_row[32];
     strlcpy(str_asset_row, msg->asset_code, sizeof(str_asset_row));
 
-    const char **str_trustor_rows = stellar_lineBreakAddress(msg->trusted_account.bytes);
+    // Validate account and convert to bytes
+    uint8_t trusted_account_bytes[STELLAR_KEY_SIZE];
+    if (!stellar_getAddressBytes(msg->trusted_account, trusted_account_bytes)) {
+        stellar_signingAbort(_("Invalid trusted account"));
+        return false;
+    }
+
+    const char **str_trustor_rows = stellar_lineBreakAddress(trusted_account_bytes);
 
     // By: G...
     char str_by[32];
@@ -898,12 +1061,12 @@ void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg)
         str_trustor_rows[2]
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Hash: trustor account (the account being allowed to access the asset)
-    stellar_hashupdate_address(msg->trusted_account.bytes);
+    stellar_hashupdate_address(trusted_account_bytes);
     // asset type
     stellar_hashupdate_uint32(msg->asset_type);
     // asset code
@@ -924,15 +1087,29 @@ void stellar_confirmAllowTrustOp(StellarAllowTrustOp *msg)
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmAccountMergeOp(StellarAccountMergeOp *msg)
+bool stellar_confirmAccountMergeOp(StellarAccountMergeOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(8);
 
-    const char **str_destination_rows = stellar_lineBreakAddress(msg->destination_account.bytes);
+    // Validate account and convert to bytes
+    uint8_t destination_account_bytes[STELLAR_KEY_SIZE];
+    if (!stellar_getAddressBytes(msg->destination_account, destination_account_bytes)) {
+        stellar_signingAbort(_("Invalid destination account"));
+        return false;
+    }
+
+    const char **str_destination_rows = stellar_lineBreakAddress(destination_account_bytes);
 
     stellar_layoutTransactionDialog(
         _("Merge Account"),
@@ -942,20 +1119,27 @@ void stellar_confirmAccountMergeOp(StellarAccountMergeOp *msg)
         str_destination_rows[2]
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Hash: destination account
-    stellar_hashupdate_address(msg->destination_account.bytes);
+    stellar_hashupdate_address(destination_account_bytes);
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmManageDataOp(StellarManageDataOp *msg)
+bool stellar_confirmManageDataOp(StellarManageDataOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(10);
 
@@ -978,8 +1162,8 @@ void stellar_confirmManageDataOp(StellarManageDataOp *msg)
         str_key_lines[3]
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Confirm value by displaying sha256 hash since this can contain non-printable characters
@@ -998,8 +1182,8 @@ void stellar_confirmManageDataOp(StellarManageDataOp *msg)
             str_hash_lines[3]
         );
         if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-            stellar_signingAbort();
-            return;
+            stellar_signingAbort(_("User canceled"));
+            return false;
         }
     }
 
@@ -1018,11 +1202,18 @@ void stellar_confirmManageDataOp(StellarManageDataOp *msg)
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_confirmBumpSequenceOp(StellarBumpSequenceOp *msg)
+bool stellar_confirmBumpSequenceOp(StellarBumpSequenceOp *msg)
 {
-    stellar_confirmSourceAccount(msg->has_source_account, msg->source_account.bytes);
+    if (!stellar_signing) return false;
+
+    if (!stellar_confirmSourceAccount(msg->has_source_account, msg->source_account)) {
+        stellar_signingAbort(_("Source account error"));
+        return false;
+    }
+
     // Hash: operation type
     stellar_hashupdate_uint32(11);
 
@@ -1037,8 +1228,8 @@ void stellar_confirmBumpSequenceOp(StellarBumpSequenceOp *msg)
         NULL
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
-        return;
+        stellar_signingAbort(_("User canceled"));
+        return false;
     }
 
     // Hash: bump to
@@ -1046,12 +1237,17 @@ void stellar_confirmBumpSequenceOp(StellarBumpSequenceOp *msg)
 
     // At this point, the operation is confirmed
     stellar_activeTx.confirmed_operations++;
+    return true;
 }
 
-void stellar_signingAbort()
+void stellar_signingAbort(const char *reason)
 {
+    if (!reason) {
+        reason = _("Unknown error");
+    }
+
     stellar_signing = false;
-    fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+    fsm_sendFailure(FailureType_Failure_ProcessError, reason);
     layoutHome();
 }
 
@@ -1207,8 +1403,6 @@ const char **stellar_lineBreakAddress(uint8_t *addrbytes)
 void stellar_format_asset(StellarAssetType *asset, char *str_formatted, size_t len)
 {
     char str_asset_code[12 + 1];
-    // Full asset issuer string
-    char str_asset_issuer[56+1];
     // truncated asset issuer, final length depends on length of asset code
     char str_asset_issuer_trunc[13 + 1];
 
@@ -1216,8 +1410,11 @@ void stellar_format_asset(StellarAssetType *asset, char *str_formatted, size_t l
     memset(str_asset_code, 0, sizeof(str_asset_code));
     memset(str_asset_issuer_trunc, 0, sizeof(str_asset_issuer_trunc));
 
-    // Get string representation of address
-    stellar_publicAddressAsStr(asset->issuer.bytes, str_asset_issuer, sizeof(str_asset_issuer));
+    // Validate issuer account for non-native assets
+    if (asset->type != 0 && !stellar_validateAddress(asset->issuer)) {
+        stellar_signingAbort(_("Invalid asset issuer"));
+        return;
+    }
 
     // Native asset
     if (asset->type == 0) {
@@ -1229,7 +1426,7 @@ void stellar_format_asset(StellarAssetType *asset, char *str_formatted, size_t l
         strlcpy(str_formatted, str_asset_code, len);
 
         // Truncate issuer to 13 chars
-        memcpy(str_asset_issuer_trunc, str_asset_issuer, 13);
+        memcpy(str_asset_issuer_trunc, asset->issuer, 13);
     }
     // 12-character custom
     if (asset->type == 2) {
@@ -1237,7 +1434,7 @@ void stellar_format_asset(StellarAssetType *asset, char *str_formatted, size_t l
         strlcpy(str_formatted, str_asset_code, len);
 
         // Truncate issuer to 5 characters
-        memcpy(str_asset_issuer_trunc, str_asset_issuer, 5);
+        memcpy(str_asset_issuer_trunc, asset->issuer, 5);
     }
     // Issuer is read the same way for both types of custom assets
     if (asset->type == 1 || asset->type == 2) {
@@ -1406,6 +1603,13 @@ void stellar_hashupdate_asset(StellarAssetType *asset)
 {
     stellar_hashupdate_uint32(asset->type);
 
+    // For non-native assets, validate issuer account and convert to bytes
+    uint8_t issuer_bytes[STELLAR_KEY_SIZE];
+    if (asset->type != 0 && !stellar_getAddressBytes(asset->issuer, issuer_bytes)) {
+        stellar_signingAbort(_("Invalid asset issuer"));
+        return;
+    }
+
     // 4-character asset code
     if (asset->type == 1) {
         char code4[4+1];
@@ -1413,7 +1617,7 @@ void stellar_hashupdate_asset(StellarAssetType *asset)
         strlcpy(code4, asset->code, sizeof(code4));
 
         stellar_hashupdate_bytes((uint8_t *)code4, 4);
-        stellar_hashupdate_address(asset->issuer.bytes);
+        stellar_hashupdate_address(issuer_bytes);
     }
 
     // 12-character asset code
@@ -1423,7 +1627,7 @@ void stellar_hashupdate_asset(StellarAssetType *asset)
         strlcpy(code12, asset->code, sizeof(code12));
 
         stellar_hashupdate_bytes((uint8_t *)code12, 12);
-        stellar_hashupdate_address(asset->issuer.bytes);
+        stellar_hashupdate_address(issuer_bytes);
     }
 }
 
@@ -1475,7 +1679,7 @@ void stellar_layoutTransactionSummary(StellarSignTx *msg)
         str_addr_rows[2]
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
+        stellar_signingAbort(_("User canceled"));
         return;
     }
 
@@ -1529,7 +1733,7 @@ void stellar_layoutTransactionSummary(StellarSignTx *msg)
         str_lines[4]
     );
     if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-        stellar_signingAbort();
+        stellar_signingAbort(_("User canceled"));
         return;
     }
 
@@ -1577,7 +1781,7 @@ void stellar_layoutTransactionSummary(StellarSignTx *msg)
             str_lines[3]
         );
         if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
-            stellar_signingAbort();
+            stellar_signingAbort(_("User canceled"));
             return;
         }
     }
