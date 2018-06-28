@@ -57,6 +57,7 @@
 #include "gettext.h"
 #include "supervise.h"
 #include "stellar.h"
+#include "tron.h"
 
 // message methods
 
