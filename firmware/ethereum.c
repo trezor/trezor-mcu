@@ -568,7 +568,11 @@ void ethereum_signing_init(EthereumSignTx *msg, const HDNode *node)
 		rlp_length += rlp_calculate_length(1, tx_type);
 	}
 	if (chain_id) {
-		rlp_length += rlp_calculate_length(1, chain_id);
+		int length = 0;
+		if (msg->has_chain_id) {
+			length = chain_id < 0x80 ? 0: chain_id < 0x100 ? 1: chain_id < 0x10000 ? 2: chain_id < 0x1000000 ? 3 : 4;
+		}
+		rlp_length += rlp_calculate_length(length, chain_id);
 		rlp_length += rlp_calculate_length(0, 0);
 		rlp_length += rlp_calculate_length(0, 0);
 	}
