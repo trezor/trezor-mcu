@@ -7,7 +7,7 @@ https://trezor.io/
 ## How to build the TREZOR bootloader and firmware?
 
 1. [Install Docker](https://docs.docker.com/engine/installation/)
-2. `git clone https://github.com/trezor/trezor-mcu.git`
+2. `git clone --recurisve https://github.com/trezor/trezor-mcu.git`
 3. `cd trezor-mcu`
 4. `./build.sh BOOTLOADER_TAG FIRMWARE_TAG` (where BOOTLOADER_TAG is bl1.5.0 and FIRMWARE_TAG is v1.7.0 for example, if left blank the script builds latest commit in master branch)
 
