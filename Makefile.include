@@ -98,6 +98,10 @@ CFLAGS   += -I/usr/include/SDL2 -D_REENTRANT
 LDLIBS   += -lSDL2
 endif
 
+ifdef USE_RANDOM
+CFLAGS += -DUSE_RANDOM=1
+endif
+
 else
 ifdef APPVER
 CFLAGS   += -DAPPVER=$(APPVER)
