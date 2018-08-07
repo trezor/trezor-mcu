@@ -98,8 +98,8 @@ CFLAGS   += -I/usr/include/SDL2 -D_REENTRANT
 LDLIBS   += -lSDL2
 endif
 
-ifdef USE_RANDOM
-CFLAGS += -DUSE_RANDOM=1
+ifdef RANDOM_DEV_FILE
+CFLAGS += -DRANDOM_DEV_FILE=\"$(RANDOM_DEV_FILE)\"
 endif
 
 else

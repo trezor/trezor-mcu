@@ -34,9 +34,7 @@
 
 #define EMULATOR_FLASH_FILE "emulator.img"
 
-#ifdef USE_RANDOM
-#define RANDOM_DEV_FILE "/dev/random"
-#else
+#ifndef RANDOM_DEV_FILE
 #define RANDOM_DEV_FILE "/dev/urandom"
 #endif
 
