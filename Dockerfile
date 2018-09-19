@@ -1,6 +1,6 @@
 # initialize from the image
 
-FROM debian:9
+FROM debian:buster
 
 # install build tools and dependencies
 
