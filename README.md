@@ -72,3 +72,5 @@ You can launch the emulator using `firmware/trezor.elf`. To use `trezorctl` with
 `trezorctl -t udp` (for example, `trezorctl -t udp get_features`).
 
 If `trezorctl -t udp` appears to hang, make sure you have run `export TREZOR_TRANSPORT_V1=1`.
+
+If you have problems, make sure you are using python 3. Try `export PYTHON=python3` before running `script/cibuild`.
