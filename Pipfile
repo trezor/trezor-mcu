@@ -5,7 +5,7 @@ verify_ssl = true
 
 [packages]
 setuptools = ">=24.2.0"
-trezor = {git = "https://github.com/trezor/python-trezor", editable = true, ref = "master"}
+trezor = {git = "https://github.com/trezor/python-trezor", editable = true, ref = "tsusanka/paths"}
 pytest = "*"
 mock = "*"
 typing = "*"
