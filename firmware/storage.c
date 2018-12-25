@@ -112,7 +112,7 @@ static bool sessionPinCached = false;
 static bool sessionPassphraseCached = false;
 static char CONFIDENTIAL sessionPassphrase[51];
 
-#define STORAGE_VERSION 10
+#define STORAGE_VERSION 11
 
 void storage_show_error(void)
 {
@@ -316,6 +316,10 @@ static void storage_commit_locked(bool update)
 			strlcpy(storageUpdate.pin, storageRom->pin, sizeof(storageUpdate.pin));
 		} else if (!storageUpdate.pin[0]) {
 			storageUpdate.has_pin = false;
+		}
+		if (!storageUpdate.has_pin_entry_on_device) {
+			storageUpdate.has_pin_entry_on_device = storageRom->has_pin_entry_on_device;
+			storageUpdate.pin_entry_on_device = storageRom->pin_entry_on_device;
 		}
 		if (!storageUpdate.has_language) {
 			storageUpdate.has_language = storageRom->has_language;
@@ -685,6 +689,17 @@ void storage_setPin(const char *pin)
 const char *storage_getPin(void)
 {
 	return storageRom->has_pin ? storageRom->pin : 0;
+}
+
+void storage_setPinEntryOnDevice(bool pin_entry_on_device)
+{
+	storageUpdate.has_pin_entry_on_device = true;
+	storageUpdate.pin_entry_on_device = pin_entry_on_device;
+}
+
+bool storage_hasPinEntryOnDevice(void)
+{
+	return storageRom->has_pin_entry_on_device && storageRom->pin_entry_on_device;
 }
 
 void session_cachePassphrase(const char *passphrase)

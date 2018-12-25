@@ -47,6 +47,7 @@ void fsm_msgGetFeatures(const GetFeatures *msg)
 	resp->has_patch_version = true;  resp->patch_version = VERSION_PATCH;
 	resp->has_device_id = true;      strlcpy(resp->device_id, storage_uuid_str, sizeof(resp->device_id));
 	resp->has_pin_protection = true; resp->pin_protection = storage_hasPin();
+	resp->has_pin_entry_on_device = true; resp->pin_entry_on_device = storage_hasPinEntryOnDevice();
 	resp->has_passphrase_protection = true; resp->passphrase_protection = storage_hasPassphraseProtection();
 #ifdef SCM_REVISION
 	int len = sizeof(SCM_REVISION) - 1;
@@ -264,7 +265,7 @@ void fsm_msgClearSession(const ClearSession *msg)
 
 void fsm_msgApplySettings(const ApplySettings *msg)
 {
-	CHECK_PARAM(msg->has_label || msg->has_language || msg->has_use_passphrase || msg->has_homescreen || msg->has_auto_lock_delay_ms,
+	CHECK_PARAM(msg->has_label || msg->has_language || msg->has_use_passphrase || msg->has_homescreen || msg->has_auto_lock_delay_ms || msg->has_pin_entry_on_device,
 				_("No setting provided"));
 
 	CHECK_PIN
@@ -293,6 +294,16 @@ void fsm_msgApplySettings(const ApplySettings *msg)
 			return;
 		}
 	}
+
+	if (msg->has_pin_entry_on_device) {
+		layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Confirm"), NULL, _("Do you really want to"), msg->pin_entry_on_device ? _("enable pin entry on") : _("disable pin entry on"), _("device protection?"), NULL, NULL, NULL);
+		if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+			fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+			layoutHome();
+			return;
+		}
+	}
+	
 	if (msg->has_homescreen) {
 		layoutDialogSwipe(&bmp_icon_question, _("Cancel"), _("Confirm"), NULL, _("Do you really want to"), _("change the home"), _("screen?"), NULL, NULL, NULL);
 		if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
@@ -319,6 +330,9 @@ void fsm_msgApplySettings(const ApplySettings *msg)
 	}
 	if (msg->has_use_passphrase) {
 		storage_setPassphraseProtection(msg->use_passphrase);
+	}
+	if (msg->has_pin_entry_on_device) {
+		storage_setPinEntryOnDevice(msg->pin_entry_on_device);
 	}
 	if (msg->has_homescreen) {
 		storage_setHomescreen(msg->homescreen.bytes, msg->homescreen.size);

@@ -47,13 +47,17 @@ void pinmatrix_draw(const char *text)
 	oledRefresh();
 }
 
-void pinmatrix_start(const char *text)
+void pinmatrix_start(const char *text, const bool randomize)
 {
 	for (int i = 0; i < 9; i++) {
 		pinmatrix_perm[i] = '1' + i;
 	}
 	pinmatrix_perm[9] = 0;
-	random_permute(pinmatrix_perm, 9);
+
+	if(randomize) {
+		random_permute(pinmatrix_perm, 9);
+	}
+	
 	pinmatrix_draw(text);
 }
 
@@ -70,6 +74,25 @@ void pinmatrix_done(char *pin)
 		i++;
 	}
 	memset(pinmatrix_perm, 'X', sizeof(pinmatrix_perm) - 1);
+}
+
+void pinmatrix_select(int digit)
+{
+	digit--; // zero base the index (0 -> 8)
+
+	const int w = bmp_digit0.width, h = bmp_digit0.height, pad = 2;
+
+	int col = digit % 3;
+	int row = 2 - ((digit - col) / 3);
+
+	int width = (w + pad);
+	int height = (h + pad);
+
+	int x = (OLED_WIDTH - 3 * w - 2 * pad) / 2 + col * width;
+	int y = OLED_HEIGHT - 3 * h - 2 * pad + row * height;
+
+	oledInvert(x, y, x + w - 1, y + h - 1);
+	oledRefresh();
 }
 
 #if DEBUG_LINK

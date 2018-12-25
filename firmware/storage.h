@@ -74,6 +74,7 @@ typedef struct _Storage {
     STORAGE_BOOL   (unfinished_backup)
     STORAGE_UINT32 (auto_lock_delay_ms)
     STORAGE_BOOL   (no_backup)
+    STORAGE_BOOL   (pin_entry_on_device)
 } Storage;
 
 extern Storage storageUpdate;
@@ -129,6 +130,8 @@ void storage_resetPinFails(uint32_t flash_pinfails);
 bool storage_increasePinFails(uint32_t flash_pinfails);
 uint32_t storage_getPinWait(uint32_t flash_pinfails);
 uint32_t storage_getPinFailsOffset(void);
+void storage_setPinEntryOnDevice(bool pin_entry_on_device);
+bool storage_hasPinEntryOnDevice(void);
 
 uint32_t storage_nextU2FCounter(void);
 void storage_setU2FCounter(uint32_t u2fcounter);
