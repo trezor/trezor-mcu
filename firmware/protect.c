@@ -18,7 +18,7 @@
  */
 
 #include "protect.h"
-#include "storage.h"
+#include "config.h"
 #include "memory.h"
 #include "messages.h"
 #include "usb.h"
@@ -151,18 +151,18 @@ static void protectCheckMaxTry(uint32_t wait) {
 	if (wait < (1 << MAX_WRONG_PINS))
 		return;
 
-	storage_wipe();
+	config_wipe();
 	layoutDialog(&bmp_icon_error, NULL, NULL, NULL, _("Too many wrong PIN"), _("attempts. Storage has"), _("been wiped."), NULL, _("Please unplug"), _("the device."));
 	for (;;) {} // loop forever
 }
 
 bool protectPin(bool use_cached)
 {
-	if (!storage_hasPin() || (use_cached && session_isPinCached())) {
+	if (!config_hasPin() || (use_cached && session_isPinCached())) {
 		return true;
 	}
-	uint32_t fails = storage_getPinFailsOffset();
-	uint32_t wait = storage_getPinWait(fails);
+	uint32_t fails = config_getPinFailsOffset();
+	uint32_t wait = config_getPinWait(fails);
 	protectCheckMaxTry(wait);
 	usbTiny(1);
 	while (wait > 0) {
@@ -199,16 +199,16 @@ bool protectPin(bool use_cached)
 		fsm_sendFailure(FailureType_Failure_PinCancelled, NULL);
 		return false;
 	}
-	if (!storage_increasePinFails(fails)) {
+	if (!config_increasePinFails(fails)) {
 		fsm_sendFailure(FailureType_Failure_PinInvalid, NULL);
 		return false;
 	}
-	if (storage_containsPin(pin)) {
+	if (config_containsPin(pin)) {
 		session_cachePin();
-		storage_resetPinFails(fails);
+		config_resetPinFails(fails);
 		return true;
 	} else {
-		protectCheckMaxTry(storage_getPinWait(fails));
+		protectCheckMaxTry(config_getPinWait(fails));
 		fsm_sendFailure(FailureType_Failure_PinInvalid, NULL);
 		return false;
 	}
@@ -231,8 +231,8 @@ bool protectChangePin(void)
 	const bool result = pin && (strncmp(pin_compare, pin, sizeof(pin_compare)) == 0);
 
 	if (result) {
-		storage_setPin(pin_compare);
-		storage_update();
+		config_setPin(pin_compare);
+		config_update();
 	}
 
 	memzero(pin_compare, sizeof(pin_compare));
@@ -242,7 +242,7 @@ bool protectChangePin(void)
 
 bool protectPassphrase(void)
 {
-	if (!storage_hasPassphraseProtection() || session_isPassphraseCached()) {
+	if (!config_hasPassphraseProtection() || session_isPassphraseCached()) {
 		return true;
 	}
 

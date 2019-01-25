@@ -22,7 +22,7 @@
 #include <ctype.h>
 
 #include "layout2.h"
-#include "storage.h"
+#include "config.h"
 #include "oled.h"
 #include "bitmaps.h"
 #include "string.h"
@@ -235,8 +235,8 @@ void layoutHome(void)
 		layoutSwipe();
 	}
 	layoutLast = layoutHome;
-	const char *label = storage_isInitialized() ? storage_getLabel() : _("Go to trezor.io/start");
-	const uint8_t *homescreen = storage_getHomescreen();
+	const char *label = config_isInitialized() ? config_getLabel() : _("Go to trezor.io/start");
+	const uint8_t *homescreen = config_getHomescreen();
 	if (homescreen) {
 		BITMAP b;
 		b.width = 128;
@@ -251,15 +251,15 @@ void layoutHome(void)
 			oledDrawBitmap(40, 0, &bmp_logo64);
 		}
 	}
-	if (storage_noBackup()) {
+	if (config_noBackup()) {
 		oledBox(0, 0, 127, 8, false);
 		oledDrawStringCenter(OLED_WIDTH / 2, 0, "SEEDLESS", FONT_STANDARD);
 	} else
-	if (storage_unfinishedBackup()) {
+	if (config_unfinishedBackup()) {
 		oledBox(0, 0, 127, 8, false);
 		oledDrawStringCenter(OLED_WIDTH / 2, 0, "BACKUP FAILED!", FONT_STANDARD);
 	} else
-	if (storage_needsBackup()) {
+	if (config_needsBackup()) {
 		oledBox(0, 0, 127, 8, false);
 		oledDrawStringCenter(OLED_WIDTH / 2, 0, "NEEDS BACKUP!", FONT_STANDARD);
 	}

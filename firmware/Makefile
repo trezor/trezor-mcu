@@ -11,7 +11,7 @@ endif
 
 OBJS += u2f.o
 OBJS += messages.o
-OBJS += storage.o
+OBJS += config.o
 OBJS += trezor.o
 OBJS += pinmatrix.o
 OBJS += fsm.o
@@ -78,6 +78,9 @@ OBJS += ../vendor/trezor-crypto/aes/aes_modes.o
 OBJS += ../vendor/trezor-crypto/nem.o
 
 OBJS += ../vendor/trezor-qrenc/qr_encode.o
+
+OBJS += ../vendor/trezor-storage/storage.o
+OBJS += ../vendor/trezor-storage/norcow.o
 
 OBJS += ../vendor/nanopb/pb_common.o
 OBJS += ../vendor/nanopb/pb_decode.o
