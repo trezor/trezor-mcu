@@ -394,6 +394,43 @@ void layoutConfirmOpReturn(const uint8_t *data, uint32_t size)
 	);
 }
 
+void layoutConfirmEosActionUnknown(const char *title, const uint8_t *hash, uint32_t size)
+{
+	const char **str = split_message_hex(hash, size);
+	layoutDialogSwipe(&bmp_icon_question,
+		_("Cancel"),
+		_("Confirm"),
+		NULL,
+		title,
+		str[0],
+		str[1],
+		str[2],
+		str[3],
+		NULL
+	);
+}
+
+void layoutConfirmMemo(const uint8_t *data, uint32_t size)
+{
+	const char **str;
+	if (!is_valid_ascii(data, size)) {
+		str = split_message_hex(data, size);
+	} else {
+		str = split_message(data, size, 20);
+	}
+	layoutDialogSwipe(&bmp_icon_question,
+		_("Cancel"),
+		_("Confirm"),
+		NULL,
+		_("Confirm Memo:"),
+		str[0],
+		str[1],
+		str[2],
+		str[3],
+		NULL
+	);
+}
+
 void layoutConfirmTx(const CoinInfo *coin, uint64_t amount_out, uint64_t amount_fee)
 {
 	char str_out[32], str_fee[32];

@@ -30,6 +30,9 @@ OBJS += nem2.o
 OBJS += nem_mosaics.o
 OBJS += stellar.o
 OBJS += lisk.o
+OBJS += eos.o
+OBJS += eosio_system.o
+OBJS += eosio_token.o
 
 OBJS += debug.o
 
@@ -93,6 +96,7 @@ OBJS += protob/messages-management.pb.o
 OBJS += protob/messages-nem.pb.o
 OBJS += protob/messages-stellar.pb.o
 OBJS += protob/messages-lisk.pb.o
+OBJS += protob/messages-eos.pb.o
 
 OPTFLAGS ?= -Os
 
@@ -128,3 +132,6 @@ bl_data.h: bl_data.py ../bootloader/bootloader.bin
 clean::
 	rm -f bl_data.h
 	find -maxdepth 1 -name "*.mako" | sed 's/.mako$$//' | xargs rm -f
+
+
+

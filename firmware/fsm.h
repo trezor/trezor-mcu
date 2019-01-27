@@ -28,6 +28,7 @@
 #include "messages-nem.pb.h"
 #include "messages-stellar.pb.h"
 #include "messages-lisk.pb.h"
+#include "messages-eos.pb.h"
 
 // message functions
 
@@ -123,5 +124,10 @@ void fsm_msgStellarAllowTrustOp(const StellarAllowTrustOp *msg);
 void fsm_msgStellarAccountMergeOp(const StellarAccountMergeOp *msg);
 void fsm_msgStellarManageDataOp(const StellarManageDataOp *msg);
 void fsm_msgStellarBumpSequenceOp(const StellarBumpSequenceOp *msg);
+
+// eos
+void fsm_msgEosGetPublicKey(const EosGetPublicKey *msg);
+void fsm_msgEosSignTx(const EosSignTx *msg);
+void fsm_msgEosTxActionAck(const EosTxActionAck *msg);
 
 #endif

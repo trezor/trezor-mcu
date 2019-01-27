@@ -252,3 +252,4 @@ static bool fsm_layoutAddress(const char *address, const char *desc, bool ignore
 #include "fsm_msg_stellar.h"
 #include "fsm_msg_lisk.h"
 #include "fsm_msg_debug.h"
+#include "fsm_msg_eos.h"
