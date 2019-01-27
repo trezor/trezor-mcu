@@ -144,7 +144,7 @@ bool eos_publicKeyToWif(const uint8_t *public_key, char *pubkey, size_t len) {
     const size_t prefix_len = strlen(prefix);
     strlcpy(pubkey, prefix, len);
 
-    if (!base58_encode_check(public_key, 33, HASHER_RIPEMD,
+    if (!base58_encode_check(public_key, 33, HASHER_SHA2, // FIXME: HASHER_RIPEMD,
                              pubkey + prefix_len,
                              len - prefix_len)) {
         return false;
