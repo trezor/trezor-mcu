@@ -19,7 +19,6 @@
 
 #include <string.h>
 #include <stdint.h>
-
 #include <libopencm3/stm32/flash.h>
 
 #include "messages.pb.h"
@@ -44,6 +43,7 @@
 #include "u2f.h"
 #include "memzero.h"
 #include "supervise.h"
+#include "storage.h"
 
 /* magic constant to check validity of storage block */
 static const uint32_t config_magic = 0x726f7473;   // 'stor' as uint32_t
