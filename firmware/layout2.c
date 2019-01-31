@@ -235,16 +235,21 @@ void layoutHome(void)
 		layoutSwipe();
 	}
 	layoutLast = layoutHome;
-	const char *label = config_isInitialized() ? config_getLabel() : _("Go to trezor.io/start");
-	const uint8_t *homescreen = config_getHomescreen();
-	if (homescreen) {
+
+	char label[MAX_LABEL_LEN + 1] = _("Go to trezor.io/start");
+	if (config_isInitialized()) {
+	    config_getLabel(label, sizeof(label));
+	}
+
+	uint8_t homescreen[HOMESCREEN_SIZE];
+	if (config_getHomescreen(homescreen, sizeof(homescreen))) {
 		BITMAP b;
 		b.width = 128;
 		b.height = 64;
 		b.data = homescreen;
 		oledDrawBitmap(0, 0, &b);
 	} else {
-		if (label && strlen(label) > 0) {
+		if (label[0] != '\0') {
 			oledDrawBitmap(44, 4, &bmp_logo48);
 			oledDrawStringCenter(OLED_WIDTH / 2, OLED_HEIGHT - 8, label, FONT_STANDARD);
 		} else {

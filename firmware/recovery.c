@@ -170,7 +170,6 @@ static void recovery_done(void) {
 				// not enforcing => mark config as imported
 				config_setImported(true);
 			}
-			config_update();
 			fsm_sendSuccess(_("Device recovered"));
 		} else {
 			// Inform the user about new mnemonic correctness (as well as whether it is the same as the current one).
@@ -466,8 +465,7 @@ void recovery_init(uint32_t _word_count, bool passphrase_protection, bool pin_pr
 	}
 
 	if (!dry_run) {
-		if (pin_protection && !protectChangePin()) {
-			fsm_sendFailure(FailureType_Failure_PinMismatch, NULL);
+		if (pin_protection && !protectChangePin(false)) {
 			layoutHome();
 			return;
 		}
@@ -476,7 +474,6 @@ void recovery_init(uint32_t _word_count, bool passphrase_protection, bool pin_pr
 		config_setLanguage(language);
 		config_setLabel(label);
 		config_setU2FCounter(u2f_counter);
-		config_update();
 	}
 
 	if ((type & RecoveryDeviceType_RecoveryDeviceType_Matrix) != 0) {

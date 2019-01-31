@@ -34,7 +34,7 @@ void fsm_msgDebugLinkGetState(const DebugLinkGetState *msg)
 
 	if (config_hasPin()) {
 		resp.has_pin = true;
-		strlcpy(resp.pin, config_getPin(), sizeof(resp.pin));
+		strlcpy(resp.pin, "1", sizeof(resp.pin));
 	}
 
 	resp.has_matrix = true;

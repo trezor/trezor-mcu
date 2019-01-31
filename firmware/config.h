@@ -17,8 +17,8 @@
  * along with this library.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __STORAGE_H__
-#define __STORAGE_H__
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
 
 #include "bip32.h"
 #include "messages-management.pb.h"
@@ -78,11 +78,15 @@ typedef struct _Storage {
 
 extern Storage configUpdate;
 
+#define MAX_PIN_LEN         9
+#define MAX_LABEL_LEN       32
+#define MAX_LANGUAGE_LEN    16
+#define MAX_MNEMONIC_LEN    240
+#define HOMESCREEN_SIZE     1024
+#define UUID_SIZE           12
+
 void config_init(void);
-void config_generate_uuid(void);
-void config_clear_update(void);
-void config_update(void);
-void session_clear(bool clear_pin);
+void session_clear(bool lock);
 
 void config_loadDevice(const LoadDevice *msg);
 
@@ -91,16 +95,16 @@ const uint8_t *config_getSeed(bool usePassphrase);
 bool config_getU2FRoot(HDNode *node);
 bool config_getRootNode(HDNode *node, const char *curve, bool usePassphrase);
 
-const char *config_getLabel(void);
+bool config_getLabel(char *dest, uint16_t dest_size);
 void config_setLabel(const char *label);
 
-const char *config_getLanguage(void);
+bool config_getLanguage(char *dest, uint16_t dest_size);
 void config_setLanguage(const char *lang);
 
 void config_setPassphraseProtection(bool passphrase_protection);
 bool config_hasPassphraseProtection(void);
 
-const uint8_t *config_getHomescreen(void);
+bool config_getHomescreen(uint8_t *dest, uint16_t dest_size);
 void config_setHomescreen(const uint8_t *data, uint32_t size);
 
 void session_cachePassphrase(const char *passphrase);
@@ -110,7 +114,7 @@ bool session_getState(const uint8_t *salt, uint8_t *state, const char *passphras
 void config_setMnemonic(const char *mnemonic);
 bool config_containsMnemonic(const char *mnemonic);
 bool config_hasMnemonic(void);
-const char *config_getMnemonic(void);
+bool config_getMnemonic(char *dest, uint16_t dest_size);
 
 bool config_hasNode(void);
 #if DEBUG_LINK
@@ -119,16 +123,9 @@ void config_dumpNode(HDNodeType *node);
 
 bool config_containsPin(const char *pin);
 bool config_hasPin(void);
-const char *config_getPin(void);
 void config_setPin(const char *pin);
-void session_cachePin(void);
-void session_uncachePin(void);
+bool config_changePin(const char *old_pin, const char *new_pin);
 bool session_isPinCached(void);
-void config_clearPinArea(void);
-void config_resetPinFails(uint32_t flash_pinfails);
-bool config_increasePinFails(uint32_t flash_pinfails);
-uint32_t config_getPinWait(uint32_t flash_pinfails);
-uint32_t config_getPinFailsOffset(void);
 
 uint32_t config_nextU2FCounter(void);
 void config_setU2FCounter(uint32_t u2fcounter);
@@ -155,6 +152,6 @@ void config_setAutoLockDelayMs(uint32_t auto_lock_delay_ms);
 
 void config_wipe(void);
 
-extern char config_uuid_str[25];
+extern char config_uuid_str[2*UUID_SIZE + 1];
 
 #endif

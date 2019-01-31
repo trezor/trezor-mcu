@@ -75,8 +75,7 @@ void reset_init(bool display_random, uint32_t _strength, bool passphrase_protect
 		}
 	}
 
-	if (pin_protection && !protectChangePin()) {
-		fsm_sendFailure(FailureType_Failure_PinMismatch, NULL);
+	if (pin_protection && !protectChangePin(false)) {
 		layoutHome();
 		return;
 	}
@@ -85,7 +84,6 @@ void reset_init(bool display_random, uint32_t _strength, bool passphrase_protect
 	config_setLanguage(language);
 	config_setLabel(label);
 	config_setU2FCounter(u2f_counter);
-	config_update();
 
 	EntropyRequest resp;
 	memzero(&resp, sizeof(EntropyRequest));
@@ -104,44 +102,40 @@ void reset_entropy(const uint8_t *ext_entropy, uint32_t len)
 	sha256_Update(&ctx, int_entropy, 32);
 	sha256_Update(&ctx, ext_entropy, len);
 	sha256_Final(&ctx, int_entropy);
-	if (no_backup) {
-		config_setNoBackup();
-	} else {
-		config_setNeedsBackup(true);
-	}
-	config_setMnemonic(mnemonic_from_data(int_entropy, strength / 8));
-	mnemonic_clear();
+	const char* mnemonic = mnemonic_from_data(int_entropy, strength / 8);
 	memzero(int_entropy, 32);
 	awaiting_entropy = false;
 
+
 	if (skip_backup || no_backup) {
-		config_update();
+	    if (no_backup) {
+	        config_setNoBackup();
+	    } else {
+	        config_setNeedsBackup(true);
+	    }
+        config_setMnemonic(mnemonic);
 		fsm_sendSuccess(_("Device successfully initialized"));
 		layoutHome();
 	} else {
-		reset_backup(false);
+		reset_backup(false, mnemonic);
 	}
-
+    mnemonic_clear();
 }
 
 static char current_word[10];
 
 // separated == true if called as a separate workflow via BackupMessage
-void reset_backup(bool separated)
+void reset_backup(bool separated, const char* mnemonic)
 {
 	if (!config_needsBackup()) {
 		fsm_sendFailure(FailureType_Failure_UnexpectedMessage, _("Seed already backed up"));
 		return;
 	}
 
-	config_setUnfinishedBackup(true);
-	config_setNeedsBackup(false);
-
 	if (separated) {
-		config_update();
+	    config_setUnfinishedBackup(true);
+	    config_setNeedsBackup(false);
 	}
-
-	const char *mnemonic = config_getMnemonic();
 
 	for (int pass = 0; pass < 2; pass++) {
 		int i = 0, word_pos = 1;
@@ -159,7 +153,6 @@ void reset_backup(bool separated)
 			layoutResetWord(current_word, pass, word_pos, mnemonic[i] == 0);
 			if (!protectButton(ButtonRequestType_ButtonRequest_ConfirmWord, true)) {
 				if (!separated) {
-					config_clear_update();
 					session_clear(true);
 				}
 				layoutHome();
@@ -176,7 +169,8 @@ void reset_backup(bool separated)
 	if (separated) {
 		fsm_sendSuccess(_("Seed successfully backed up"));
 	} else {
-		config_update();
+        config_setNeedsBackup(false);
+        config_setMnemonic(mnemonic);
 		fsm_sendSuccess(_("Device successfully initialized"));
 	}
 	layoutHome();

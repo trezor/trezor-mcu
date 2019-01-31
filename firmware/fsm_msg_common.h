@@ -53,13 +53,13 @@ void fsm_msgGetFeatures(const GetFeatures *msg)
 	resp->has_revision = true; memcpy(resp->revision.bytes, SCM_REVISION, len); resp->revision.size = len;
 #endif
 	resp->has_bootloader_hash = true; resp->bootloader_hash.size = memory_bootloader_hash(resp->bootloader_hash.bytes);
-	if (config_getLanguage()) {
-		resp->has_language = true;
-		strlcpy(resp->language, config_getLanguage(), sizeof(resp->language));
-	}
-	if (config_getLabel()) {
+
+    if (config_getLanguage(resp->language, sizeof(resp->language))) {
+        resp->has_language = true;
+    }
+
+    if (config_getLabel(resp->label, sizeof(resp->label))) {
 		resp->has_label = true;
-		strlcpy(resp->label, config_getLabel(), sizeof(resp->label));
 	}
 
 	resp->has_initialized = true; resp->initialized = config_isInitialized();
@@ -130,19 +130,14 @@ void fsm_msgChangePin(const ChangePin *msg)
 		return;
 	}
 
-	CHECK_PIN_UNCACHED
+    if (protectChangePin(removal)) {
+        if (removal) {
+            fsm_sendSuccess(_("PIN removed"));
+        } else {
+            fsm_sendSuccess(_("PIN changed"));
+        }
+    }
 
-	if (removal) {
-		config_setPin("");
-		config_update();
-		fsm_sendSuccess(_("PIN removed"));
-	} else {
-		if (protectChangePin()) {
-			fsm_sendSuccess(_("PIN changed"));
-		} else {
-			fsm_sendFailure(FailureType_Failure_PinMismatch, NULL);
-		}
-	}
 	layoutHome();
 }
 
@@ -242,7 +237,11 @@ void fsm_msgBackupDevice(const BackupDevice *msg)
 	CHECK_PIN_UNCACHED
 
 	(void)msg;
-	reset_backup(true);
+    char mnemonic[MAX_MNEMONIC_LEN + 1];
+    if (config_getMnemonic(mnemonic, sizeof(mnemonic))) {
+        reset_backup(true, mnemonic);
+    }
+    memzero(mnemonic, sizeof(mnemonic));
 }
 
 void fsm_msgCancel(const Cancel *msg)
@@ -326,7 +325,6 @@ void fsm_msgApplySettings(const ApplySettings *msg)
 	if (msg->has_auto_lock_delay_ms) {
 		config_setAutoLockDelayMs(msg->auto_lock_delay_ms);
 	}
-	config_update();
 	fsm_sendSuccess(_("Settings applied"));
 	layoutHome();
 }
@@ -377,7 +375,6 @@ void fsm_msgSetU2FCounter(const SetU2FCounter *msg)
 		return;
 	}
 	config_setU2FCounter(msg->u2f_counter);
-	config_update();
 	fsm_sendSuccess(_("U2F counter set"));
 	layoutHome();
 }

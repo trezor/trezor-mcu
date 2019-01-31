@@ -75,6 +75,11 @@ OBJS += ../vendor/trezor-crypto/aes/aeskey.o
 OBJS += ../vendor/trezor-crypto/aes/aestab.o
 OBJS += ../vendor/trezor-crypto/aes/aes_modes.o
 
+OBJS += ../vendor/trezor-crypto/chacha20poly1305/chacha20poly1305.o
+OBJS += ../vendor/trezor-crypto/chacha20poly1305/chacha_merged.o
+OBJS += ../vendor/trezor-crypto/chacha20poly1305/poly1305-donna.o
+OBJS += ../vendor/trezor-crypto/chacha20poly1305/rfc7539.o
+
 OBJS += ../vendor/trezor-crypto/nem.o
 
 OBJS += ../vendor/trezor-qrenc/qr_encode.o

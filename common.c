@@ -44,8 +44,11 @@ void __attribute__((noreturn)) __fatal_error(const char *expr, const char *msg, 
         snprintf(line[i], sizeof(line[0]), "Func: %s", func);
         i++;
     }
+    error_shutdown("FATAL ERROR:", NULL, line[0], line[1], line[2], line[3]);
+}
 
-    layoutDialog(&bmp_icon_error, NULL, NULL, NULL, "FATAL ERROR:", NULL, line[0], line[1], line[2], line[3]);
+void __attribute__((noreturn)) error_shutdown(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5, const char *line6) {
+    layoutDialog(&bmp_icon_error, NULL, NULL, NULL, line1, line2, line3, line4, line5, line6);
     shutdown();
     for (;;);
 }
