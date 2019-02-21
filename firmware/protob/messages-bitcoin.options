@@ -15,6 +15,10 @@ SignMessage.address_n                                       max_count:8
 SignMessage.message                                         max_size:1024
 SignMessage.coin_name                                       max_size:21
 
+SignTxInput.address_n                                       max_count:8
+SignTxInput.tx_input                                        max_size:1024
+SignTxInput.coin_name                                       max_size:21
+
 VerifyMessage.address                                       max_size:130
 VerifyMessage.signature                                     max_size:65
 VerifyMessage.message                                       max_size:1024

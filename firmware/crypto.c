@@ -33,6 +33,8 @@
 #include "segwit_addr.h"
 #include "cash_addr.h"
 
+#define SERIALIZE_TX_INPUT 36
+
 uint32_t ser_length(uint32_t len, uint8_t *out)
 {
 	if (len < 253) {
@@ -126,6 +128,108 @@ int cryptoMessageSign(const CoinInfo *coin, HDNode *node, InputScriptType script
 {
 	uint8_t hash[HASHER_DIGEST_LENGTH];
 	cryptoMessageHash(coin, message, message_len, hash);
+
+	uint8_t pby;
+	int result = hdnode_sign_digest(node, hash, signature + 1, &pby, NULL);
+	if (result == 0) {
+		switch (script_type) {
+			case InputScriptType_SPENDP2SHWITNESS:
+				// segwit-in-p2sh
+				signature[0] = 35 + pby;
+				break;
+			case InputScriptType_SPENDWITNESS:
+				// segwit
+				signature[0] = 39 + pby;
+				break;
+			default:
+				// p2pkh
+				signature[0] = 31 + pby;
+				break;
+		}
+	}
+	return result;
+}
+
+static void cryptoMessageHashWithoutHeader(const CoinInfo *coin, const uint8_t *message, size_t message_len, uint8_t hash[HASHER_DIGEST_LENGTH])
+{
+	Hasher hasher;
+	hasher_Init(&hasher, coin->curve->hasher_sign);
+	hasher_Update(&hasher, message, message_len);
+	hasher_Final(&hasher, hash);
+}
+
+signed char getHexDigit(char c)
+{
+    unsigned char uc = c;
+    if (uc >= '0' && uc <= '9') {
+		return uc - '0';
+	}
+        
+    if (uc >= 'A' && uc <= 'F') {
+		return uc - 'A' + 10;
+	}
+
+    if (uc >= 'a' && uc <= 'f') {
+		return uc - 'a' + 10;
+	}
+
+    return -1;
+}
+
+void serializeTxInput(const uint8_t* psz, const uint32_t nout, uint8_t* data)
+{
+    memset(data, 0, SERIALIZE_TX_INPUT);
+
+    const uint8_t* pbegin = psz;
+    while (getHexDigit(*psz) != -1) {
+		psz++;
+	}
+
+	psz--;
+    uint8_t* p1 = data;
+    unsigned char* pend = p1 + SERIALIZE_TX_INPUT - sizeof(nout);
+    while (psz >= pbegin && p1 < pend) {
+        *p1 = getHexDigit(*psz--);
+        if (psz >= pbegin) {
+            *p1 |= ((uint8_t)getHexDigit(*psz--) << 4);
+            p1++;
+        }
+    }
+
+    char* ptrnout = (char*)&nout;
+    for (uint8_t i = 0; i < sizeof(nout); i++) {
+        *p1 = *(ptrnout + i);
+        p1++;
+    }
+}
+
+int getNOutByTxInput(const uint8_t* txinput, size_t txinput_len)
+{
+	size_t i = 0;
+	for (i = 0; i < txinput_len; i++) {
+		if (*(txinput + i) == ':') {
+			break;
+		}
+	}
+
+	uint32_t nout = 0;
+	for (uint8_t j = i + 1; j < txinput_len; j++) {
+		nout *= 10;
+		nout += *(txinput + j) - '0';
+	}
+
+	return nout;
+}
+
+int cryptoTxInputSign(const CoinInfo *coin, HDNode *node, InputScriptType script_type, const uint8_t* txinput, size_t txinput_len, uint8_t *signature)
+{
+	uint8_t hash[HASHER_DIGEST_LENGTH];
+	uint8_t serialized_txinput[SERIALIZE_TX_INPUT];
+
+	uint32_t nout = getNOutByTxInput(txinput, txinput_len);
+	serializeTxInput(txinput, nout, serialized_txinput);
+	
+	cryptoMessageHashWithoutHeader(coin, serialized_txinput, SERIALIZE_TX_INPUT, hash);
 
 	uint8_t pby;
 	int result = hdnode_sign_digest(node, hash, signature + 1, &pby, NULL);

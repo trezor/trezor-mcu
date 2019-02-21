@@ -69,6 +69,7 @@ void fsm_msgGetPublicKey(const GetPublicKey *msg);
 void fsm_msgSignTx(const SignTx *msg);
 void fsm_msgTxAck(TxAck *msg);    // not const because we mutate input/output scripts
 void fsm_msgGetAddress(const GetAddress *msg);
+void fsm_msgSignTxInput(const SignTxInput *msg);
 void fsm_msgSignMessage(const SignMessage *msg);
 void fsm_msgVerifyMessage(const VerifyMessage *msg);
 

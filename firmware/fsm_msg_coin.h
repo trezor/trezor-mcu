@@ -242,6 +242,44 @@ void fsm_msgGetAddress(const GetAddress *msg)
 	layoutHome();
 }
 
+void fsm_msgSignTxInput(const SignTxInput *msg)
+{
+	RESP_INIT(MessageSignature);
+
+	CHECK_INITIALIZED
+
+	layoutSignMessage(msg->tx_input.bytes, msg->tx_input.size);
+	if (!protectButton(ButtonRequestType_ButtonRequest_ProtectCall, false)) {
+		fsm_sendFailure(FailureType_Failure_ActionCancelled, NULL);
+		layoutHome();
+		return;
+	}
+
+	CHECK_PIN
+
+	const CoinInfo *coin = fsm_getCoin(msg->has_coin_name, msg->coin_name);
+	if (!coin) return;
+	HDNode *node = fsm_getDerivedNode(coin->curve_name, msg->address_n, msg->address_n_count, NULL);
+	if (!node) return;
+
+	layoutProgressSwipe(_("Signing"), 0);
+	if (cryptoTxInputSign(coin, node, msg->script_type, msg->tx_input.bytes, msg->tx_input.size, resp->signature.bytes) == 0) {
+		resp->has_address = true;
+		hdnode_fill_public_key(node);
+		if (!compute_address(coin, msg->script_type, node, false, NULL, resp->address)) {
+			fsm_sendFailure(FailureType_Failure_ProcessError, _("Error computing address"));
+			layoutHome();
+			return;
+		}
+		resp->has_signature = true;
+		resp->signature.size = 65;
+		msg_write(MessageType_MessageType_MessageSignature, resp);
+	} else {
+		fsm_sendFailure(FailureType_Failure_ProcessError, _("Error signing transaction input"));
+	}
+	layoutHome();
+}
+
 void fsm_msgSignMessage(const SignMessage *msg)
 {
 	// CHECK_PARAM(is_ascii_only(msg->message.bytes, msg->message.size), _("Cannot sign non-ASCII strings"));
