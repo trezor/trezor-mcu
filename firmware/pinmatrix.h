@@ -20,8 +20,11 @@
 #ifndef __PINMATRIX_H__
 #define __PINMATRIX_H__
 
-void pinmatrix_start(const char *text);
+#include <stdbool.h>
+
+void pinmatrix_start(const char *text, const bool randomize);
 void pinmatrix_done(char *pin);
+void pinmatrix_select(int digit);
 const char *pinmatrix_get(void);
 
 #endif

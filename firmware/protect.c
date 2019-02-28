@@ -119,7 +119,7 @@ const char *requestPin(PinMatrixRequestType type, const char *text)
 	resp.type = type;
 	usbTiny(1);
 	msg_write(MessageType_MessageType_PinMatrixRequest, &resp);
-	pinmatrix_start(text);
+	pinmatrix_start(text, true);
 	for (;;) {
 		usbPoll();
 		if (msg_tiny_id == MessageType_MessageType_PinMatrixAck) {
@@ -144,6 +144,88 @@ const char *requestPin(PinMatrixRequestType type, const char *text)
 			fsm_msgDebugLinkGetState((DebugLinkGetState *)msg_tiny);
 		}
 #endif
+	}
+}
+
+const char *requestPinOnDevice(PinMatrixRequestType type, const char *text, char *pin)
+{
+	(void)type;
+	usbTiny(1);
+	pinmatrix_start(text, false);
+
+	int selected_digit = 1;
+	pinmatrix_select(selected_digit);
+
+	int pin_index = 0;
+
+	int prev_action_was_selection = 0;
+
+	for (;;) {
+		usbPoll();
+		buttonUpdate();
+
+		if (prev_action_was_selection == 1 && button.YesDown > 4 * 150000) {
+			pin[pin_index] = '\0';
+			usbTiny(0);
+			return pin;
+		}
+
+		if (prev_action_was_selection == 0 && button.YesDown > 150000) {
+			prev_action_was_selection = 1;
+
+			pin[pin_index] = selected_digit + '0'; // convert single digit int to char
+			pin_index++;
+
+			pinmatrix_select(selected_digit);
+			usbSleep(150);
+			pinmatrix_select(selected_digit);
+
+			usbSleep(150);
+
+			pinmatrix_select(selected_digit);
+			usbSleep(150);
+			pinmatrix_select(selected_digit);
+			continue;
+		} else if (prev_action_was_selection == 1 && button.YesUp) {
+			// After the medium long YesDown, it will be followed by
+			// a YesUp in the next iteration of the for() loop
+			// that shouldn't trigger a move to the next digit.
+			prev_action_was_selection = 0;
+			continue;
+		}
+
+		if (button.YesUp) {
+			// Unselect digit
+			pinmatrix_select(selected_digit);
+
+			// Select next digit
+			selected_digit = (selected_digit % 9) + 1;
+			pinmatrix_select(selected_digit);
+		}
+
+		if (button.NoUp) {
+			// Unselect digit
+			pinmatrix_select(selected_digit);
+
+			// Select next digit
+			selected_digit = (selected_digit + 3) % 9;
+
+			if (selected_digit == 0) {
+				selected_digit = 9;
+			}
+
+			pinmatrix_select(selected_digit);
+		}
+
+		// check for Cancel / Initialize
+		protectAbortedByCancel = (msg_tiny_id == MessageType_MessageType_Cancel);
+		protectAbortedByInitialize = (msg_tiny_id == MessageType_MessageType_Initialize);
+		if (protectAbortedByCancel || protectAbortedByInitialize) {
+			pinmatrix_done(0);
+			msg_tiny_id = 0xFFFF;
+			usbTiny(0);
+			return 0;
+		}
 	}
 }
 
@@ -197,7 +279,8 @@ bool protectPin(bool use_cached)
 
 	const char *pin = "";
 	if (config_hasPin()) {
-		pin = requestPin(PinMatrixRequestType_PinMatrixRequestType_Current, _("Please enter current PIN:"));
+		char pin_var[10] = "XXXXXXXXX";
+		pin = requestPinOnDevice(PinMatrixRequestType_PinMatrixRequestType_Current, _("Please enter current PIN:"), pin_var);
 		if (!pin) {
 			fsm_sendFailure(FailureType_Failure_PinCancelled, NULL);
 			return false;
@@ -219,8 +302,10 @@ bool protectChangePin(bool removal)
 	static CONFIDENTIAL char new_pin[MAX_PIN_LEN + 1] = "";
 	const char* pin = NULL;
 
+	char pin_var[10] = "XXXXXXXXX";
+
 	if (config_hasPin()) {
-		pin = requestPin(PinMatrixRequestType_PinMatrixRequestType_Current, _("Please enter current PIN:"));
+		pin = requestPinOnDevice(PinMatrixRequestType_PinMatrixRequestType_Current, _("Please enter current PIN:"), pin_var);
 		if (pin == NULL) {
 			fsm_sendFailure(FailureType_Failure_PinCancelled, NULL);
 			return false;
@@ -229,7 +314,7 @@ bool protectChangePin(bool removal)
 	}
 
 	if (!removal) {
-		pin = requestPin(PinMatrixRequestType_PinMatrixRequestType_NewFirst, _("Please enter new PIN:"));
+		pin = requestPinOnDevice(PinMatrixRequestType_PinMatrixRequestType_NewFirst, _("Please enter new PIN:"), pin_var);
 		if (pin == NULL) {
 			memzero(old_pin, sizeof(old_pin));
 			fsm_sendFailure(FailureType_Failure_PinCancelled, NULL);
@@ -237,7 +322,7 @@ bool protectChangePin(bool removal)
 		}
 		strlcpy(new_pin, pin, sizeof(new_pin));
 
-		pin = requestPin(PinMatrixRequestType_PinMatrixRequestType_NewSecond, _("Please re-enter new PIN:"));
+		pin = requestPinOnDevice(PinMatrixRequestType_PinMatrixRequestType_NewSecond, _("Please re-enter new PIN:"), pin_var);
 		if (pin == NULL) {
 			memzero(old_pin, sizeof(old_pin));
 			memzero(new_pin, sizeof(new_pin));
