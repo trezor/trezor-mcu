@@ -48,6 +48,7 @@ void fsm_msgGetPublicKey(const GetPublicKey *msg)
 		}
 	}
 
+	resp->has_node = true;
 	resp->node.depth = node->depth;
 	resp->node.fingerprint = fingerprint;
 	resp->node.child_num = node->child_num;
