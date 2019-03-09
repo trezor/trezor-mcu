@@ -212,9 +212,32 @@ int compile_output(const CoinInfo *coin, const HDNode *root, TxOutputType *in, T
 		}
 		uint32_t r = 0;
 		out->script_pubkey.bytes[0] = 0x6A; r++; // OP_RETURN
-		r += op_push(in->op_return_data.size, out->script_pubkey.bytes + r);
-		memcpy(out->script_pubkey.bytes + r, in->op_return_data.bytes, in->op_return_data.size); r += in->op_return_data.size;
-		out->script_pubkey.size = r;
+		// TPOS contract for Stakenet
+		if (strcmp(coin->coin_name, "Stakenet") == 0 && in->op_return_data.size == 0x86) {
+			
+			r += op_push(0x22, out->script_pubkey.bytes + r);
+			memcpy(out->script_pubkey.bytes + r, in->op_return_data.bytes, 0x22);
+			r += 0x22;
+
+			r += op_push(0x22, out->script_pubkey.bytes + r);
+			memcpy(out->script_pubkey.bytes + r, in->op_return_data.bytes + 0x22, 0x22);
+			r += 0x22;
+
+			r += op_push(0x1, out->script_pubkey.bytes + r);
+			memcpy(out->script_pubkey.bytes + r, in->op_return_data.bytes + 0x44, 0x1);
+			r += 0x1;
+
+			r += op_push(0x41, out->script_pubkey.bytes + r);
+			memcpy(out->script_pubkey.bytes + r, in->op_return_data.bytes + 0x45, 0x41);
+			r += 0x41;
+
+			out->script_pubkey.size = r;
+		} else {
+			r += op_push(in->op_return_data.size, out->script_pubkey.bytes + r);
+			memcpy(out->script_pubkey.bytes + r, in->op_return_data.bytes, in->op_return_data.size); r += in->op_return_data.size;
+			out->script_pubkey.size = r;
+		}
+
 		return r;
 	}
 
