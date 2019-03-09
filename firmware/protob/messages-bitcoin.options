@@ -39,7 +39,7 @@ TxInputType.prev_block_hash_bip115                          max_size:32
 
 TxOutputType.address                                        max_size:130
 TxOutputType.address_n                                      max_count:8
-TxOutputType.op_return_data                                 max_size:80
+TxOutputType.op_return_data                                 max_size:400
 TxOutputType.block_hash_bip115                              max_size:32
 
 TxOutputBinType.script_pubkey                               max_size:520
